@@ -1,0 +1,45 @@
+# Company data must never be committed.
+*.xlsx
+*.xls
+*.numbers
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.jsonl
+*.db
+*.sqlite
+*.sqlite3
+
+# Private inputs, mappings, and generated artifacts.
+data/
+datasets/
+private/
+raw/
+runs/
+artifacts/
+models/
+checkpoints/
+config.local.yaml
+configs/local*.yaml
+.env
+.env.*
+
+# Serialized models and exploratory notebooks may contain sensitive values.
+*.cbm
+*.pkl
+*.pickle
+*.joblib
+*.ipynb
+
+# Python and editor state.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+.DS_Store
+.idea/
+.vscode/
