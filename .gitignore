@@ -24,13 +24,13 @@ config.local.yaml
 configs/local*.yaml
 .env
 .env.*
-
-# Serialized models and exploratory notebooks may contain sensitive values.
+# Serialized models remain local.
 *.cbm
 *.pkl
 *.pickle
 *.joblib
-*.ipynb
+
+# Notebook source is tracked, but executed outputs must be cleared before publishing.
 
 # Python and editor state.
 __pycache__/

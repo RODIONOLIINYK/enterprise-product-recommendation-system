@@ -4,7 +4,12 @@ A privacy-first machine-learning project focused on implementing a production-or
 
 ## Project status
 
-The repository is currently in the architecture and planning stage. Training-pipeline implementation will be added later.
+The repository includes the first local data-preparation stages:
+
+1. Clean positive paid and gifted product receipts into one customer-date-product row.
+2. Build point-in-time customer-product history counts, quantities, and recency features.
+
+Candidate generation, labeled ranking examples, and model training will be added next.
 
 ## Objective
 
@@ -55,7 +60,7 @@ The public repository will contain only reusable implementation code and documen
 
 - raw or cleaned sales records;
 - customer or product catalogues;
-- company-specific identifiers or column mappings;
+- customer or product identifier values;
 - trained models or intermediate feature tables;
 - company-derived metrics that could reveal commercially sensitive information.
 
@@ -70,4 +75,4 @@ Future public additions will be restricted to:
 - synthetic-data tests;
 - architecture and evaluation documentation.
 
-No training pipeline has been committed yet.
+Private inputs and generated outputs remain ignored. Tracked notebooks are published without executed outputs so real customer and product identifiers are not included in Git history.
