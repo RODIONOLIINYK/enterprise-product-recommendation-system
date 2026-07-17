@@ -18,7 +18,12 @@
     "excluded": [
       "group_id",
       "customer_id",
-      "label"
+      "label",
+      "previous_paid_purchase_count",
+      "days_since_last_paid_purchase",
+      "quantity_adjusted_replenishment_progress",
+      "average_days_between_customer_product_purchases",
+      "previous_received_quantity"
     ]
   },
   "model": {

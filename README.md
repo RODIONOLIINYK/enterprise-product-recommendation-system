@@ -111,7 +111,7 @@ Each model row means:
 
 `business_line` supplies a population-level signal for customers with little or no history. The historical business-line flag adds a personalized signal once prior purchases exist.
 
-The local feature table retains raw columns for auditing and reproducible ablation tests. The current CatBoost model uses both the raw history and the derived replenishment signals. Those derived values combine elapsed time, the customer's usual paid quantity, the latest quantity received, and the customer's historical purchase cadence.
+The local feature table retains raw columns for auditing and reproducible ablation tests. Validation-driven backward elimination reduced the current CatBoost model to 12 inputs. It keeps the stronger receipt, quantity, product-context, affinity, and expected-reorder signals while ignoring five redundant raw or derived columns through the training configuration.
 
 ### Output
 
@@ -197,7 +197,7 @@ model = CatBoostRanker()
 model.load_model("models/catboost_ranker.cbm")
 ```
 
-The model expects the same 17-feature schema created by the candidate-building notebook. It returns relative ranking scores, not calibrated purchase probabilities.
+The model expects the 12-feature subset selected in the training configuration from the schema created by the candidate-building notebook. It returns relative ranking scores, not calibrated purchase probabilities.
 
 ## Repository layout
 
