@@ -48,6 +48,14 @@ def resolve_path(path_value: str | Path) -> Path:
     return path if path.is_absolute() else PROJECT_ROOT / path
 
 
+def portable_artifact_path(path: Path) -> str:
+    """Return a project-relative artifact path when possible."""
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
 def load_config(path: Path) -> dict[str, Any]:
     config_path = resolve_path(path)
     with config_path.open(encoding="utf-8") as config_file:
@@ -583,9 +591,11 @@ def train(config: dict[str, Any]) -> dict[str, Any]:
             "pandas": pd.__version__,
         },
         "artifacts": {
-            "model": str(model_path),
-            "feature_importance": str(feature_importance_path),
-            "test_predictions": str(predictions_path),
+            "model": portable_artifact_path(model_path),
+            "feature_importance": portable_artifact_path(
+                feature_importance_path
+            ),
+            "test_predictions": portable_artifact_path(predictions_path),
         },
     }
     save_json(metrics_path, results)

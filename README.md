@@ -26,7 +26,7 @@ This repository contains a complete local recommendation baseline:
 5. train a configurable `CatBoostRanker`;
 6. evaluate recommendation quality against random and purchase-history baselines.
 
-The implementation is designed for a real business dataset without publishing the dataset, trained model, customer identifiers, product identifiers, or company-derived results.
+The implementation is designed for a real business dataset without publishing row-level business data or identifiers. This repository includes one explicitly reviewed baseline model and aggregate evaluation artifacts.
 
 ## Why learning to rank?
 
@@ -91,7 +91,7 @@ The scoring date is written to separate group metadata for validation and auditi
 - creates deterministic `70 / 15 / 15` customer-disjoint splits;
 - trains a CatBoost YetiRank model with early stopping;
 - compares it with random and purchase-history baselines;
-- exports local metrics, feature importance, test predictions, and the model.
+- exports metrics, feature importance, test predictions, and the model.
 
 ## Model contract
 
@@ -106,11 +106,12 @@ Each model row means:
 | Product identity | `product_id`, `product_category`, `business_line` |
 | Purchase history | prior purchase count, prior paid quantity, last paid quantity |
 | Receipt history | prior receipt count, prior received quantity, last received quantity |
-| Recency | days since the last paid purchase or receipt |
-| Frequency | average days between purchases of this exact customer-product pair |
+| Replenishment timing | expected reorder days for the latest received quantity and quantity-adjusted replenishment progress |
 | Affinity | previously purchased this category or business line |
 
 `business_line` supplies a population-level signal for customers with little or no history. The historical business-line flag adds a personalized signal once prior purchases exist.
+
+The local feature table retains raw columns for auditing and reproducible ablation tests. The current CatBoost model uses both the raw history and the derived replenishment signals. Those derived values combine elapsed time, the customer's usual paid quantity, the latest quantity received, and the customer's historical purchase cadence.
 
 ### Output
 
@@ -180,6 +181,24 @@ uv run --with-requirements requirements-training.txt \
 
 Hyperparameters, categorical features, excluded fields, split fractions, metric cutoffs, and output paths live in [`configs/catboost_training.json`](configs/catboost_training.json).
 
+The default configuration is selected automatically, so this shorter command is equivalent:
+
+```bash
+uv run --with-requirements requirements-training.txt \
+  python scripts/train_catboost.py
+```
+
+### Use the published baseline
+
+```python
+from catboost import CatBoostRanker
+
+model = CatBoostRanker()
+model.load_model("models/catboost_ranker.cbm")
+```
+
+The model expects the same 17-feature schema created by the candidate-building notebook. It returns relative ranking scores, not calibrated purchase probabilities.
+
 ## Repository layout
 
 ```text
@@ -189,20 +208,24 @@ Hyperparameters, categorical features, excluded fields, split fractions, metric 
 ├── notebooks/
 │   ├── 01_clean_purchases.ipynb     # Private-data cleaning
 │   └── 02_build_historical_features.ipynb
+├── models/
+│   └── catboost_ranker.cbm           # Reviewed CatBoost baseline
+├── artifacts/
+│   └── catboost/
+│       ├── metrics.json              # Aggregate evaluation results
+│       └── feature_importance.csv    # Aggregate feature importance
 ├── scripts/
 │   └── train_catboost.py            # Reproducible training and evaluation
 ├── requirements-training.txt        # Pinned training dependencies
 └── README.md
 ```
 
-Generated outputs remain local and ignored:
+Confidential and row-level outputs remain local and ignored:
 
 ```text
 data/
-models/catboost_ranker.cbm
-artifacts/catboost/metrics.json
-artifacts/catboost/feature_importance.csv
 artifacts/catboost/test_predictions.csv
+artifacts/reports/
 ```
 
 ## Privacy by design
@@ -212,11 +235,11 @@ The business dataset is confidential. This public repository intentionally exclu
 - raw and cleaned sales records;
 - customer and product identifier values;
 - product catalogues derived from company data;
-- trained models and intermediate feature tables;
-- company-derived evaluation results;
+- intermediate feature tables and row-level predictions;
+- confidential project reports;
 - executed notebook outputs.
 
-Tracked notebooks contain source code only. Public tests and examples should use synthetic data.
+Tracked notebooks contain source code only. The published model, aggregate metrics, and aggregate feature importance were included by explicit approval after a check for embedded raw identifiers and local file paths. A trained model still represents patterns learned from confidential data, so publishing future model versions should receive the same review. Public tests and examples should use synthetic data.
 
 ## Current limitations
 
