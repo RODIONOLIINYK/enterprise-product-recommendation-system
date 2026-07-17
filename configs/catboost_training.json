@@ -1,0 +1,55 @@
+{
+  "data": {
+    "training_path": "data/processed/catboost_training.csv",
+    "group_metadata_path": "data/processed/catboost_group_metadata.csv"
+  },
+  "split": {
+    "train_fraction": 0.7,
+    "validation_fraction": 0.15,
+    "test_fraction": 0.15,
+    "random_seed": 42
+  },
+  "features": {
+    "categorical": [
+      "product_id",
+      "product_category",
+      "business_line"
+    ],
+    "excluded": [
+      "group_id",
+      "customer_id",
+      "label"
+    ]
+  },
+  "model": {
+    "loss_function": "YetiRank",
+    "eval_metric": "NDCG:top=10",
+    "iterations": 500,
+    "learning_rate": 0.05,
+    "depth": 8,
+    "l2_leaf_reg": 5.0,
+    "random_strength": 0.5,
+    "bootstrap_type": "Bayesian",
+    "bagging_temperature": 1.0,
+    "random_seed": 42,
+    "od_type": "Iter",
+    "od_wait": 50,
+    "verbose": 50,
+    "allow_writing_files": false,
+    "thread_count": -1
+  },
+  "evaluation": {
+    "top_k": [
+      1,
+      3,
+      5,
+      10
+    ]
+  },
+  "outputs": {
+    "model_path": "models/catboost_ranker.cbm",
+    "metrics_path": "artifacts/catboost/metrics.json",
+    "feature_importance_path": "artifacts/catboost/feature_importance.csv",
+    "test_predictions_path": "artifacts/catboost/test_predictions.csv"
+  }
+}
