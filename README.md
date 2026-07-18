@@ -105,14 +105,16 @@ Each model row means:
 |---|---|
 | Product identity | `product_id`, `product_category`, `business_line` |
 | Purchase history | prior purchase count, cumulative purchased quantity, and last purchase quantity |
-| Purchase timing | days since the last purchase, average reorder interval, and observed interval count |
+| Purchase timing | days since the last purchase; average, variability, and count of reorder intervals |
 | Replenishment timing | expected days before the next order for the last purchased quantity |
 | Affinity | prior category and business-line purchase counts and shares |
 | Product demand | lifetime product purchases and customers, plus recent 30-day purchase count |
 
 `business_line` supplies a population-level signal for customers with little or no history. The historical business-line count and share add personalized signals once prior purchases exist.
 
-The current purchase-only CatBoost model uses 17 inputs. It excludes gift/receipt-history fields and redundant boolean, median, interval-variability, customer-order-count, quantity-trend, and replenishment-progress fields, while retaining product context, reorder cadence, affinity depth, and point-in-time product popularity.
+`std_days_between_customer_product_purchases` is the population standard deviation, in days, of the intervals between that customer's earlier purchases of the candidate product. It is `0` until at least two reorder intervals exist.
+
+The current purchase-only CatBoost model uses 18 inputs. It excludes gift/receipt-history fields and redundant boolean, median, customer-order-count, quantity-trend, and replenishment-progress fields, while retaining product context, reorder cadence and variability, affinity depth, and point-in-time product popularity.
 
 ### Output
 
@@ -198,7 +200,7 @@ model = CatBoostRanker()
 model.load_model("models/catboost_ranker.cbm")
 ```
 
-The model expects the 17-feature purchase-only subset selected in the training configuration from the schema created by the candidate-building notebook. It returns relative ranking scores, not calibrated purchase probabilities.
+The model expects the 18-feature purchase-only subset selected in the training configuration from the schema created by the candidate-building notebook. It returns relative ranking scores, not calibrated purchase probabilities.
 
 ## Repository layout
 
