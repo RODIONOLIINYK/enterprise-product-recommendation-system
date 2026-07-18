@@ -77,8 +77,8 @@ flowchart LR
 - creates one ranking group per customer purchase date;
 - keeps all products actually paid for on that date as positives;
 - samples products previously purchased by the same customer as hard negatives;
-- samples a small number of real catalogue products never paid for by that customer;
-- calculates every feature from the candidate customer’s real prior history;
+- targets 25 candidates per group, balancing hard historical negatives with real catalogue products never paid for by that customer;
+- calculates customer-product, category, business-line, and global product-demand features strictly from prior history;
 - removes target-day quantities and purchase dates from the final training table.
 
 The scoring date is written to separate group metadata for validation and auditing. It is not a model input.
@@ -105,13 +105,14 @@ Each model row means:
 |---|---|
 | Product identity | `product_id`, `product_category`, `business_line` |
 | Purchase history | prior purchase count, cumulative purchased quantity, and last purchase quantity |
-| Purchase timing | days since the last purchase and average days between purchases |
-| Replenishment timing | expected reorder days for the last purchased quantity and quantity-adjusted replenishment progress |
-| Affinity | previously purchased this category or business line |
+| Purchase timing | days since the last purchase, average reorder interval, and observed interval count |
+| Replenishment timing | expected days before the next order for the last purchased quantity |
+| Affinity | prior category and business-line purchase counts and shares |
+| Product demand | lifetime product purchases and customers, plus recent 30-day purchase count |
 
-`business_line` supplies a population-level signal for customers with little or no history. The historical business-line flag adds a personalized signal once prior purchases exist.
+`business_line` supplies a population-level signal for customers with little or no history. The historical business-line count and share add personalized signals once prior purchases exist.
 
-The current purchase-only CatBoost model uses 12 inputs. It starts from the earlier 17-feature design, removes the five gift/receipt-history fields entirely, and keeps cumulative purchased quantity, purchase frequency, last quantity, purchase timing, product context, affinity, and replenishment signals.
+The current purchase-only CatBoost model uses 17 inputs. It excludes gift/receipt-history fields and redundant boolean, median, interval-variability, customer-order-count, quantity-trend, and replenishment-progress fields, while retaining product context, reorder cadence, affinity depth, and point-in-time product popularity.
 
 ### Output
 
@@ -174,7 +175,7 @@ notebooks/02_build_historical_features.ipynb
 ### Train
 
 ```bash
-uv run --with-requirements requirements-training.txt \
+uv run --with-requirements requirements.txt \
   python scripts/train_catboost.py \
   --config configs/catboost_training.json
 ```
@@ -184,7 +185,7 @@ Hyperparameters, categorical features, excluded fields, split fractions, metric 
 The default configuration is selected automatically, so this shorter command is equivalent:
 
 ```bash
-uv run --with-requirements requirements-training.txt \
+uv run --with-requirements requirements.txt \
   python scripts/train_catboost.py
 ```
 
@@ -197,7 +198,7 @@ model = CatBoostRanker()
 model.load_model("models/catboost_ranker.cbm")
 ```
 
-The model expects the 12-feature purchase-only subset selected in the training configuration from the schema created by the candidate-building notebook. It returns relative ranking scores, not calibrated purchase probabilities.
+The model expects the 17-feature purchase-only subset selected in the training configuration from the schema created by the candidate-building notebook. It returns relative ranking scores, not calibrated purchase probabilities.
 
 ## Repository layout
 
@@ -216,7 +217,7 @@ The model expects the 12-feature purchase-only subset selected in the training c
 │       └── feature_importance.csv    # Aggregate feature importance
 ├── scripts/
 │   └── train_catboost.py            # Reproducible training and evaluation
-├── requirements-training.txt        # Pinned training dependencies
+├── requirements.txt        # Pinned training dependencies
 └── README.md
 ```
 
@@ -243,8 +244,8 @@ Tracked notebooks contain source code only. The published model, aggregate metri
 
 ## Current limitations
 
-- Candidate groups are sampled and may be smaller than the production catalogue.
-- Strong offline results on small candidate groups may overstate production performance.
+- Candidate groups contain at least 25 sampled products and remain smaller than the production catalogue.
+- Offline quality still depends on whether production candidate retrieval supplies similarly difficult and relevant products.
 - Repeat-purchase ranking should be evaluated separately from first-purchase discovery.
 - A future production evaluation should use the exact candidate-generation policy used at inference time.
 

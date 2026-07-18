@@ -12,10 +12,8 @@
 *.sqlite3
 
 # Private inputs, mappings, and generated artifacts.
-data/
 datasets/
 private/
-raw/
 runs/
 artifacts/
 models/

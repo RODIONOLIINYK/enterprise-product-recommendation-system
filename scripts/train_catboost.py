@@ -537,9 +537,11 @@ def train(config: dict[str, Any]) -> dict[str, Any]:
         history_scores = (
             split_frame["previous_paid_purchase_count"].fillna(0).to_numpy()
             + (
-                split_frame["has_purchased_category_before"]
-                .fillna(0)
-                .to_numpy()
+                np.log1p(
+                    split_frame["previous_category_purchase_count"]
+                    .fillna(0)
+                    .to_numpy()
+                )
                 * 0.01
             )
             + (random_generator.random(len(split_frame)) * 1e-6)
