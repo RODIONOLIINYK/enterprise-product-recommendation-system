@@ -112,7 +112,7 @@ Each model row means:
 
 `business_line` supplies a population-level signal for customers with little or no history. The historical business-line count and share add personalized signals once prior purchases exist.
 
-`std_days_between_customer_product_purchases` is the population standard deviation, in days, of the intervals between that customer's earlier purchases of the candidate product. It is `0` until at least two reorder intervals exist.
+`average_days_between_customer_product_purchases`, `std_days_between_customer_product_purchases`, and `expected_days_before_next_order` remain missing (`NaN`) until the customer's prior history for that product is sufficient to calculate them. `observed_reorder_interval_count` remains `0` when no interval exists, so missing cadence is distinct from a genuine zero-day interval. Once an interval exists, the standard deviation is the population standard deviation (`ddof=0`), which is `0` for one observed interval.
 
 The current purchase-only CatBoost model uses 18 inputs. It excludes gift/receipt-history fields and redundant boolean, median, customer-order-count, quantity-trend, and replenishment-progress fields, while retaining product context, reorder cadence and variability, affinity depth, and point-in-time product popularity.
 

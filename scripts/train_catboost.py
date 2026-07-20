@@ -19,6 +19,11 @@ from catboost import CatBoostRanker, Pool
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SPLIT_NAMES = ("train", "validation", "test")
+NULLABLE_CADENCE_FEATURES = {
+    "average_days_between_customer_product_purchases",
+    "std_days_between_customer_product_purchases",
+    "expected_days_before_next_order",
+}
 
 
 @dataclass(frozen=True)
@@ -327,7 +332,9 @@ def prepare_feature_frame(
         features[column] = pd.to_numeric(
             features[column],
             errors="raise",
-        ).fillna(0)
+        )
+        if column not in NULLABLE_CADENCE_FEATURES:
+            features[column] = features[column].fillna(0)
     for column in categorical_features:
         features[column] = (
             features[column]
