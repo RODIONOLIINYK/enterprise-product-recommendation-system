@@ -48,6 +48,41 @@ NULLABLE_CADENCE_FEATURES = {
     "std_days_between_customer_product_purchases",
     "expected_days_before_next_order",
 }
+REQUIRED_HISTORY_COLUMNS = {
+    "customer_id",
+    "product_id",
+    "product_category",
+    "business_line",
+    "purchase_date",
+    "quantity",
+}
+REQUIRED_TEXT_COLUMNS = [
+    "customer_id",
+    "product_id",
+    "product_category",
+    "business_line",
+]
+REQUIRED_CATEGORICAL_COLUMNS = [
+    "product_id",
+    "product_category",
+    "business_line",
+]
+
+
+def complete_history_row_mask(purchases: pd.DataFrame) -> pd.Series:
+    missing_columns = sorted(REQUIRED_HISTORY_COLUMNS - set(purchases.columns))
+    if missing_columns:
+        raise ValueError(f"Missing required history columns: {missing_columns}")
+
+    required_text = purchases[REQUIRED_TEXT_COLUMNS].apply(
+        lambda values: values.astype("string").str.strip()
+    )
+    return (
+        required_text.notna().all(axis=1)
+        & required_text.ne("").all(axis=1)
+        & purchases["purchase_date"].notna()
+        & purchases["quantity"].notna()
+    )
 
 
 def load_purchases(input_path: Path) -> pd.DataFrame:
@@ -73,9 +108,7 @@ def load_purchases(input_path: Path) -> pd.DataFrame:
     )
     purchases["quantity"] = pd.to_numeric(purchases["quantity"], errors="coerce")
     purchases = purchases.loc[
-        purchases["customer_id"].notna()
-        & purchases["product_id"].notna()
-        & purchases["purchase_date"].notna()
+        complete_history_row_mask(purchases)
         & purchases["item_type"].eq("ТОВАР")
         & purchases["transaction_type"].eq("ПРОДАЖА")
         & purchases["quantity"].gt(0)
@@ -101,6 +134,11 @@ def load_purchases(input_path: Path) -> pd.DataFrame:
 def build_features(
     purchases: pd.DataFrame, customer_id: str, scoring_date: pd.Timestamp
 ) -> pd.DataFrame:
+    purchases = purchases.copy()
+    purchases[REQUIRED_TEXT_COLUMNS] = purchases[REQUIRED_TEXT_COLUMNS].apply(
+        lambda values: values.astype("string").str.strip()
+    )
+    purchases = purchases.loc[complete_history_row_mask(purchases)].copy()
     prior_purchases = purchases.loc[purchases["purchase_date"].le(scoring_date)]
     catalogue = (
         prior_purchases.sort_values(["purchase_date", "product_id"])
@@ -213,9 +251,12 @@ def build_features(
     result[non_nullable_numeric_columns] = result[
         non_nullable_numeric_columns
     ].fillna(0)
-    result[["product_id", "product_category", "business_line"]] = result[
-        ["product_id", "product_category", "business_line"]
-    ].fillna("__MISSING__")
+    required_categorical = result[REQUIRED_CATEGORICAL_COLUMNS]
+    complete_candidate_mask = (
+        required_categorical.notna().all(axis=1)
+        & required_categorical.ne("").all(axis=1)
+    )
+    result = result.loc[complete_candidate_mask].reset_index(drop=True)
     return result[MODEL_COLUMNS]
 
 def evaluate(features):
@@ -326,15 +367,21 @@ def rank_with_the_final_model(candidates: pd.DataFrame):
     }
 
     model_input = candidates[feature_columns].copy()
+    model_input[list(categorical_columns)] = model_input[
+        list(categorical_columns)
+    ].apply(lambda values: values.astype("string").str.strip())
+    invalid_categorical = (
+        model_input[list(categorical_columns)].isna()
+        | model_input[list(categorical_columns)].eq("")
+    )
+    if invalid_categorical.any().any():
+        raise ValueError(
+            "Model candidates contain missing required categorical values."
+        )
 
     for column in feature_columns:
         if column in categorical_columns:
-            model_input[column] = (
-                model_input[column]
-                .astype("string")
-                .fillna("__MISSING__")
-                .astype(object)
-            )
+            model_input[column] = model_input[column].astype(object)
         else:
             model_input[column] = pd.to_numeric(
                 model_input[column],

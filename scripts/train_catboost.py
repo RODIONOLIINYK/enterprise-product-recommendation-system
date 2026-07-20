@@ -116,6 +116,8 @@ def load_training_data(config: dict[str, Any]) -> pd.DataFrame:
         "group_id",
         "customer_id",
         "product_id",
+        "product_category",
+        "business_line",
         "label",
     }
     required_metadata_columns = {"group_id", "customer_id", "scoring_date"}
@@ -129,6 +131,23 @@ def load_training_data(config: dict[str, Any]) -> pd.DataFrame:
         raise ValueError(f"Missing training columns: {missing_training}")
     if missing_metadata:
         raise ValueError(f"Missing metadata columns: {missing_metadata}")
+    required_text_columns = [
+        "customer_id",
+        "product_id",
+        "product_category",
+        "business_line",
+    ]
+    training_data[required_text_columns] = training_data[
+        required_text_columns
+    ].apply(lambda values: values.str.strip())
+    required_text = training_data[required_text_columns]
+    invalid_required_text = (required_text.isna() | required_text.eq("")).any(
+        axis=1
+    )
+    if invalid_required_text.any():
+        raise ValueError(
+            "Training data contains rows with missing required text values."
+        )
     if group_metadata["group_id"].duplicated().any():
         raise ValueError("Group metadata contains duplicate group IDs.")
 
@@ -339,7 +358,6 @@ def prepare_feature_frame(
         features[column] = (
             features[column]
             .astype("string")
-            .fillna("__MISSING__")
             .astype(object)
         )
     return features

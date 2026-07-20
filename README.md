@@ -88,7 +88,7 @@ The scoring date is written to separate group metadata for validation and auditi
 [`scripts/train_catboost.py`](scripts/train_catboost.py):
 
 - validates the training and metadata contracts;
-- creates deterministic `70 / 15 / 15` customer-disjoint splits;
+- creates deterministic `80 / 10 / 10` customer-disjoint splits;
 - trains a CatBoost YetiRank model with early stopping;
 - compares it with random and purchase-history baselines;
 - exports metrics, feature importance, test predictions, and the model.
@@ -111,6 +111,8 @@ Each model row means:
 | Product demand | lifetime product purchases and customers, plus recent 30-day purchase count |
 
 `business_line` supplies a population-level signal for customers with little or no history. The historical business-line count and share add personalized signals once prior purchases exist.
+
+Rows missing any required customer ID, product ID, category, business line, purchase date, or quantity are removed during preprocessing and serving ingestion. Required categorical values are never replaced with a synthetic missing token.
 
 `average_days_between_customer_product_purchases`, `std_days_between_customer_product_purchases`, and `expected_days_before_next_order` remain missing (`NaN`) until the customer's prior history for that product is sufficient to calculate them. `observed_reorder_interval_count` remains `0` when no interval exists, so missing cadence is distinct from a genuine zero-day interval. Once an interval exists, the standard deviation is the population standard deviation (`ddof=0`), which is `0` for one observed interval.
 
