@@ -349,13 +349,16 @@ def evaluate(features):
 
     ranked_products["purchase_probability"] = (
         calibrator.predict_proba(
-            ranked_products[["prediction", "previous_paid_purchase_count", "rank"]]
+            ranked_products[["prediction", "standardized_gap_from_top", "group_z_score", "historical_score", "rank"]]
         )[:, 1]
     )
+
+    ranked_products['purchase_probability'] = ranked_products['purchase_probability'].map("{:.2%}".format)
 
     return ranked_products
 
 def rank_with_the_final_model(candidates: pd.DataFrame):
+    candidates = candidates.copy()
     model = CatBoostRanker()
     model.load_model(PROJECT_ROOT / "models" / "catboost_ranker.cbm")
 
@@ -391,6 +394,18 @@ def rank_with_the_final_model(candidates: pd.DataFrame):
                 model_input[column] = model_input[column].fillna(0)
 
     candidates["prediction"] = model.predict(model_input)
+    prediction_mean = candidates["prediction"].mean()
+    prediction_std = candidates["prediction"].std(ddof=0)
+    if np.isfinite(prediction_std) and prediction_std > 0:
+        candidates["group_z_score"] = (
+            candidates["prediction"] - prediction_mean
+        ) / prediction_std
+        candidates["standardized_gap_from_top"] = (
+            candidates["prediction"].max() - candidates["prediction"]
+        ) / prediction_std
+    else:
+        candidates["group_z_score"] = 0.0
+        candidates["standardized_gap_from_top"] = 0.0
 
     ranked_products = (
         candidates

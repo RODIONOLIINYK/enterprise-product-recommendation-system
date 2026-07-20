@@ -18,6 +18,7 @@
     "excluded": [
       "group_id",
       "customer_id",
+      "historical_score",
       "label"
     ]
   },

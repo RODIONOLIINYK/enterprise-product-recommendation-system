@@ -10,7 +10,7 @@ df = pd.read_csv(
 )
 
 calibration_features = (
-    df[["prediction", "previous_paid_purchase_count", "rank"]]
+    df[["prediction", "standardized_gap_from_top", "group_z_score", "historical_score", "rank"]]
 )
 
 calibration_labels = df["label"].astype(int)
@@ -35,7 +35,8 @@ joblib.dump(
 print(df[[
     "label",
     "rank",
-    "previous_paid_purchase_count",
+    "standardized_gap_from_top",
     "prediction",
-    "purchase_probability",
+    "group_z_score",
+    "historical_score"
 ]].head(30))

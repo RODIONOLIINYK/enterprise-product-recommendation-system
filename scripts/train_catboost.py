@@ -411,10 +411,24 @@ def ranking_metrics(
             "customer_id",
             "product_id",
             "previous_paid_purchase_count",
+            "historical_score",
             "label",
         ]
     ].copy()
     scored["prediction"] = predictions
+    grouped_predictions = scored.groupby("group_id")["prediction"]
+    group_prediction_mean = grouped_predictions.transform("mean")
+    group_prediction_std = grouped_predictions.transform(
+        lambda values: values.std(ddof=0)
+    )
+    safe_group_prediction_std = group_prediction_std.replace(0, np.nan)
+    scored["group_z_score"] = (
+        scored["prediction"] - group_prediction_mean
+    ).div(safe_group_prediction_std).fillna(0)
+    group_top_prediction = grouped_predictions.transform("max")
+    scored["standardized_gap_from_top"] = (
+        group_top_prediction - scored["prediction"]
+    ).div(safe_group_prediction_std).fillna(0)
     scored = scored.sort_values(
         ["group_id", "prediction", "product_id"],
         ascending=[True, False, True],
