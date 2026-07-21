@@ -102,6 +102,7 @@ def load_training_data(config: dict[str, Any]) -> pd.DataFrame:
         dtype={
             "customer_id": "string",
             "product_id": "string",
+            "product_name": "string",
             "product_category": "string",
             "business_line": "string",
         },
@@ -116,6 +117,7 @@ def load_training_data(config: dict[str, Any]) -> pd.DataFrame:
         "group_id",
         "customer_id",
         "product_id",
+        "product_name",
         "product_category",
         "business_line",
         "label",
@@ -134,6 +136,7 @@ def load_training_data(config: dict[str, Any]) -> pd.DataFrame:
     required_text_columns = [
         "customer_id",
         "product_id",
+        "product_name",
         "product_category",
         "business_line",
     ]

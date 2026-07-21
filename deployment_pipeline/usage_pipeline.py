@@ -1,5 +1,6 @@
 import argparse
 import random
+import re
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -15,6 +16,7 @@ RECENT_WINDOW_DAYS = 30
 COLUMN_MAPPING = {
     "КлиентДляОплатыКод": "customer_id",
     "ТоварКод": "product_id",
+    "Товар": "product_name",
     "Категория": "product_category",
     "БизнесЛиния": "business_line",
     "ДатаПродажи": "purchase_date",
@@ -43,6 +45,15 @@ MODEL_COLUMNS = [
     "historical_product_unique_customer_count",
     "product_purchase_count_last_30_days",
 ]
+CANDIDATE_OUTPUT_COLUMNS = [
+    "product_id",
+    "product_name",
+    *MODEL_COLUMNS[1:],
+]
+VOLUME_SUFFIX_PATTERN = (
+    r",\s*(?P<package_amount>\d+(?:[.,]\d+)?)\s*"
+    r"(?P<package_unit>ml|мл|l|л)\s*$"
+)
 NULLABLE_CADENCE_FEATURES = {
     "average_days_between_customer_product_purchases",
     "std_days_between_customer_product_purchases",
@@ -51,6 +62,7 @@ NULLABLE_CADENCE_FEATURES = {
 REQUIRED_HISTORY_COLUMNS = {
     "customer_id",
     "product_id",
+    "product_name",
     "product_category",
     "business_line",
     "purchase_date",
@@ -59,6 +71,7 @@ REQUIRED_HISTORY_COLUMNS = {
 REQUIRED_TEXT_COLUMNS = [
     "customer_id",
     "product_id",
+    "product_name",
     "product_category",
     "business_line",
 ]
@@ -85,6 +98,104 @@ def complete_history_row_mask(purchases: pd.DataFrame) -> pd.Series:
     )
 
 
+def unify_volume_package_variants(purchases: pd.DataFrame) -> pd.DataFrame:
+    purchases = purchases.copy()
+    volume_parts = purchases["product_name"].str.extract(
+        VOLUME_SUFFIX_PATTERN,
+        flags=re.IGNORECASE,
+    )
+    package_volume_litres = pd.to_numeric(
+        volume_parts["package_amount"].str.replace(",", ".", regex=False),
+        errors="coerce",
+    )
+    millilitre_rows = volume_parts["package_unit"].str.casefold().isin(
+        ["ml", "мл"]
+    )
+    package_volume_litres = package_volume_litres.mask(
+        millilitre_rows,
+        package_volume_litres / 1_000,
+    )
+    volume_variant_rows = package_volume_litres.gt(0)
+    if not volume_variant_rows.any():
+        return purchases
+
+    normalized_product_base = (
+        purchases["product_name"]
+        .str.replace(
+            VOLUME_SUFFIX_PATTERN,
+            "",
+            regex=True,
+            flags=re.IGNORECASE,
+        )
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+        .str.casefold()
+    )
+    volume_catalogue = (
+        purchases.loc[
+            volume_variant_rows,
+            [
+                "product_id",
+                "product_name",
+            ],
+        ]
+        .assign(
+            normalized_product_base=normalized_product_base.loc[
+                volume_variant_rows
+            ],
+            package_volume_litres=package_volume_litres.loc[
+                volume_variant_rows
+            ],
+        )
+        .drop_duplicates()
+        .sort_values(
+            [
+                "normalized_product_base",
+                "package_volume_litres",
+                "product_id",
+            ],
+            kind="stable",
+        )
+    )
+    canonical_products = (
+        volume_catalogue.drop_duplicates(
+            "normalized_product_base",
+            keep="first",
+        ).set_index("normalized_product_base")
+    )
+
+    canonical_package_volume_litres = normalized_product_base.map(
+        canonical_products["package_volume_litres"]
+    )
+    package_conversion_factors = (
+        package_volume_litres / canonical_package_volume_litres
+    )
+    expected_quantity = purchases["quantity"].copy()
+    expected_quantity.loc[volume_variant_rows] = (
+        expected_quantity.loc[volume_variant_rows]
+        * package_conversion_factors.loc[volume_variant_rows]
+    )
+    purchases.loc[volume_variant_rows, "quantity"] = (
+        expected_quantity.loc[volume_variant_rows].to_numpy()
+    )
+
+    for column in [
+        "product_id",
+        "product_name",
+    ]:
+        purchases.loc[volume_variant_rows, column] = (
+            normalized_product_base.loc[volume_variant_rows]
+            .map(canonical_products[column])
+            .to_numpy()
+        )
+    pd.testing.assert_series_equal(
+        purchases["quantity"],
+        expected_quantity,
+        check_names=False,
+    )
+    return purchases
+
+
 def load_purchases(input_path: Path) -> pd.DataFrame:
     purchases = pd.read_excel(input_path)
     missing = sorted(set(COLUMN_MAPPING) - set(purchases.columns))
@@ -95,6 +206,7 @@ def load_purchases(input_path: Path) -> pd.DataFrame:
     text_columns = [
         "customer_id",
         "product_id",
+        "product_name",
         "product_category",
         "business_line",
         "transaction_type",
@@ -113,7 +225,8 @@ def load_purchases(input_path: Path) -> pd.DataFrame:
         & purchases["transaction_type"].eq("ПРОДАЖА")
         & purchases["quantity"].gt(0)
         & purchases["product_id"].str.startswith("ТОВ", na=False)
-    ]
+    ].copy()
+    purchases = unify_volume_package_variants(purchases)
 
     return (
         purchases.groupby(
@@ -123,6 +236,7 @@ def load_purchases(input_path: Path) -> pd.DataFrame:
         )
         .agg(
             quantity=("quantity", "sum"),
+            product_name=("product_name", "first"),
             business_line=("business_line", "first"),
             product_category=("product_category", "first"),
         )
@@ -144,6 +258,7 @@ def build_features(
         prior_purchases.sort_values(["purchase_date", "product_id"])
         .groupby("product_id", sort=False, as_index=False)
         .agg(
+            product_name=("product_name", "first"),
             product_category=("product_category", "first"),
             business_line=("business_line", "first"),
         )
@@ -257,7 +372,7 @@ def build_features(
         & required_categorical.ne("").all(axis=1)
     )
     result = result.loc[complete_candidate_mask].reset_index(drop=True)
-    return result[MODEL_COLUMNS]
+    return result[CANDIDATE_OUTPUT_COLUMNS]
 
 def evaluate(features):
     features = features.copy()
