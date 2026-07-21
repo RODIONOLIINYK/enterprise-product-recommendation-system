@@ -196,6 +196,22 @@ uv run --with-requirements requirements.txt \
   python scripts/train_catboost.py
 ```
 
+### Compare serving approaches
+
+Run the usage pipeline with an optional customer ID:
+
+```bash
+uv run --with-requirements requirements.txt \
+  python deployment_pipeline/usage_pipeline.py [customer_id]
+```
+
+The same filtered candidate table is scored by both approaches. The command prints and saves two separate recommendation tables:
+
+- `deployment_pipeline/data/products_classifier.csv` — `CatBoostClassifier` probabilities, sorted directly by probability;
+- `deployment_pipeline/data/products_ranker_logistic_regression.csv` — the preserved `CatBoostRanker` ordering with probabilities from the legacy logistic-regression calibrator.
+
+The classifier remains the primary experiment. The ranker and logistic-regression artifacts are retained only for side-by-side comparison. The legacy calibrator is the original saved model and was fitted on the old test-prediction artifact, so its displayed probabilities must not be treated as an independent test of calibration.
+
 ### Use the published baseline
 
 ```python
@@ -217,7 +233,9 @@ The model expects the 17-feature purchase-only subset selected in the training c
 │   ├── 01_clean_purchases.ipynb     # Private-data cleaning
 │   └── 02_build_historical_features.ipynb
 ├── models/
-│   └── catboost_classifier.cbm       # CatBoost purchase classifier
+│   ├── catboost_classifier.cbm       # CatBoost purchase classifier
+│   ├── catboost_ranker.cbm           # Preserved ranking baseline
+│   └── purchase_probability_calibrator.joblib
 ├── artifacts/
 │   └── catboost_classifier/
 │       ├── metrics.json              # Aggregate evaluation results
