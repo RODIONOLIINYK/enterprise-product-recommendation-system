@@ -57,8 +57,7 @@ PRODUCT_OUTPUT_COLUMNS = [
 ] + [EXPECTED_DAYS_COLUMN]
 MODEL_OUTPUT_COLUMNS = [
     "historical_score",
-    "classifier_score",
-    "classifier_rank",
+    "probability",
 ]
 VOLUME_SUFFIX_PATTERN = (
     r",\s*(?P<package_amount>\d+(?:[.,]\d+)?)\s*"
@@ -515,15 +514,14 @@ def rank_with_classifier(candidates: pd.DataFrame) -> pd.DataFrame:
         candidates,
         classifier.feature_names_,
     )
-    candidates["classifier_score"] = classifier.predict_proba(
+    candidates["probability"] = classifier.predict_proba(
         classifier_input
     )[:, 1]
 
     ranked_products = candidates.sort_values(
-        ["classifier_score", "product_id"],
+        ["probability", "product_id"],
         ascending=[False, True],
     ).reset_index(drop=True)
-    ranked_products["classifier_rank"] = ranked_products.index + 1
     ranked_products = ranked_products.head(
         min(TOP_RECOMMENDATIONS, len(ranked_products))
     )
@@ -556,10 +554,9 @@ def main() -> None:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     ranked_products.to_csv(OUTPUT_PATH, index=False)
     display_columns = [
-        "classifier_rank",
         "product_id",
         "product_name",
-        "classifier_score",
+        "probability",
     ]
     print(ranked_products[display_columns].to_string(index=False))
     print(

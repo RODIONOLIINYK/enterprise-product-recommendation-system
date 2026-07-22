@@ -118,11 +118,10 @@ product identity
 → catalogue demand
 → expected_days_before_next_order
 → historical_score
-→ classifier_score
-→ classifier_rank
+→ probability
 ```
 
-Rows are sorted by `classifier_score` descending. Scores are calculated on the same row that supplies the product ID and product name, preventing positional joins or product-score misalignment.
+Rows are sorted by `probability` descending. Probabilities are calculated on the same row that supplies the product ID and product name, preventing positional joins or product-probability misalignment.
 
 ## Feature engineering
 
