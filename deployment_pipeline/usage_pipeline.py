@@ -10,20 +10,7 @@ import joblib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
-OUTPUT_PATHS = {
-    "catboost_classifier": (
-        PROJECT_ROOT
-        / "deployment_pipeline"
-        / "data"
-        / "products_classifier.csv"
-    ),
-    "catboost_ranker_logistic_regression": (
-        PROJECT_ROOT
-        / "deployment_pipeline"
-        / "data"
-        / "products_ranker_logistic_regression.csv"
-    ),
-}
+OUTPUT_PATH = PROJECT_ROOT / "deployment_pipeline" / "data" / "products.csv"
 RECENT_WINDOW_DAYS = 30
 TOP_RECOMMENDATIONS = 20
 
@@ -62,6 +49,22 @@ CANDIDATE_OUTPUT_COLUMNS = [
     "product_id",
     "product_name",
     *MODEL_COLUMNS[1:],
+]
+EXPECTED_DAYS_COLUMN = "expected_days_before_next_order"
+PRODUCT_OUTPUT_COLUMNS = [
+    column
+    for column in CANDIDATE_OUTPUT_COLUMNS
+    if column != EXPECTED_DAYS_COLUMN
+] + [EXPECTED_DAYS_COLUMN]
+COMPARISON_SCORE_COLUMNS = [
+    "historical_score",
+    "classifier_score",
+    "classifier_rank",
+    "ranker_score",
+    "ranker_group_z_score",
+    "ranker_standardized_gap_from_top",
+    "ranker_rank",
+    "ranker_logistic_probability",
 ]
 VOLUME_SUFFIX_PATTERN = (
     r",\s*(?P<package_amount>\d+(?:[.,]\d+)?)\s*"
@@ -393,7 +396,7 @@ def build_features(
     result = result.loc[complete_candidate_mask].reset_index(drop=True)
     return result[CANDIDATE_OUTPUT_COLUMNS]
 
-def evaluate(features: pd.DataFrame) -> dict[str, pd.DataFrame]:
+def evaluate(features: pd.DataFrame) -> pd.DataFrame:
     features = features.copy()
     count = features["previous_paid_purchase_count"].fillna(0)
     products_purchased = features.loc[
@@ -476,17 +479,7 @@ def evaluate(features: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     # here should be sequence model results
 
-    ranked_tables = {
-        "catboost_classifier": rank_with_classifier(features),
-        "catboost_ranker_logistic_regression": (
-            rank_with_ranker_and_logistic_regression(features)
-        ),
-    }
-    for table in ranked_tables.values():
-        table["purchase_probability"] = table[
-            "purchase_probability"
-        ].map("{:.2%}".format)
-    return ranked_tables
+    return score_with_both_models(features)
 
 
 def prepare_model_input(
@@ -524,59 +517,52 @@ def prepare_model_input(
     return model_input
 
 
-def rank_with_classifier(candidates: pd.DataFrame) -> pd.DataFrame:
+def score_with_both_models(candidates: pd.DataFrame) -> pd.DataFrame:
     candidates = candidates.copy()
-    model = CatBoostClassifier()
-    model.load_model(PROJECT_ROOT / "models" / "catboost_classifier.cbm")
-    feature_columns = model.feature_names_
-    model_input = prepare_model_input(candidates, feature_columns)
-    candidates["purchase_probability"] = model.predict_proba(
-        model_input
-    )[:, 1]
-    ranked_products = (
-        candidates
-        .sort_values(
-            ["purchase_probability", "product_id"],
-            ascending=[False, True],
-        )
-        .reset_index(drop=True)
+    if candidates["product_id"].duplicated().any():
+        raise ValueError("Comparison candidates must contain one row per product.")
+
+    classifier = CatBoostClassifier()
+    classifier.load_model(
+        PROJECT_ROOT / "models" / "catboost_classifier.cbm"
     )
-    ranked_products["rank"] = ranked_products.index + 1
-    return ranked_products.head(min(TOP_RECOMMENDATIONS, len(ranked_products)))
+    classifier_input = prepare_model_input(
+        candidates,
+        classifier.feature_names_,
+    )
+    candidates["classifier_score"] = classifier.predict_proba(
+        classifier_input
+    )[:, 1]
 
-
-def rank_with_ranker_and_logistic_regression(
-    candidates: pd.DataFrame,
-) -> pd.DataFrame:
-    candidates = candidates.copy()
     ranker = CatBoostRanker()
     ranker.load_model(PROJECT_ROOT / "models" / "catboost_ranker.cbm")
-    model_input = prepare_model_input(candidates, ranker.feature_names_)
-    candidates["prediction"] = ranker.predict(model_input)
+    ranker_input = prepare_model_input(candidates, ranker.feature_names_)
+    candidates["ranker_score"] = ranker.predict(ranker_input)
 
-    prediction_mean = candidates["prediction"].mean()
-    prediction_std = candidates["prediction"].std(ddof=0)
+    prediction_mean = candidates["ranker_score"].mean()
+    prediction_std = candidates["ranker_score"].std(ddof=0)
     if np.isfinite(prediction_std) and prediction_std > 0:
-        candidates["group_z_score"] = (
-            candidates["prediction"] - prediction_mean
+        candidates["ranker_group_z_score"] = (
+            candidates["ranker_score"] - prediction_mean
         ) / prediction_std
-        candidates["standardized_gap_from_top"] = (
-            candidates["prediction"].max() - candidates["prediction"]
+        candidates["ranker_standardized_gap_from_top"] = (
+            candidates["ranker_score"].max() - candidates["ranker_score"]
         ) / prediction_std
     else:
-        candidates["group_z_score"] = 0.0
-        candidates["standardized_gap_from_top"] = 0.0
+        candidates["ranker_group_z_score"] = 0.0
+        candidates["ranker_standardized_gap_from_top"] = 0.0
 
-    ranked_products = (
-        candidates.sort_values(
-            ["prediction", "product_id"],
-            ascending=[False, True],
-        )
-        .reset_index(drop=True)
-        .head(min(TOP_RECOMMENDATIONS, len(candidates)))
-        .copy()
+    ranker_order = candidates.sort_values(
+        ["ranker_score", "product_id"],
+        ascending=[False, True],
+    ).index
+    ranker_ranks = pd.Series(
+        np.arange(1, len(candidates) + 1),
+        index=ranker_order,
     )
-    ranked_products["rank"] = ranked_products.index + 1
+    candidates["ranker_rank"] = ranker_ranks.reindex(candidates.index).astype(
+        int
+    )
 
     calibrator = joblib.load(
         PROJECT_ROOT / "models" / "purchase_probability_calibrator.joblib"
@@ -587,13 +573,33 @@ def rank_with_ranker_and_logistic_regression(
             "Unexpected ranker calibrator features: "
             f"{expected_calibration_columns}"
         )
-    ranked_products["purchase_probability"] = calibrator.predict_proba(
-        ranked_products[RANKER_CALIBRATION_COLUMNS]
-    )[:, 1]
-    ranked_products = ranked_products.rename(
-        columns={"prediction": "ranker_score"}
+    calibration_features = pd.DataFrame(
+        {
+            "prediction": candidates["ranker_score"],
+            "standardized_gap_from_top": candidates[
+                "ranker_standardized_gap_from_top"
+            ],
+            "group_z_score": candidates["ranker_group_z_score"],
+            "historical_score": candidates["historical_score"],
+            "rank": candidates["ranker_rank"],
+        },
+        index=candidates.index,
     )
-    return ranked_products
+    candidates["ranker_logistic_probability"] = calibrator.predict_proba(
+        calibration_features[RANKER_CALIBRATION_COLUMNS]
+    )[:, 1]
+
+    ranked_products = candidates.sort_values(
+        ["classifier_score", "product_id"],
+        ascending=[False, True],
+    ).reset_index(drop=True)
+    ranked_products["classifier_rank"] = ranked_products.index + 1
+    ranked_products = ranked_products.head(
+        min(TOP_RECOMMENDATIONS, len(ranked_products))
+    )
+    return ranked_products[
+        PRODUCT_OUTPUT_COLUMNS + COMPARISON_SCORE_COLUMNS
+    ]
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -616,23 +622,22 @@ def main() -> None:
 
     scoring_date = pd.Timestamp.today().normalize()
     features = build_features(purchases, customer_id, scoring_date)
-    ranked_tables = evaluate(features)
+    ranked_products = evaluate(features)
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ranked_products.to_csv(OUTPUT_PATH, index=False)
     display_columns = [
-        "rank",
+        "classifier_rank",
         "product_id",
         "product_name",
-        "purchase_probability",
+        "classifier_score",
+        "ranker_rank",
+        "ranker_logistic_probability",
     ]
-    for model_name, ranked_products in ranked_tables.items():
-        output_path = OUTPUT_PATHS[model_name]
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        ranked_products.to_csv(output_path, index=False)
-        print(f"\n{model_name}\n")
-        print(ranked_products[display_columns].to_string(index=False))
-        print(
-            f"\nSaved {len(ranked_products):,} product rows for customer "
-            f"{customer_id} at {scoring_date.date()} to {output_path}"
-        )
+    print(ranked_products[display_columns].to_string(index=False))
+    print(
+        f"\nSaved {len(ranked_products):,} product rows for customer "
+        f"{customer_id} at {scoring_date.date()} to {OUTPUT_PATH}"
+    )
 
 
 if __name__ == "__main__":

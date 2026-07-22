@@ -2,175 +2,201 @@
 
 # Enterprise Product Recommendation System
 
-### Privacy-first, point-in-time product recommendations with CatBoost
+### Point-in-time recommendations, calibrated probabilities, and explainable model comparison
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![CatBoost](https://img.shields.io/badge/CatBoost-1.2.10-FFCC00)](https://catboost.ai/)
-[![Model](https://img.shields.io/badge/Task-Binary--Classification-7C3AED)](#why-classification)
+[![Pandas](https://img.shields.io/badge/Pandas-3.0-150458?logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![Task](https://img.shields.io/badge/Task-Product%20Recommendation-7C3AED)](#model-lab)
+[![Evaluation](https://img.shields.io/badge/Split-Customer--Disjoint-0EA5E9)](#evaluation)
 [![Privacy](https://img.shields.io/badge/Data-Local%20Only-059669)](#privacy-by-design)
 
-Turn truthful customer-product history into a ranked list of products a customer is likely to purchase next.
+An end-to-end recommendation pipeline that turns private purchase history into a ranked product list, compares two CatBoost strategies, and exposes the result through one product-aligned serving table.
+
+**Classifier probabilities · Learning-to-rank baseline · Point-in-time features · First/repeat purchase evaluation**
 
 </div>
 
 ---
 
-## Overview
+## At a glance
 
-This repository contains a complete local recommendation baseline:
+| Capability | Implementation |
+|---|---|
+| Business problem | Recommend the products a customer is most likely to purchase next |
+| Data preparation | Product cleaning, package-volume unification, receipt aggregation |
+| Feature design | Strictly prior customer-product history, cadence, affinity, and demand |
+| Main experiment | `CatBoostClassifier` with direct purchase probabilities |
+| Comparison model | `CatBoostRanker` with a legacy logistic probability calibrator |
+| Validation | Customer-disjoint train, validation, and test splits |
+| Serving output | One classifier-sorted table containing both models' scores |
+| Privacy | Raw data, row-level predictions, and customer-specific outputs stay local |
 
-1. clean paid product purchases and remove gifts;
-2. construct point-in-time customer-product history;
-3. generate positive and negative ranking candidates;
-4. keep every customer in exactly one data split;
-5. train a configurable `CatBoostClassifier`;
-6. evaluate recommendation quality against random and purchase-history baselines.
+## Why this project matters
 
-The implementation is designed for a real business dataset without publishing row-level business data or identifiers. This repository includes one explicitly reviewed baseline model and aggregate evaluation artifacts.
+Real recommendation systems are not just model-training scripts. They must keep historical features leakage-safe, construct truthful negatives, handle products never purchased before, reproduce training transformations during inference, and make competing model outputs comparable at the product level.
 
-## Why classification?
-
-Each candidate is a binary decision: estimate whether the customer will purchase that product in the scoring event. The resulting probabilities are sorted to produce the recommendation list.
-
-For every customer scoring event, the pipeline creates a candidate group:
-
-| Candidate | Meaning | Label |
-|---|---|---:|
-| Product purchased in this event | Positive example, including a first purchase | `1` |
-| Product purchased earlier but not now | Truthful historical negative | `0` |
-| Existing product never paid for by this customer | Sampled catalogue negative | `0` |
-
-CatBoost receives the candidates and their historical features, then learns the probability that each candidate is positive.
+This project implements that complete path:
 
 ```mermaid
 flowchart LR
-    A["Private purchase data"] --> B["Clean and aggregate"]
+    A["Private purchase workbook"] --> B["Clean and unify products"]
     B --> C["Point-in-time history"]
-    C --> D["Candidate groups"]
+    C --> D["Candidate generation"]
     D --> E["Customer-disjoint split"]
     E --> F["CatBoostClassifier"]
-    F --> G["Ranked products"]
-    G --> H["Ranking metrics"]
+    E --> G["CatBoostRanker"]
+    G --> H["Logistic calibrator"]
+    F --> I["Product-aligned comparison"]
+    H --> I
+    I --> J["Classifier-sorted products.csv"]
 ```
 
-## Core guarantees
+## Verified results
 
-- **Truthful history** — every historical feature uses only events strictly before the scoring event.
-- **Same customer, same product** — product-history statistics are never copied from another customer or product.
-- **First purchases are retained** — a positive product does not need earlier purchase history.
-- **Realistic negatives** — previously purchased products can correctly have `label = 0` when they were not purchased in the current event.
-- **No identity memorization** — `customer_id` and `group_id` organize the data but never enter the model.
-- **No target leakage** — current-event quantities and dates are excluded from training features.
-- **Unseen-customer evaluation** — all records for one customer stay in one split.
+The current experiment uses 17 model features and evaluates unseen customers. The test split contains 371 customers, 4,247 ranking groups, 106,175 candidate rows, and zero customer overlap with training or validation.
 
-## Pipeline
+### Recommendation quality
 
-### 1. Clean purchases
+| Test metric | CatBoostClassifier | CatBoostRanker | Better |
+|---|---:|---:|---|
+| MRR | 0.6363 | **0.6415** | Ranker |
+| Hit Rate@1 | 47.96% | **48.58%** | Ranker |
+| Recall@5 | 77.64% | **77.96%** | Ranker |
+| Recall@10 | 93.07% | **93.17%** | Ranker |
+| NDCG@10 | 0.6909 | **0.6952** | Ranker |
+| First-purchase Recall@10 | 81.04% | **82.27%** | Ranker |
+| Repeat-purchase Recall@10 | **96.04%** | 95.72% | Classifier |
+| Catalogue Coverage@10 | 86.03% | **91.48%** | Ranker |
 
-[`notebooks/01_clean_purchases.ipynb`](notebooks/01_clean_purchases.ipynb) removes gifts and other non-purchase rows, then converts paid product sales into one customer-date-product record with a single `quantity` field.
+The classifier is close to the ranker and slightly stronger for repeat-purchase recall at 10, but the ranker remains the stronger pure-ranking model overall.
 
-### 2. Build ranking candidates
+### Classifier probability quality
 
-[`notebooks/02_build_historical_features.ipynb`](notebooks/02_build_historical_features.ipynb):
+| Test metric | Value |
+|---|---:|
+| ROC AUC | **0.9017** |
+| Log loss | **0.1563** |
+| Brier score | **0.0447** |
+| Expected calibration error | **0.0019** |
+| Mean predicted probability | 6.43% |
+| Observed positive rate | 6.31% |
 
-- sorts source events chronologically;
-- creates one ranking group per customer purchase date;
-- keeps all products actually paid for on that date as positives;
-- samples products previously purchased by the same customer as hard negatives;
-- targets 25 candidates per group, balancing hard historical negatives with real catalogue products never paid for by that customer;
-- calculates customer-product, category, business-line, and global product-demand features strictly from prior history;
-- removes target-day quantities and purchase dates from the final training table.
+These probabilities are conditional on the candidate-generation policy used during training. They should not be interpreted as unconditional purchase probabilities across the entire catalogue.
 
-The scoring date is written to separate group metadata for validation and auditing. It is not a model input.
+## Model lab
 
-### 3. Train and evaluate
+### CatBoostClassifier
 
-[`scripts/train_catboost.py`](scripts/train_catboost.py):
+The classifier treats every customer-product candidate as a binary decision:
 
-- validates the training and metadata contracts;
-- creates deterministic `80 / 10 / 10` customer-disjoint splits;
-- trains a CatBoost YetiRank model with early stopping;
-- compares it with random and purchase-history baselines;
-- exports metrics, feature importance, test predictions, and the model.
+> Given only information available before the scoring date, will this customer purchase this product in the current event?
 
-## Model contract
+It optimizes `Logloss`, returns `predict_proba()[:, 1]`, and supplies the primary sort order in the serving pipeline.
 
-### Input
+### CatBoostRanker + logistic regression
 
-Each model row means:
+The preserved ranker uses the same 17 features but optimizes `YetiRank` inside customer scoring groups. A logistic-regression model converts ranker diagnostics into a displayed probability.
 
-> “Should this product rank highly for this customer at this scoring event, given only information available beforehand?”
+The legacy calibrator is retained for comparison and was fitted on the old test-prediction artifact. Its probabilities are useful for inspecting the former serving behavior, but they are not an independent test of calibration.
+
+### What the live comparisons show
+
+Five deterministic usage-pipeline runs across customers with light through heavy histories produced:
+
+| Comparison | Observed result |
+|---|---:|
+| Same top product | 3 of 5 runs |
+| Mean overlap in top five | 4.4 of 5 products |
+| Classifier correlation with historical score | 0.483 Spearman |
+| Ranker correlation with historical score | 0.518 Spearman |
+
+The ranker is slightly more conservative and history-aligned. The classifier is slightly more responsive to overdue reorder timing and recent product demand. Both approaches consistently prioritize repeat products in the current serving candidate policy.
+
+## One product-aligned comparison table
+
+The usage pipeline writes a single local file:
+
+```text
+deployment_pipeline/data/products.csv
+```
+
+Each row represents exactly one product. Both models score the same candidate row before the classifier top 20 is selected, preventing positional joins or scores being attached to the wrong product.
+
+```text
+product identity
+→ customer-product history
+→ category and business-line affinity
+→ catalogue demand
+→ expected_days_before_next_order
+→ historical_score
+→ classifier_score
+→ classifier_rank
+→ ranker_score and diagnostics
+→ ranker_rank
+→ ranker_logistic_probability
+```
+
+`expected_days_before_next_order` is deliberately the final feature column. Every column after it is a model score, diagnostic, or rank. Rows are sorted by `classifier_score` descending.
+
+## Feature engineering
 
 | Feature family | Examples |
 |---|---|
-| Product identity | `product_id`, `product_category`, `business_line` |
-| Purchase history | prior purchase count, cumulative purchased quantity, and last purchase quantity |
-| Purchase timing | days since the last purchase and average and variability of reorder intervals |
-| Replenishment timing | expected days before the next order for the last purchased quantity |
-| Affinity | prior category and business-line purchase counts and shares |
-| Product demand | lifetime product purchases and customers, plus recent 30-day purchase count |
+| Product context | `product_id`, `product_category`, `business_line` |
+| Purchase depth | prior purchase count, cumulative quantity, last quantity |
+| Recency | days since the last paid purchase |
+| Reorder cadence | average and variability of prior purchase intervals |
+| Replenishment | expected days before the next order |
+| Customer affinity | prior category and business-line counts and shares |
+| Product demand | lifetime purchases, unique customers, recent 30-day purchases |
 
-`business_line` supplies a population-level signal for customers with little or no history. The historical business-line count and share add personalized signals once prior purchases exist.
+### Leakage controls
 
-Rows missing any required customer ID, product ID, category, business line, purchase date, or quantity are removed during preprocessing and serving ingestion. Required categorical values are never replaced with a synthetic missing token.
+- Every historical feature uses information available at or before the scoring boundary.
+- Customer and group identifiers organize examples but never enter the model.
+- Current-event quantities and outcomes do not enter the feature set.
+- First purchases remain valid positive labels.
+- Products purchased previously can be truthful negatives when not purchased in the current event.
+- Customers never overlap across train, validation, and test.
 
-`average_days_between_customer_product_purchases`, `std_days_between_customer_product_purchases`, and `expected_days_before_next_order` remain missing (`NaN`) until the customer's prior history for that product is sufficient to calculate them. Once an interval exists, the standard deviation is the population standard deviation (`ddof=0`), which is `0` for one observed interval.
+### Product unification
 
-The current purchase-only CatBoost model uses 17 inputs. It excludes gift/receipt-history fields and redundant boolean, median, customer-order-count, quantity-trend, and replenishment-progress fields, while retaining product context, reorder cadence and variability, affinity depth, and point-in-time product popularity.
+Package variants such as `1 L`, `2 L`, `500 ml`, and Cyrillic unit equivalents are grouped by normalized base name. The smallest package becomes canonical, larger packages are converted into canonical-unit quantities, and product identity is remapped consistently in both training and usage pipelines.
 
-### Output
-
-CatBoost outputs an estimated purchase probability for every candidate product. Products are sorted by that probability inside the customer’s group:
-
-```text
-customer scoring group
-├── Product A  probability 72%  → rank 1
-├── Product C  probability 41%  → rank 2
-└── Product B  probability 18%  → rank 3
-```
-
-The probability is conditional on the candidate-generation policy used during training. The evaluator reports both recommendation-ranking metrics and probability-quality metrics.
-
-## Evaluation, without the jargon
-
-Suppose the customer actually purchased `A` and `B`, while the model ranks:
+## Repository structure
 
 ```text
-1. A  ✓
-2. C  ✗
-3. B  ✓
+.
+├── configs/
+│   └── catboost_training.json
+├── deployment_pipeline/
+│   └── usage_pipeline.py
+├── notebooks/
+│   ├── 01_clean_purchases.ipynb
+│   └── 02_build_historical_features.ipynb
+├── scripts/
+│   └── train_catboost.py
+├── models/
+│   ├── catboost_classifier.cbm
+│   ├── catboost_ranker.cbm
+│   └── purchase_probability_calibrator.joblib
+├── artifacts/
+│   ├── catboost/
+│   └── catboost_classifier/
+├── requirements.txt
+└── README.md
 ```
 
-| Metric | Result | Question it answers |
-|---|---:|---|
-| HitRate@1 | `1.00` | Was at least one correct product first? |
-| Precision@1 | `1.00` | Was the single first recommendation correct? |
-| Recall@1 | `0.50` | How much of the two-product basket appeared in the first slot? |
-| Precision@3 | `0.67` | What fraction of the first three recommendations was correct? |
-| Recall@3 | `1.00` | How much of the purchased basket appeared in the first three slots? |
-| MRR | `1.00` | How early did the first correct result appear? |
-| NDCG@3 | `< 1.00` | Were all correct products placed as high as possible? |
-
-The evaluator also reports:
-
-- **catalogue coverage** — how much of the candidate catalogue is ever recommended;
-- **first-purchase Recall@K** — recall for products the customer had never paid for before;
-- **repeat-purchase Recall@K** — recall for purchased products with earlier paid history.
-- **log loss and Brier score** — how accurate the returned probabilities are;
-- **ROC AUC** — how well probabilities separate purchased from non-purchased candidates;
-- **expected calibration error** — how closely predicted probabilities match observed purchase rates.
-
-Metrics are always compared with simple baselines. A sophisticated model is useful only if it beats an understandable alternative.
-
-## Quick start
+## Run locally
 
 ### Requirements
 
 - Python 3.12
 - [`uv`](https://docs.astral.sh/uv/)
-- the private source data in the expected local path
+- The private source workbook in `data/raw/`
 
-### Prepare the data
+### 1. Prepare the data
 
 Run the notebooks in order:
 
@@ -179,7 +205,7 @@ notebooks/01_clean_purchases.ipynb
 notebooks/02_build_historical_features.ipynb
 ```
 
-### Train
+### 2. Train the classifier
 
 ```bash
 uv run --with-requirements requirements.txt \
@@ -187,110 +213,58 @@ uv run --with-requirements requirements.txt \
   --config configs/catboost_training.json
 ```
 
-Hyperparameters, categorical features, excluded fields, split fractions, metric cutoffs, and output paths live in [`configs/catboost_training.json`](configs/catboost_training.json).
-
-The default configuration is selected automatically, so this shorter command is equivalent:
-
-```bash
-uv run --with-requirements requirements.txt \
-  python scripts/train_catboost.py
-```
-
-### Compare serving approaches
-
-Run the usage pipeline with an optional customer ID:
+### 3. Compare both serving approaches
 
 ```bash
 uv run --with-requirements requirements.txt \
   python deployment_pipeline/usage_pipeline.py [customer_id]
 ```
 
-The same filtered candidate table is scored by both approaches. The command prints and saves two separate recommendation tables:
+When `customer_id` is omitted, the script chooses a known customer. The customer-specific comparison is saved locally to `deployment_pipeline/data/products.csv`.
 
-- `deployment_pipeline/data/products_classifier.csv` — `CatBoostClassifier` probabilities, sorted directly by probability;
-- `deployment_pipeline/data/products_ranker_logistic_regression.csv` — the preserved `CatBoostRanker` ordering with probabilities from the legacy logistic-regression calibrator.
+## Evaluation
 
-The classifier remains the primary experiment. The ranker and logistic-regression artifacts are retained only for side-by-side comparison. The legacy calibrator is the original saved model and was fitted on the old test-prediction artifact, so its displayed probabilities must not be treated as an independent test of calibration.
+Recommendation quality is measured at K = 1, 3, 5, and 10 using:
 
-### Use the published baseline
+- **Hit Rate** — whether at least one relevant product appears in the top K;
+- **Precision** — how much of the recommendation list is relevant;
+- **Recall** — how much of the purchased basket is recovered;
+- **MRR** — how early the first relevant product appears;
+- **NDCG** — whether relevant products are ordered near the top;
+- **Catalogue coverage** — how broadly the model recommends across products;
+- **First/repeat recall** — discovery and replenishment performance separately.
 
-```python
-from catboost import CatBoostClassifier
-
-model = CatBoostClassifier()
-model.load_model("models/catboost_classifier.cbm")
-```
-
-The model expects the 17-feature purchase-only subset selected in the training configuration from the schema created by the candidate-building notebook. It returns candidate-level estimated purchase probabilities.
-
-## Repository layout
-
-```text
-.
-├── configs/
-│   └── catboost_training.json       # Model, split, feature, and output settings
-├── notebooks/
-│   ├── 01_clean_purchases.ipynb     # Private-data cleaning
-│   └── 02_build_historical_features.ipynb
-├── models/
-│   ├── catboost_classifier.cbm       # CatBoost purchase classifier
-│   ├── catboost_ranker.cbm           # Preserved ranking baseline
-│   └── purchase_probability_calibrator.joblib
-├── artifacts/
-│   └── catboost_classifier/
-│       ├── metrics.json              # Aggregate evaluation results
-│       └── feature_importance.csv    # Aggregate feature importance
-├── scripts/
-│   └── train_catboost.py            # Reproducible training and evaluation
-├── requirements.txt        # Pinned training dependencies
-└── README.md
-```
-
-Confidential and row-level outputs remain local and ignored:
-
-```text
-data/
-artifacts/catboost/test_predictions.csv
-artifacts/reports/
-```
+Classifier probabilities are evaluated with log loss, Brier score, ROC AUC, and expected calibration error.
 
 ## Privacy by design
 
-The business dataset is confidential. This public repository intentionally excludes:
+The following stay local and are excluded from publication:
 
-- raw and cleaned sales records;
-- customer and product identifier values;
-- product catalogues derived from company data;
-- intermediate feature tables and row-level predictions;
-- confidential project reports;
+- raw and cleaned purchase records;
+- customer and product-level training tables;
+- private workbooks and generated customer tables;
+- row-level test predictions;
 - executed notebook outputs.
 
-Tracked notebooks contain source code only. The published model, aggregate metrics, and aggregate feature importance were included by explicit approval after a check for embedded raw identifiers and local file paths. A trained model still represents patterns learned from confidential data, so publishing future model versions should receive the same review. Public tests and examples should use synthetic data.
+Only explicitly reviewed code, model artifacts, aggregate metrics, and aggregate feature importance are published. Trained models still encode patterns learned from confidential data and should receive the same review before every release.
 
-## Current limitations
+## Limitations and next steps
 
-- Candidate groups contain at least 25 sampled products and remain smaller than the production catalogue.
-- Offline quality still depends on whether production candidate retrieval supplies similarly difficult and relevant products.
-- Returned probabilities are conditional on the training candidate-generation policy rather than the entire product catalogue.
-- Repeat-purchase ranking should be evaluated separately from first-purchase discovery.
-- A future production evaluation should use the exact candidate-generation policy used at inference time.
+- Candidate groups are much smaller than the full production catalogue.
+- Offline quality depends on production candidate retrieval matching evaluation conditions.
+- Classifier probabilities are conditional on sampled candidates.
+- The legacy logistic calibrator does not have an untouched calibration test.
+- Current live comparisons describe model behavior but do not contain future purchase outcomes.
+- Production monitoring for drift, coverage, calibration, and realized conversion remains future work.
 
-## Roadmap
+## Resume-ready summary
 
-- [x] Privacy-safe cleaning pipeline
-- [x] Point-in-time customer-product features
-- [x] Truthful positive and negative candidates
-- [x] Customer-disjoint CatBoost classifier
-- [x] Ranking metrics and simple baselines
-- [ ] Synthetic-data regression tests
-- [ ] Production-scale candidate retrieval
-- [x] Probability scoring and serving interface
-- [ ] Monitoring for drift, coverage, and recommendation quality
-
----
+> Built an end-to-end enterprise product recommendation system using leakage-safe point-in-time features, customer-disjoint evaluation, CatBoost classification and learning-to-rank models, calibrated probability analysis, product-variant unification, and a shared inference pipeline; achieved 93.1% Recall@10 and 0.902 ROC AUC on held-out customers.
 
 <div align="center">
 
-Built as a transparent recommendation baseline: correct history first, model complexity second.
+---
+
+**A recommendation system is only trustworthy when its history, candidates, evaluation, and serving path all mean the same thing.**
 
 </div>
