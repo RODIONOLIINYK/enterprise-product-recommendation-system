@@ -121,7 +121,7 @@ product identity
 → probability
 ```
 
-Rows are sorted by `probability` descending. Probabilities are calculated on the same row that supplies the product ID and product name, preventing positional joins or product-probability misalignment.
+Rows are sorted by `probability` descending and displayed as percentages. Probabilities are calculated on the same row that supplies the product ID and product name, preventing positional joins or product-probability misalignment.
 
 ## Feature engineering
 

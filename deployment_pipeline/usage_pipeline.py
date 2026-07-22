@@ -525,6 +525,9 @@ def rank_with_classifier(candidates: pd.DataFrame) -> pd.DataFrame:
     ranked_products = ranked_products.head(
         min(TOP_RECOMMENDATIONS, len(ranked_products))
     )
+    ranked_products["probability"] = ranked_products["probability"].map(
+        "{:.2%}".format
+    )
     return ranked_products[
         PRODUCT_OUTPUT_COLUMNS + MODEL_OUTPUT_COLUMNS
     ]
