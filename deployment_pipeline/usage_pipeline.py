@@ -4,14 +4,14 @@ import re
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from catboost import CatBoostRanker
-import joblib
+from catboost import CatBoostClassifier
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
 OUTPUT_PATH = PROJECT_ROOT / "deployment_pipeline" / "data" / "products.csv"
 RECENT_WINDOW_DAYS = 30
+TOP_RECOMMENDATIONS = 20
 
 COLUMN_MAPPING = {
     "КлиентДляОплатыКод": "customer_id",
@@ -49,6 +49,17 @@ CANDIDATE_OUTPUT_COLUMNS = [
     "product_name",
     *MODEL_COLUMNS[1:],
 ]
+EXPECTED_DAYS_COLUMN = "expected_days_before_next_order"
+PRODUCT_OUTPUT_COLUMNS = [
+    column
+    for column in CANDIDATE_OUTPUT_COLUMNS
+    if column != EXPECTED_DAYS_COLUMN
+] + [EXPECTED_DAYS_COLUMN]
+MODEL_OUTPUT_COLUMNS = [
+    "historical_score",
+    "classifier_score",
+    "classifier_rank",
+]
 VOLUME_SUFFIX_PATTERN = (
     r",\s*(?P<package_amount>\d+(?:[.,]\d+)?)\s*"
     r"(?P<package_unit>ml|мл|l|л)\s*$"
@@ -79,8 +90,6 @@ REQUIRED_CATEGORICAL_COLUMNS = [
     "product_category",
     "business_line",
 ]
-
-
 def complete_history_row_mask(purchases: pd.DataFrame) -> pd.Series:
     missing_columns = sorted(REQUIRED_HISTORY_COLUMNS - set(purchases.columns))
     if missing_columns:
@@ -372,7 +381,7 @@ def build_features(
     result = result.loc[complete_candidate_mask].reset_index(drop=True)
     return result[CANDIDATE_OUTPUT_COLUMNS]
 
-def evaluate(features):
+def evaluate(features: pd.DataFrame) -> pd.DataFrame:
     features = features.copy()
     count = features["previous_paid_purchase_count"].fillna(0)
     products_purchased = features.loc[
@@ -455,35 +464,19 @@ def evaluate(features):
 
     # here should be sequence model results
 
-    ranked_products = rank_with_the_final_model(features)
+    return rank_with_classifier(features)
 
-    calibrator = joblib.load(
-        "models/purchase_probability_calibrator.joblib"
-    )
 
-    ranked_products["purchase_probability"] = (
-        calibrator.predict_proba(
-            ranked_products[["prediction", "standardized_gap_from_top", "group_z_score", "historical_score", "rank"]]
-        )[:, 1]
-    )
-
-    ranked_products['purchase_probability'] = ranked_products['purchase_probability'].map("{:.2%}".format)
-
-    return ranked_products
-
-def rank_with_the_final_model(candidates: pd.DataFrame):
-    candidates = candidates.copy()
-    model = CatBoostRanker()
-    model.load_model(PROJECT_ROOT / "models" / "catboost_ranker.cbm")
-
-    feature_columns = model.feature_names_
-    categorical_columns = {
-        "product_id",
-        "product_category",
-        "business_line",
-    }
+def prepare_model_input(
+    candidates: pd.DataFrame,
+    feature_columns: list[str],
+) -> pd.DataFrame:
+    missing_columns = sorted(set(feature_columns) - set(candidates.columns))
+    if missing_columns:
+        raise ValueError(f"Model candidates are missing features: {missing_columns}")
 
     model_input = candidates[feature_columns].copy()
+    categorical_columns = set(REQUIRED_CATEGORICAL_COLUMNS)
     model_input[list(categorical_columns)] = model_input[
         list(categorical_columns)
     ].apply(lambda values: values.astype("string").str.strip())
@@ -506,32 +499,37 @@ def rank_with_the_final_model(candidates: pd.DataFrame):
             )
             if column not in NULLABLE_CADENCE_FEATURES:
                 model_input[column] = model_input[column].fillna(0)
+    return model_input
 
-    candidates["prediction"] = model.predict(model_input)
-    prediction_mean = candidates["prediction"].mean()
-    prediction_std = candidates["prediction"].std(ddof=0)
-    if np.isfinite(prediction_std) and prediction_std > 0:
-        candidates["group_z_score"] = (
-            candidates["prediction"] - prediction_mean
-        ) / prediction_std
-        candidates["standardized_gap_from_top"] = (
-            candidates["prediction"].max() - candidates["prediction"]
-        ) / prediction_std
-    else:
-        candidates["group_z_score"] = 0.0
-        candidates["standardized_gap_from_top"] = 0.0
 
-    ranked_products = (
-        candidates
-        .sort_values(
-            ["prediction", "product_id"],
-            ascending=[False, True],
-        )
-        .reset_index(drop=True)
+def rank_with_classifier(candidates: pd.DataFrame) -> pd.DataFrame:
+    candidates = candidates.copy()
+    if candidates["product_id"].duplicated().any():
+        raise ValueError("Classifier candidates must contain one row per product.")
+
+    classifier = CatBoostClassifier()
+    classifier.load_model(
+        PROJECT_ROOT / "models" / "catboost_classifier.cbm"
     )
-    ranked_products['rank'] = ranked_products.index + 1
+    classifier_input = prepare_model_input(
+        candidates,
+        classifier.feature_names_,
+    )
+    candidates["classifier_score"] = classifier.predict_proba(
+        classifier_input
+    )[:, 1]
 
-    return ranked_products.head(min(20, len(ranked_products)))
+    ranked_products = candidates.sort_values(
+        ["classifier_score", "product_id"],
+        ascending=[False, True],
+    ).reset_index(drop=True)
+    ranked_products["classifier_rank"] = ranked_products.index + 1
+    ranked_products = ranked_products.head(
+        min(TOP_RECOMMENDATIONS, len(ranked_products))
+    )
+    return ranked_products[
+        PRODUCT_OUTPUT_COLUMNS + MODEL_OUTPUT_COLUMNS
+    ]
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -554,12 +552,19 @@ def main() -> None:
 
     scoring_date = pd.Timestamp.today().normalize()
     features = build_features(purchases, customer_id, scoring_date)
-    features = evaluate(features)
+    ranked_products = evaluate(features)
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    features.to_csv(OUTPUT_PATH, index=False)
+    ranked_products.to_csv(OUTPUT_PATH, index=False)
+    display_columns = [
+        "classifier_rank",
+        "product_id",
+        "product_name",
+        "classifier_score",
+    ]
+    print(ranked_products[display_columns].to_string(index=False))
     print(
-        f"Saved {len(features):,} product rows for customer {customer_id} "
-        f"at {scoring_date.date()} to {OUTPUT_PATH}"
+        f"\nSaved {len(ranked_products):,} product rows for customer "
+        f"{customer_id} at {scoring_date.date()} to {OUTPUT_PATH}"
     )
 
 

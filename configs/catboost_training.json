@@ -24,8 +24,8 @@
     ]
   },
   "model": {
-    "loss_function": "YetiRank",
-    "eval_metric": "NDCG:top=10",
+    "loss_function": "Logloss",
+    "eval_metric": "Logloss",
     "iterations": 500,
     "learning_rate": 0.05,
     "depth": 8,
@@ -49,9 +49,8 @@
     ]
   },
   "outputs": {
-    "model_path": "models/catboost_ranker.cbm",
-    "metrics_path": "artifacts/catboost/metrics.json",
-    "feature_importance_path": "artifacts/catboost/feature_importance.csv",
-    "test_predictions_path": "artifacts/catboost/test_predictions.csv"
+    "model_path": "models/catboost_classifier.cbm",
+    "metrics_path": "artifacts/catboost_classifier/metrics.json",
+    "feature_importance_path": "artifacts/catboost_classifier/feature_importance.csv"
   }
 }
