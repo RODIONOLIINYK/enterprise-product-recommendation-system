@@ -51,7 +51,6 @@
   "outputs": {
     "model_path": "models/catboost_classifier.cbm",
     "metrics_path": "artifacts/catboost_classifier/metrics.json",
-    "feature_importance_path": "artifacts/catboost_classifier/feature_importance.csv",
-    "test_predictions_path": "artifacts/catboost_classifier/test_predictions.csv"
+    "feature_importance_path": "artifacts/catboost_classifier/feature_importance.csv"
   }
 }

@@ -406,31 +406,17 @@ def ranking_metrics(
     frame: pd.DataFrame,
     predictions: np.ndarray,
     top_k_values: list[int],
-) -> tuple[dict[str, float], pd.DataFrame]:
+) -> dict[str, float]:
     scored = frame[
         [
             "group_id",
             "customer_id",
             "product_id",
             "previous_paid_purchase_count",
-            "historical_score",
             "label",
         ]
     ].copy()
     scored["prediction"] = predictions
-    grouped_predictions = scored.groupby("group_id")["prediction"]
-    group_prediction_mean = grouped_predictions.transform("mean")
-    group_prediction_std = grouped_predictions.transform(
-        lambda values: values.std(ddof=0)
-    )
-    safe_group_prediction_std = group_prediction_std.replace(0, np.nan)
-    scored["group_z_score"] = (
-        scored["prediction"] - group_prediction_mean
-    ).div(safe_group_prediction_std).fillna(0)
-    group_top_prediction = grouped_predictions.transform("max")
-    scored["standardized_gap_from_top"] = (
-        group_top_prediction - scored["prediction"]
-    ).div(safe_group_prediction_std).fillna(0)
     scored = scored.sort_values(
         ["group_id", "prediction", "product_id"],
         ascending=[True, False, True],
@@ -514,7 +500,7 @@ def ranking_metrics(
                 if segment_count
                 else float("nan")
             )
-    return metrics, scored
+    return metrics
 
 
 def probability_metrics(
@@ -625,13 +611,12 @@ def train(config: dict[str, Any]) -> dict[str, Any]:
     evaluation_metrics: dict[str, dict[str, float]] = {}
     probability_evaluation: dict[str, dict[str, float]] = {}
     baseline_metrics: dict[str, dict[str, dict[str, float]]] = {}
-    test_predictions: pd.DataFrame | None = None
     for split_index, split_name in enumerate(("validation", "test")):
         split_frame = prepared[split_name].frame
         predictions = model.predict_proba(
             prepared[split_name].pool
         )[:, 1]
-        metrics, scored = ranking_metrics(
+        metrics = ranking_metrics(
             split_frame,
             predictions,
             top_k_values,
@@ -646,7 +631,7 @@ def train(config: dict[str, Any]) -> dict[str, Any]:
             int(config["split"]["random_seed"]) + split_index
         )
         random_scores = random_generator.random(len(split_frame))
-        random_metrics, _ = ranking_metrics(
+        random_metrics = ranking_metrics(
             split_frame,
             random_scores,
             top_k_values,
@@ -663,7 +648,7 @@ def train(config: dict[str, Any]) -> dict[str, Any]:
             )
             + (random_generator.random(len(split_frame)) * 1e-6)
         )
-        history_metrics, _ = ranking_metrics(
+        history_metrics = ranking_metrics(
             split_frame,
             history_scores,
             top_k_values,
@@ -672,18 +657,11 @@ def train(config: dict[str, Any]) -> dict[str, Any]:
             "random": random_metrics,
             "purchase_history": history_metrics,
         }
-        if split_name == "test":
-            test_predictions = scored.rename(
-                columns={"prediction": "purchase_probability"}
-            )
 
     model_path = resolve_path(config["outputs"]["model_path"])
     metrics_path = resolve_path(config["outputs"]["metrics_path"])
     feature_importance_path = resolve_path(
         config["outputs"]["feature_importance_path"]
-    )
-    predictions_path = resolve_path(
-        config["outputs"]["test_predictions_path"]
     )
 
     model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -699,11 +677,6 @@ def train(config: dict[str, Any]) -> dict[str, Any]:
     ).sort_values("importance", ascending=False)
     feature_importance_path.parent.mkdir(parents=True, exist_ok=True)
     feature_importance.to_csv(feature_importance_path, index=False)
-
-    if test_predictions is None:
-        raise RuntimeError("Test predictions were not created.")
-    predictions_path.parent.mkdir(parents=True, exist_ok=True)
-    test_predictions.to_csv(predictions_path, index=False)
 
     results = {
         "model_type": "CatBoostClassifier",
@@ -728,7 +701,6 @@ def train(config: dict[str, Any]) -> dict[str, Any]:
             "feature_importance": portable_artifact_path(
                 feature_importance_path
             ),
-            "test_predictions": portable_artifact_path(predictions_path),
         },
     }
     save_json(metrics_path, results)
@@ -736,7 +708,6 @@ def train(config: dict[str, Any]) -> dict[str, Any]:
     print(f"Saved model to {model_path}")
     print(f"Saved metrics to {metrics_path}")
     print(f"Saved feature importance to {feature_importance_path}")
-    print(f"Saved test predictions to {predictions_path}")
     print(
         json.dumps(
             {

@@ -4,8 +4,7 @@ import re
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from catboost import CatBoostClassifier, CatBoostRanker
-import joblib
+from catboost import CatBoostClassifier
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -56,15 +55,10 @@ PRODUCT_OUTPUT_COLUMNS = [
     for column in CANDIDATE_OUTPUT_COLUMNS
     if column != EXPECTED_DAYS_COLUMN
 ] + [EXPECTED_DAYS_COLUMN]
-COMPARISON_SCORE_COLUMNS = [
+MODEL_OUTPUT_COLUMNS = [
     "historical_score",
     "classifier_score",
     "classifier_rank",
-    "ranker_score",
-    "ranker_group_z_score",
-    "ranker_standardized_gap_from_top",
-    "ranker_rank",
-    "ranker_logistic_probability",
 ]
 VOLUME_SUFFIX_PATTERN = (
     r",\s*(?P<package_amount>\d+(?:[.,]\d+)?)\s*"
@@ -96,15 +90,6 @@ REQUIRED_CATEGORICAL_COLUMNS = [
     "product_category",
     "business_line",
 ]
-RANKER_CALIBRATION_COLUMNS = [
-    "prediction",
-    "standardized_gap_from_top",
-    "group_z_score",
-    "historical_score",
-    "rank",
-]
-
-
 def complete_history_row_mask(purchases: pd.DataFrame) -> pd.Series:
     missing_columns = sorted(REQUIRED_HISTORY_COLUMNS - set(purchases.columns))
     if missing_columns:
@@ -479,7 +464,7 @@ def evaluate(features: pd.DataFrame) -> pd.DataFrame:
 
     # here should be sequence model results
 
-    return score_with_both_models(features)
+    return rank_with_classifier(features)
 
 
 def prepare_model_input(
@@ -517,10 +502,10 @@ def prepare_model_input(
     return model_input
 
 
-def score_with_both_models(candidates: pd.DataFrame) -> pd.DataFrame:
+def rank_with_classifier(candidates: pd.DataFrame) -> pd.DataFrame:
     candidates = candidates.copy()
     if candidates["product_id"].duplicated().any():
-        raise ValueError("Comparison candidates must contain one row per product.")
+        raise ValueError("Classifier candidates must contain one row per product.")
 
     classifier = CatBoostClassifier()
     classifier.load_model(
@@ -534,61 +519,6 @@ def score_with_both_models(candidates: pd.DataFrame) -> pd.DataFrame:
         classifier_input
     )[:, 1]
 
-    ranker = CatBoostRanker()
-    ranker.load_model(PROJECT_ROOT / "models" / "catboost_ranker.cbm")
-    ranker_input = prepare_model_input(candidates, ranker.feature_names_)
-    candidates["ranker_score"] = ranker.predict(ranker_input)
-
-    prediction_mean = candidates["ranker_score"].mean()
-    prediction_std = candidates["ranker_score"].std(ddof=0)
-    if np.isfinite(prediction_std) and prediction_std > 0:
-        candidates["ranker_group_z_score"] = (
-            candidates["ranker_score"] - prediction_mean
-        ) / prediction_std
-        candidates["ranker_standardized_gap_from_top"] = (
-            candidates["ranker_score"].max() - candidates["ranker_score"]
-        ) / prediction_std
-    else:
-        candidates["ranker_group_z_score"] = 0.0
-        candidates["ranker_standardized_gap_from_top"] = 0.0
-
-    ranker_order = candidates.sort_values(
-        ["ranker_score", "product_id"],
-        ascending=[False, True],
-    ).index
-    ranker_ranks = pd.Series(
-        np.arange(1, len(candidates) + 1),
-        index=ranker_order,
-    )
-    candidates["ranker_rank"] = ranker_ranks.reindex(candidates.index).astype(
-        int
-    )
-
-    calibrator = joblib.load(
-        PROJECT_ROOT / "models" / "purchase_probability_calibrator.joblib"
-    )
-    expected_calibration_columns = list(calibrator.feature_names_in_)
-    if expected_calibration_columns != RANKER_CALIBRATION_COLUMNS:
-        raise ValueError(
-            "Unexpected ranker calibrator features: "
-            f"{expected_calibration_columns}"
-        )
-    calibration_features = pd.DataFrame(
-        {
-            "prediction": candidates["ranker_score"],
-            "standardized_gap_from_top": candidates[
-                "ranker_standardized_gap_from_top"
-            ],
-            "group_z_score": candidates["ranker_group_z_score"],
-            "historical_score": candidates["historical_score"],
-            "rank": candidates["ranker_rank"],
-        },
-        index=candidates.index,
-    )
-    candidates["ranker_logistic_probability"] = calibrator.predict_proba(
-        calibration_features[RANKER_CALIBRATION_COLUMNS]
-    )[:, 1]
-
     ranked_products = candidates.sort_values(
         ["classifier_score", "product_id"],
         ascending=[False, True],
@@ -598,7 +528,7 @@ def score_with_both_models(candidates: pd.DataFrame) -> pd.DataFrame:
         min(TOP_RECOMMENDATIONS, len(ranked_products))
     )
     return ranked_products[
-        PRODUCT_OUTPUT_COLUMNS + COMPARISON_SCORE_COLUMNS
+        PRODUCT_OUTPUT_COLUMNS + MODEL_OUTPUT_COLUMNS
     ]
 
 def main() -> None:
@@ -630,8 +560,6 @@ def main() -> None:
         "product_id",
         "product_name",
         "classifier_score",
-        "ranker_rank",
-        "ranker_logistic_probability",
     ]
     print(ranked_products[display_columns].to_string(index=False))
     print(

@@ -313,7 +313,6 @@
   },
   "artifacts": {
     "model": "models/catboost_classifier.cbm",
-    "feature_importance": "artifacts/catboost_classifier/feature_importance.csv",
-    "test_predictions": "artifacts/catboost_classifier/test_predictions.csv"
+    "feature_importance": "artifacts/catboost_classifier/feature_importance.csv"
   }
 }
