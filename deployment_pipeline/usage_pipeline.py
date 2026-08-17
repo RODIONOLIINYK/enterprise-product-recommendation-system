@@ -56,7 +56,6 @@ PRODUCT_OUTPUT_COLUMNS = [
     if column != EXPECTED_DAYS_COLUMN
 ] + [EXPECTED_DAYS_COLUMN]
 MODEL_OUTPUT_COLUMNS = [
-    "historical_score",
     "probability",
 ]
 VOLUME_SUFFIX_PATTERN = r",\s*\d+(?:[.,]\d+)?\s*(?:ml|мл|l|л)\s*$"
@@ -350,88 +349,10 @@ def build_features(
 
 def evaluate(features: pd.DataFrame) -> pd.DataFrame:
     features = features.copy()
-    count = features["previous_paid_purchase_count"].fillna(0)
-    products_purchased = features.loc[
-        count.gt(0),
-        "product_id",
-    ].unique()
-    businesslines_purchased = features[features['previous_business_line_purchase_count'] > 0]['business_line'].unique()
-    categories_purchased = features[features['previous_category_purchase_count'] > 0]['product_category'].unique()
-
-    features = features[features['business_line'].isin(businesslines_purchased) | features['product_category'].isin(categories_purchased)]
-
-    if len(features) > 100:
-        print('only user purchased products as candidates')
-        features = features[features['product_id'].isin(products_purchased)]
-
-    count = features["previous_paid_purchase_count"].fillna(0)
-    is_repeat = count.gt(0)
-    repeat_strength = np.log1p(count)
-    maximum_repeat_strength = repeat_strength.max()
-    if maximum_repeat_strength > 0:
-        repeat_strength = repeat_strength / maximum_repeat_strength
-
-    cadence = (
-        features["average_days_between_customer_product_purchases"]
-        .fillna(0)
-        .where(lambda values: values.gt(0), 30)
-        .clip(lower=7)
-    )
-    recency = (
-        np.exp(-features["days_since_last_paid_purchase"].fillna(0) / cadence)
-    )
-    due_scale = (
-        features["std_days_between_customer_product_purchases"]
-        .fillna(0)
-        .where(lambda values: values.gt(0), 7)
-        .clip(lower=7)
-    )
-    due = 1.0 / (
-        1.0
-        + np.exp(
-            (
-                features["expected_days_before_next_order"].fillna(0)
-                / due_scale
-            ).clip(-50, 50)
-        )
-    )
-    has_cycle = features[
-        "average_days_between_customer_product_purchases"
-    ].fillna(0).gt(0)
-    timing = np.where(has_cycle, due, recency)
-
-    category_affinity = features[
-        "previous_category_purchase_share"
-    ].fillna(0)
-    business_line_affinity = features[
-        "previous_business_line_purchase_share"
-    ].fillna(0)
-    popularity = np.log1p(
-        features["product_purchase_count_last_30_days"].fillna(0)
-    ).rank(pct=True)
-
-    repeat_score = (
-        0.60 * repeat_strength
-        + 0.30 * timing
-        + 0.07 * category_affinity
-        + 0.03 * business_line_affinity
-    ).clip(0, 1)
-    discovery_score = (
-        0.55 * category_affinity
-        + 0.25 * business_line_affinity
-        + 0.20 * popularity
-    ).clip(0, 1)
-    features["historical_score"] = np.where(
-        is_repeat,
-        1.0 + repeat_score,
-        0.999999 * discovery_score,
-    )
-
-    features = features.sort_values('historical_score').head(min(30, len(features)))
 
     # here should be sequence model results
 
-    return rank_with_classifier(features)
+    return rank_with_classifier(features)[:30]
 
 
 def prepare_model_input(
