@@ -59,10 +59,7 @@ MODEL_OUTPUT_COLUMNS = [
     "historical_score",
     "probability",
 ]
-VOLUME_SUFFIX_PATTERN = (
-    r",\s*(?P<package_amount>\d+(?:[.,]\d+)?)\s*"
-    r"(?P<package_unit>ml|мл|l|л)\s*$"
-)
+VOLUME_SUFFIX_PATTERN = r",\s*\d+(?:[.,]\d+)?\s*(?:ml|мл|l|л)\s*$"
 NULLABLE_CADENCE_FEATURES = {
     "average_days_between_customer_product_purchases",
     "std_days_between_customer_product_purchases",
@@ -107,22 +104,11 @@ def complete_history_row_mask(purchases: pd.DataFrame) -> pd.Series:
 
 def unify_volume_package_variants(purchases: pd.DataFrame) -> pd.DataFrame:
     purchases = purchases.copy()
-    volume_parts = purchases["product_name"].str.extract(
+    volume_variant_rows = purchases["product_name"].str.contains(
         VOLUME_SUFFIX_PATTERN,
+        regex=True,
         flags=re.IGNORECASE,
     )
-    package_volume_litres = pd.to_numeric(
-        volume_parts["package_amount"].str.replace(",", ".", regex=False),
-        errors="coerce",
-    )
-    millilitre_rows = volume_parts["package_unit"].str.casefold().isin(
-        ["ml", "мл"]
-    )
-    package_volume_litres = package_volume_litres.mask(
-        millilitre_rows,
-        package_volume_litres / 1_000,
-    )
-    volume_variant_rows = package_volume_litres.gt(0)
     if not volume_variant_rows.any():
         return purchases
 
@@ -138,6 +124,7 @@ def unify_volume_package_variants(purchases: pd.DataFrame) -> pd.DataFrame:
         .str.strip()
         .str.casefold()
     )
+    product_purchasability = purchases["product_id"].value_counts()
     volume_catalogue = (
         purchases.loc[
             volume_variant_rows,
@@ -150,17 +137,18 @@ def unify_volume_package_variants(purchases: pd.DataFrame) -> pd.DataFrame:
             normalized_product_base=normalized_product_base.loc[
                 volume_variant_rows
             ],
-            package_volume_litres=package_volume_litres.loc[
-                volume_variant_rows
-            ],
+            purchasability=lambda df: df["product_id"]
+            .map(product_purchasability)
+            .fillna(0),
         )
         .drop_duplicates()
         .sort_values(
             [
                 "normalized_product_base",
-                "package_volume_litres",
+                "purchasability",
                 "product_id",
             ],
+            ascending=[True, False, True],
             kind="stable",
         )
     )
@@ -169,21 +157,6 @@ def unify_volume_package_variants(purchases: pd.DataFrame) -> pd.DataFrame:
             "normalized_product_base",
             keep="first",
         ).set_index("normalized_product_base")
-    )
-
-    canonical_package_volume_litres = normalized_product_base.map(
-        canonical_products["package_volume_litres"]
-    )
-    package_conversion_factors = (
-        package_volume_litres / canonical_package_volume_litres
-    )
-    expected_quantity = purchases["quantity"].copy()
-    expected_quantity.loc[volume_variant_rows] = (
-        expected_quantity.loc[volume_variant_rows]
-        * package_conversion_factors.loc[volume_variant_rows]
-    )
-    purchases.loc[volume_variant_rows, "quantity"] = (
-        expected_quantity.loc[volume_variant_rows].to_numpy()
     )
 
     for column in [
@@ -195,11 +168,6 @@ def unify_volume_package_variants(purchases: pd.DataFrame) -> pd.DataFrame:
             .map(canonical_products[column])
             .to_numpy()
         )
-    pd.testing.assert_series_equal(
-        purchases["quantity"],
-        expected_quantity,
-        check_names=False,
-    )
     return purchases
 
 
