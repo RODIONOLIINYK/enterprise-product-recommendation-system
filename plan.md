@@ -4,7 +4,7 @@
 
 Build a local next-basket recommendation system: **two-tower retrieval → hybrid cross-encoder ranking → top-K products**. Train on the Apple Silicon Mac with 16 GB of memory. Preserve exact sellable product IDs, including separate package variants. Default to 100 retrieval candidates and 10 final recommendations.
 
-This is a future implementation plan. The current branch implements purchase preparation and its tests; it does not yet implement metadata features, neural models, training or inference. Do not present the old model's results as results for this approach.
+This is a future implementation plan. The current branch implements actual-purchase preparation, item-catalogue loading, shared historical product eligibility and their tests. It does not yet implement company metadata features, neural models, training or recommendation serving. Do not present the old model's results as results for this approach.
 
 The ranker must receive the **same complete company and product input features** as the towers, at the same scoring time. It receives the original selected purchase sequence and structured fields, not merely two final retrieval embeddings. Its text branch processes company and candidate text together, its history branch processes the identical event sequence, and its scoring head combines those outputs with every categorical and numeric feature.
 
@@ -16,12 +16,12 @@ Keep these behaviours:
 
 - Detect the workbook header in the first 20 rows, including the existing fix for a blank first row.
 - Read identifiers as strings, strip surrounding whitespace, parse purchase dates and quantities, and normalize dates to calendar days.
-- Retain complete, positive, finite `ПРОДАЖА` merchandise transactions with item type `ТОВАР` and product IDs starting with `ТОВ`.
-- Exclude gifts, returns and accounting rows before deriving purchase history or labels.
+- Retain positive finite ordinary-sale records (`Gen_ Bus_ Posting Group = ПРОДАЖА`) with valid company/product IDs and dates. Require the sales classification `Gen_ Prod_ Posting Group = ТОВАР` and membership in the item master's for-sale (`ТОВАР`) products. IDs, brands and category names are not evidence of a sale.
+- Exclude gifts (`ПОДАРОК`), returns and accounting rows before deriving history, order dates, cadence, popularity or labels. A gift-only date creates no purchase basket or target. For mixed dates, keep only actual paid-sale products.
 - Aggregate repeated lines only by company, date and exact product ID. Preserve raw quantity units and separate package variants.
 - Validate unique event keys, unchanged product IDs, positive quantities and quantity preservation per event and in total.
 
-Run `python -m unittest discover -s tests -v`, then execute `notebooks/01_clean_purchases.ipynb` top to bottom. It writes the ignored local `data/interim/cleaned_purchases.csv`. The actual valid-sale scope is deliberately retained from the existing code; broadening the catalogue to unrelated inventory is outside v1.
+Run `python -m unittest discover -s tests -v`, then execute `notebooks/01_clean_purchases.ipynb` top to bottom. It writes the ignored local `data/interim/cleaned_purchases.csv`. The notebook also reads `data/raw/items.csv`. Shared eligibility is configured in `configs/product_scope.toml`: candidates must be classified as for sale and have at least one genuine purchase strictly before the scoring time. The original product-ID-prefix heuristic is removed. Missing optional product descriptions/categories do not erase a genuine purchase.
 
 Do not reuse the old package-ID remapping, old 25-candidate training tables, old labels anchored to the current purchase event, old fitted-model metrics, or model-specific scoring formulas. The old historical-feature notebook is backed up locally: its strictly-prior counting and cumulative-history ideas are useful references, but its training table is not an input to the new system.
 
@@ -58,14 +58,14 @@ After imports and device tests pass, create an ignored exact-version environment
 
 ## 3. Prepare company and product metadata
 
-Create `recommender/metadata.py` and a `prepare_metadata` module command. Read the CSVs with `sep=";"`, `header=None`, `dtype="string"` and `encoding="utf-8-sig"`. Normalize whitespace and treat empty strings and literal `NULL` as missing. Define the column mappings centrally rather than scattering numeric indices.
+Create company enrichment in `recommender/metadata.py` and a `prepare_metadata` module command. Reuse the implemented `recommender.catalogue.load_product_catalogue` for item loading and its validated identities/classification; do not create a second item parser. Read the company CSV with `sep=";"`, `header=None`, `dtype="string"` and `encoding="utf-8-sig"`. Normalize whitespace and treat empty strings and literal `NULL` as missing. Define the column mappings centrally rather than scattering numeric indices.
 
 The inspected export positions below are **one-based**. Meanings are inferred from values and checked joins; record that status rather than claiming a provided source schema exists.
 
 | Entity | Columns to map |
 | --- | --- |
 | Company | ID 2; activity notes 91; address 89; city-like code 99 |
-| Product | ID 2; short name 4; type 6; unit 7; business line 60; brand-like field 84; category 85; finer category 87; Ukrainian name 122; family-like field 126; expanded name 133; base name 134 |
+| Product | ID 2; short name 4; generic product type 6; unit 7; for-sale accounting classification 51; business line 60; brand-like field 84; category 85; finer category 87; Ukrainian name 122; family-like field 126; expanded name 133; base name 134 |
 
 Use column 2 as the join identity, not company names or an unverified alias column. Validate unique keys and many-to-one joins against exact purchase IDs. Report unmatched records; retain purchases with missing optional metadata using unknown/missing values rather than silently losing events.
 
@@ -75,7 +75,7 @@ Build product text from available expanded/Ukrainian names and type, adding bran
 
 Historical purchase names/categories remain available from purchase events. Current company notes and master-data fields are snapshot enrichment: use them as approximate historical profiles, as selected, record the caveat, and include a notes-free experiment. Store missingness indicators and never invent company descriptions.
 
-Write ignored `data/interim/companies.parquet` and `products.parquet`, with an input-hash/column-map manifest.
+Write ignored `data/interim/companies.parquet` and `products.parquet`, with an input-hash/column-map manifest. Use `select_eligible_products` at the recorded preparation cutoff to keep only for-sale products with actual prior sales in the prepared product table. Reapply the rule at every earlier historical scoring time; eligibility at the end of the dataset must not leak into earlier examples. The full item master is read only to validate and classify identities, not directly as a training or inference catalogue.
 
 **Completion:** joins cannot multiply events; all optional-field gaps and inferred mappings are recorded; package variants remain distinct.
 
@@ -83,7 +83,7 @@ Write ignored `data/interim/companies.parquet` and `products.parquet`, with an i
 
 Create `recommender/examples.py`. Generate Monday-midnight scoring dates within the observed purchase period. A company becomes eligible for a snapshot after its first observed purchase. Features use records with `purchase_date < scoring_time`; the label is the set of exact products in that company's first observed basket on or after the snapshot.
 
-Companies with no observed future basket are censored at that snapshot: exclude them from supervised labels rather than treating every product as a negative. Retain all same-date purchased products as a single multi-positive basket. Last-basket and first-appearance rules must be explicit in the example manifest.
+Companies with no observed future basket are censored at that snapshot: exclude them from supervised labels rather than treating every product as a negative. Retain all same-date genuinely purchased products as a single multi-positive basket. Build dates and targets from the filtered actual-purchase history, never raw movement dates: receiving a present is not an order. Weekly snapshots may precede a later paid basket, but a gift itself is never their outcome. Last-basket and first-appearance rules must be explicit in the example manifest.
 
 Use these fixed temporal splits:
 
@@ -93,7 +93,7 @@ Use these fixed temporal splits:
 
 Exclude examples that cross split boundaries. Split examples before fitting vocabularies, scalers or model parameters. A validation/test company's prior purchase history is usable at scoring time; future purchases are never features.
 
-If no historical availability table exists, approximate eligibility using a product's first observed purchase strictly before the snapshot. This cannot establish actual stock or launch time. Products in a future basket but outside that eligible catalogue are unretrievable outcomes: report them in end-to-end recall and catalogue-eligibility coverage, not just in a filtered metric. For training, use only eligible positives; skip groups without any eligible positive and report how many were skipped.
+Use the implemented `select_eligible_products(catalogue, actual_purchase_history, scoring_time)` for every training, validation and test catalogue. A candidate must be `ТОВАР` in the item master and have at least one actual `ПРОДАЖА` purchase strictly before that snapshot. Gifts, zero quantities and future sales never satisfy this condition. Keep a product's first real sale in factual history so it becomes eligible at later cutoffs, but never insert that product into an earlier candidate list. A newly sold product outside a preceding snapshot's catalogue is an unretrievable outcome: include it in end-to-end recall and eligibility-coverage reporting. Train only on eligible positives, skip groups with none, and report skipped groups. This policy is not evidence of stock availability; add a separate stock constraint only when reliable inventory data is supplied.
 
 Write `data/processed/examples.parquet` with example ID, company ID, scoring time, target-basket date, positive product IDs and split. IDs/dates organize examples; actual target dates and quantities never enter the model.
 
@@ -109,7 +109,9 @@ build_product_features(product_id, scoring_time)
 build_feature_pair(company_id, product_id, scoring_time)
 ```
 
-The pair builder returns the exact company and product bundles. Version the schema, preprocessing, input hashes and cutoff together. The company ID is a lookup key, not a learned company-ID feature; the model must work from content/history for an unseen company.
+Use `actual_purchase_mask` and the prepared classification-preserving history for purchase evidence; use `select_eligible_products` for both retrieval and ranker candidates. These eligibility functions already exist in `recommender.scope` / `recommender.catalogue`. Do not maintain independent training/inference filters. The history schema retains `item_type` and `transaction_type` so inference can verify paid-sale evidence rather than treating arbitrary movements as purchases.
+
+The pair builder returns the exact company and product bundles. Version the schema, preprocessing, product-scope policy hash, input hashes and cutoff together. The company ID is a lookup key, not a learned company-ID feature; the model must work from content/history for an unseen company.
 
 ### Company bundle
 
@@ -128,7 +130,7 @@ Each selected event includes purchased-product text/identity/attributes, quantit
 - Explicit technical specifications, package amount/unit, and base-product relationship fields.
 - Lifetime purchase-event count; event counts over the preceding 30/90 days.
 - Distinct purchasing-company count and days since the last prior purchase by any company.
-- Missingness for absent metadata/history. Popularity is not a quantity sum or a count of synthetic training pairs.
+- Missingness for absent metadata/history. Popularity counts genuine purchases only, never gifts, inventory movements, quantities or synthetic training pairs.
 
 Windows are `[scoring_time - window, scoring_time)`. Derive all history and demand from events before the cutoff, including when scoring a previously purchased product. Implement cumulative date-indexed histories or grouped window calculations; avoid rescanning the full raw table per pair. These reuse the useful counting concepts from the old feature code.
 
@@ -140,7 +142,7 @@ Fit categorical vocabularies and numeric scales on training examples only. Apply
 
 Create `recommender/text.py`. Use `intfloat/multilingual-e5-small` through Sentence Transformers to produce normalized 384-dimensional standalone text embeddings. Follow the checkpoint's `query:` prefix for company text and `passage:` prefix for product text. Use a token limit of 384, text-encoding batches of eight and `eval()`/no gradients for this frozen step.
 
-Encode each unique company text and product text once, including the product texts needed for historical events. Missing text uses an explicit missing-text flag and a zero cached vector. Cache keys include normalized text, checkpoint revision, prefix convention and token limit; changing any of these invalidates the cache.
+Encode each unique company text and each eligible, previously sold product text once, including product texts needed for actual historical purchase events. Never build candidate caches from never-sold or gift-only item records. Missing text uses an explicit missing-text flag and a zero cached vector. Cache keys include normalized text, checkpoint revision, prefix convention and token limit; changing any of these invalidates the cache.
 
 Save local caches under `text_cache/`. These standalone vectors serve the towers and the history branch. They do **not** replace joint company–candidate encoding inside the ranker.
 
@@ -158,7 +160,7 @@ Create `recommender/models.py` and `train_retriever`. Both towers output L2-norm
 
 Use width 16 for history attribute embeddings and width 32 for history product IDs. Keep the pretrained text encoder frozen. Train categorical embeddings, history encoder and tower projections. Unknown product IDs still retain product content and attributes.
 
-For each scoring-date batch, compute vectors for all eligible products using that date's demand features. Score company/product pairs by dot product divided by temperature 0.1. Use a multi-positive catalogue-softmax loss with uniform target mass over each company's eligible next-basket products; do not treat basket co-positives as negatives.
+For each scoring-date batch, compute vectors only for products returned by the shared for-sale-and-prior-purchase filter, using that date's demand features. Score company/product pairs by dot product divided by temperature 0.1. Use a multi-positive catalogue-softmax loss with uniform target mass over each company's eligible next-basket products; do not treat basket co-positives as negatives.
 
 Training defaults: seed 42, AdamW, learning rate `1e-3`, weight decay `1e-4`, batch up to 64 companies from the same scoring date, gradient clipping at 1.0 and a maximum of 10 epochs. Evaluate validation Recall@100 each epoch and stop after two epochs without improvement. Save the best checkpoint, not just the final one.
 
@@ -168,9 +170,9 @@ Record model configuration, schema/preprocessing versions, checkpoint revision, 
 
 ## 8. Construct ranker training pairs
 
-Create `recommender/candidates.py`. Freeze the selected retriever and retrieve up to 100 eligible products per example using exact matrix multiplication. Record real candidate recall before augmenting anything.
+Create `recommender/candidates.py`. Apply `select_eligible_products` at each example's cutoff, freeze the selected retriever and retrieve up to 100 eligible products using exact matrix multiplication. Record real candidate recall before augmenting anything.
 
-For training only, include all eligible basket positives, up to eight top retrieved non-positive products as hard negatives, and up to eight random eligible non-positive products. Remove duplicate pairs and exclude all basket positives from both negative pools. Previously purchased products may be negatives if absent from the next basket.
+For training only, include all eligible paid-basket positives, up to eight top retrieved non-positive products as hard negatives, and up to eight random eligible non-positive products. Gifts never become positives and gift-only dates never generate target groups. Remove duplicate pairs and exclude all basket positives from both negative pools. Previously purchased products may be negatives if absent from the next basket.
 
 Use seed 42 to sample complete example groups until approximately 50,000 training pairs for the first Mac experiment; record the sampled group IDs. Label sampling as conditional on next-basket outcomes, not proof that a company dislikes a negative product forever.
 
@@ -228,7 +230,7 @@ Use one daily midnight cutoff for company features, product features and ranking
 Serving sequence:
 
 1. Resolve company metadata and purchases prior to the effective cutoff. For a known profile with no purchases, use the missing-history representation; reject completely unknown company IDs with a clear error.
-2. Build its complete company bundle and the eligible product bundles through the shared builder.
+2. Load for-sale, previously sold candidates through `load_eligible_products(items_path, actual_purchase_history, effective_cutoff)`, then build the complete company and eligible product bundles. Unsold items and products received only as gifts cannot enter retrieval, ranking or final output.
 3. Encode the company and compare with the matching daily product-vector matrix.
 4. Select at most 100 eligible candidates. Never exclude all previously purchased products: replenishment remains a valid recommendation.
 5. Pass the same company bundle and each candidate's same product bundle to the hybrid ranker in evaluation/no-gradient mode.
@@ -254,13 +256,15 @@ Implement and verify the future commands in this order; these entrypoints are pl
 10. python -m recommender.recommend --company-id <ID> --scoring-date <YYYY-MM-DD> --top-k 10
 ```
 
-Use one checked-in pipeline configuration for paths, split dates, feature windows, sequence cap and model defaults. Generated state stays in ignored folders. Each stage records its source/schema/model hashes and refuses stale incompatible upstream artifacts. Restarting model training requires rebuilding downstream candidates and ranker compatibility metadata.
+Use one checked-in pipeline configuration for paths, split dates, feature windows, sequence cap and model defaults, and reference the existing `configs/product_scope.toml` as the single business-eligibility policy. Generated state stays in ignored folders. Each stage records its source/schema/model hashes and refuses stale incompatible upstream artifacts. Restarting model training requires rebuilding downstream candidates and ranker compatibility metadata.
 
 Add meaningful tests for:
 
 - Exact package identity, source-header detection, sale filtering and quantity preservation (already implemented).
 - Unique metadata joins, string IDs, missing optional fields and unknown categorical values.
 - Strict timestamp boundaries, 30/90-day windows, basket gaps, censoring and split-crossing labels.
+- For-sale classification plus prior actual-sale evidence in both stages; exclude never-sold, gift-only and future-only products. Test that adding future sales cannot change past candidates.
+- Gift-only dates produce no basket, popularity or cadence; mixed dates keep paid products only.
 - Future-purchase invariance and equality of the company/product bundles supplied to each stage.
 - Stable 32-event selection, padding and empty-history handling without NaNs.
 - Multi-positive retrieval loss, exclusion of positives from negative pools and no evaluation positive injection.

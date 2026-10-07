@@ -5,6 +5,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from recommender.catalogue import load_product_catalogue, select_sellable_products
+from recommender.scope import ProductScope, actual_purchase_mask
+
 
 COLUMN_MAPPING = {
     "КлиентДляОплатыКод": "customer_id",
@@ -18,11 +21,13 @@ COLUMN_MAPPING = {
     "Gen_ Prod_ Posting Group": "item_type",
 }
 REQUIRED_TEXT_COLUMNS = [
-    "customer_id", "product_id", "product_name", "product_category", "business_line",
+    "customer_id", "product_id",
 ]
+SOURCE_TEXT_COLUMNS = [*REQUIRED_TEXT_COLUMNS, "product_name", "product_category", "business_line"]
 HISTORY_COLUMNS = [
     "customer_id", "purchase_date", "product_id", "quantity",
     "product_category", "business_line", "product_name",
+    "item_type", "transaction_type",
 ]
 REQUIRED_HISTORY_COLUMNS = set(HISTORY_COLUMNS)
 EVENT_KEY_COLUMNS = ["customer_id", "purchase_date", "product_id"]
@@ -47,8 +52,10 @@ def load_source_purchases(input_path: str | Path) -> pd.DataFrame:
             dtype={"КлиентДляОплатыКод": "string", "ТоварКод": "string"},
         )
     purchases = purchases.rename(columns=COLUMN_MAPPING)
-    for column in [*REQUIRED_TEXT_COLUMNS, "transaction_type", "item_type"]:
+    for column in [*SOURCE_TEXT_COLUMNS, "transaction_type", "item_type"]:
         purchases[column] = purchases[column].astype("string").str.strip()
+    for column in ["transaction_type", "item_type"]:
+        purchases[column] = purchases[column].str.upper()
     purchases["purchase_date"] = pd.to_datetime(
         purchases["purchase_date"], errors="coerce"
     ).dt.normalize()
@@ -72,18 +79,18 @@ def complete_history_row_mask(purchases: pd.DataFrame) -> pd.Series:
     )
 
 
-def select_paid_purchases(purchases: pd.DataFrame) -> pd.DataFrame:
-    """Retain the existing positive merchandise-sale and product-code scope."""
-    missing = sorted({"transaction_type", "item_type"} - set(purchases.columns))
-    if missing:
-        raise ValueError(f"Missing required transaction columns: {missing}")
+def select_paid_purchases(
+    purchases: pd.DataFrame, *, products: pd.DataFrame | None = None,
+    scope: ProductScope | None = None,
+) -> pd.DataFrame:
+    """Keep valid sales in the shared business scope, not an ID-prefix heuristic."""
     mask = (
         complete_history_row_mask(purchases)
-        & purchases["item_type"].eq("ТОВАР")
-        & purchases["transaction_type"].eq("ПРОДАЖА")
-        & purchases["quantity"].gt(0)
-        & purchases["product_id"].str.startswith("ТОВ", na=False)
+        & actual_purchase_mask(purchases, scope=scope)
     )
+    if products is not None:
+        sellable_ids = select_sellable_products(products, scope=scope)["product_id"]
+        mask &= purchases["product_id"].isin(sellable_ids)
     return purchases.loc[mask].copy()
 
 
@@ -96,6 +103,8 @@ def aggregate_purchases(paid_purchases: pd.DataFrame) -> pd.DataFrame:
             product_category=("product_category", "first"),
             business_line=("business_line", "first"),
             product_name=("product_name", "first"),
+            item_type=("item_type", "first"),
+            transaction_type=("transaction_type", "first"),
         )
         .sort_values(EVENT_KEY_COLUMNS)
         .reset_index(drop=True)
@@ -103,15 +112,18 @@ def aggregate_purchases(paid_purchases: pd.DataFrame) -> pd.DataFrame:
     return cleaned[HISTORY_COLUMNS]
 
 
-def validate_purchases(cleaned: pd.DataFrame, paid: pd.DataFrame) -> None:
+def validate_purchases(
+    cleaned: pd.DataFrame, paid: pd.DataFrame, *, products: pd.DataFrame | None = None,
+    scope: ProductScope | None = None,
+) -> None:
     """Validate event uniqueness, paid-sale scope, quantities and product IDs."""
-    if not complete_history_row_mask(cleaned).all():
+    if not complete_history_row_mask(cleaned).all() or not actual_purchase_mask(cleaned, scope=scope).all():
         raise ValueError("Cleaned history contains incomplete or non-finite values.")
     if cleaned.duplicated(EVENT_KEY_COLUMNS).any():
         raise ValueError("Cleaned history contains duplicate purchase events.")
     if not cleaned["quantity"].gt(0).all():
         raise ValueError("Cleaned history contains non-positive quantities.")
-    if len(select_paid_purchases(paid)) != len(paid):
+    if len(select_paid_purchases(paid, products=products, scope=scope)) != len(paid):
         raise ValueError("Source history contains rows outside the paid-sale scope.")
     if set(cleaned["product_id"]) != set(paid["product_id"]):
         raise ValueError("Product IDs changed during aggregation.")
@@ -125,9 +137,15 @@ def validate_purchases(cleaned: pd.DataFrame, paid: pd.DataFrame) -> None:
         raise ValueError("Total quantity changed during aggregation.")
 
 
-def load_purchases(input_path: str | Path) -> pd.DataFrame:
-    """Load, filter, aggregate and validate an exact-SKU purchase history."""
-    paid = select_paid_purchases(load_source_purchases(input_path))
+def load_purchases(
+    input_path: str | Path, *, items_path: str | Path | None = None,
+    scope: ProductScope | None = None,
+) -> pd.DataFrame:
+    """Prepare sales with the same item catalogue policy used at inference."""
+    if items_path is None:
+        items_path = Path(input_path).with_name("items.csv")
+    products = load_product_catalogue(items_path)
+    paid = select_paid_purchases(load_source_purchases(input_path), products=products, scope=scope)
     cleaned = aggregate_purchases(paid)
-    validate_purchases(cleaned, paid)
+    validate_purchases(cleaned, paid, products=products, scope=scope)
     return cleaned

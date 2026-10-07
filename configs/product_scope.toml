@@ -1,0 +1,6 @@
+# Shared source classification and sales evidence for training/inference eligibility.
+# dataset.xlsx Gen_ Prod_ Posting Group / items.csv column 51 classify saleable products.
+version = 1
+allowed_item_types = ["ТОВАР"]
+# Count only genuine paid-sale records strictly before the scoring time.
+minimum_prior_purchases = 1
