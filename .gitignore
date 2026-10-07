@@ -39,3 +39,17 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# Neural pipeline inputs and generated state.
+data/
+models/
+text_cache/
+embedding_cache/
+recommendations/
+*.pt
+*.pth
+*.safetensors
+*.npy
+*.npz
+*.bin
+.ipynb_checkpoints/
