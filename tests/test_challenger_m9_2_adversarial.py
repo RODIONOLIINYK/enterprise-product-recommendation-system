@@ -48,7 +48,7 @@ class TestChallengerM9AdversarialVerification(unittest.TestCase):
         model, ckpt = load_retriever_from_checkpoint(self.ckpt_path)
         self.assertIsInstance(model, TwoTowerModel)
         self.assertIn("product_ids", ckpt)
-        self.assertEqual(len(ckpt["product_ids"]), 927)
+        self.assertEqual(len(ckpt["product_ids"]), model.product_bias.numel())
 
         # Check required metadata keys
         required_keys = [

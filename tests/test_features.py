@@ -3,6 +3,7 @@
 import unittest
 import numpy as np
 import pandas as pd
+from recommender.merging import merge_purchase_events
 
 from recommender.features import (
     Log1pScaler,
@@ -14,6 +15,20 @@ from recommender.features import (
 
 
 class PointInTimeFeaturesTests(unittest.TestCase):
+    def test_customer_median_basket_quantity_uses_prior_purchase_days(self):
+        history = pd.DataFrame(
+            [("C1", "2025-01-01 08:00", "A", 2), ("C1", "2025-01-01 16:00", "A", 8),
+             ("C1", "2025-01-01", "B", 6), ("C1", "2025-01-02", "A", 30),
+             ("C1", "2025-01-03", "A", 1000)],
+            columns=["customer_id", "purchase_date", "product_id", "quantity"],
+        )
+        result = compute_point_in_time_features(
+            merge_purchase_events(history), "C1", pd.Timestamp("2025-01-03"),
+            include_median_quantity=True, include_median_purchase_quantity=True,
+        )
+        self.assertEqual(result["median_basket_quantity"], 23)
+        self.assertEqual(result["median_purchase_quantity"], 10)
+
     def test_compute_urgency_formula(self):
         # overdue: 14 days since order, median gap 7 -> +7.0
         self.assertEqual(compute_urgency(14.0, 7.0), 7.0)

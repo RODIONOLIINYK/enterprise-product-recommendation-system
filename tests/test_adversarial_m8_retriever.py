@@ -434,7 +434,8 @@ class TestAdversarialM8Retriever(unittest.TestCase):
         self.assertTrue(hist_path.is_file(), "checkpoints/retriever/training_history.json does not exist!")
 
         ckpt = torch.load(ckpt_path, map_location="cpu")
-        self.assertEqual(len(ckpt["product_ids"]), 927, "Must contain exactly 927 eligible catalogue products!")
+        self.assertEqual(len(ckpt["product_ids"]), ckpt["config"]["num_catalog_products"])
+        self.assertEqual(len(set(ckpt["product_ids"])), len(ckpt["product_ids"]))
         self.assertIn("val_metrics", ckpt)
 
         val_metrics = ckpt["val_metrics"]

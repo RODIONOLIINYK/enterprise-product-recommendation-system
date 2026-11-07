@@ -29,6 +29,8 @@ RETRIEVER_PROFILE_FEATURES = (
     "distinct_categories",
     "median_order_gap",
 )
+MEDIAN_BASKET_QUANTITY = "median_basket_quantity"
+MEDIAN_PURCHASE_QUANTITY = "median_purchase_quantity"
 
 
 def compute_urgency(days_since_last_order: float, median_order_gap: float) -> float:
@@ -103,7 +105,7 @@ class Log1pScaler:
 class PointInTimeNormalizer:
     """Manages individual Log1pScalers per feature, fitted strictly on train data."""
 
-    NUMERIC_FEATURES = list(LEGACY_PROFILE_FEATURES)
+    NUMERIC_FEATURES = [*LEGACY_PROFILE_FEATURES, MEDIAN_BASKET_QUANTITY, MEDIAN_PURCHASE_QUANTITY]
 
     def __init__(self):
         self.scalers: Dict[str, Log1pScaler] = {
@@ -176,6 +178,9 @@ def compute_point_in_time_features(
     as_of_date: pd.Timestamp,
     population_median_gap: float = 14.0,
     normalizer: Optional[PointInTimeNormalizer] = None,
+    *,
+    include_median_quantity: bool = False,
+    include_median_purchase_quantity: bool = False,
 ) -> Dict[str, float]:
     """Compute lifetime aggregate features strictly prior to as_of_date."""
     # Strict point-in-time filter: only events strictly before as_of_date
@@ -246,6 +251,16 @@ def compute_point_in_time_features(
             "has_cadence_history": has_cadence,
             "has_history": 1.0,
         }
+
+    if include_median_quantity:
+        raw[MEDIAN_BASKET_QUANTITY] = (
+            float(history.groupby("purchase_date")["quantity"].sum().median())
+            if not history.empty and "quantity" in history else 0.0
+        )
+    if include_median_purchase_quantity:
+        raw[MEDIAN_PURCHASE_QUANTITY] = (
+            float(history["quantity"].median()) if not history.empty and "quantity" in history else 0.0
+        )
 
     if normalizer is not None:
         return normalizer.transform_dict(raw)

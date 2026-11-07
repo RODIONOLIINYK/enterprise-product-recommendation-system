@@ -1,5 +1,6 @@
 """Adapted purchase preparation that preserves exact sellable product IDs."""
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -33,14 +34,15 @@ HISTORY_COLUMNS = [
 REQUIRED_HISTORY_COLUMNS = set(HISTORY_COLUMNS)
 
 
-def load_source_purchases(input_path: str | Path) -> pd.DataFrame:
+def load_source_purchases(input_path: str | Path, *, include_turnover: bool = False) -> pd.DataFrame:
     """Preserve the notebook's first-20-rows header detection and normalization."""
+    columns = {**COLUMN_MAPPING, "Оборот": "turnover_uah"} if include_turnover else COLUMN_MAPPING
     with pd.ExcelFile(input_path) as workbook:
         preview = pd.read_excel(workbook, sheet_name=0, header=None, nrows=20)
         header_row = next(
             (
                 index for index, row in preview.iterrows()
-                if set(COLUMN_MAPPING).issubset(set(row.dropna()))
+                if set(columns).issubset(set(row.dropna()))
             ),
             None,
         )
@@ -48,10 +50,10 @@ def load_source_purchases(input_path: str | Path) -> pd.DataFrame:
             raise ValueError("Expected source column headers not found in the first 20 rows.")
         purchases = pd.read_excel(
             workbook, sheet_name=0, header=header_row,
-            usecols=lambda column: column in COLUMN_MAPPING,
+            usecols=lambda column: column in columns,
             dtype={"КлиентДляОплатыКод": "string", "ТоварКод": "string"},
         )
-    purchases = purchases.rename(columns=COLUMN_MAPPING)
+    purchases = purchases.rename(columns=columns)
     for column in [*SOURCE_TEXT_COLUMNS, "transaction_type", "item_type"]:
         purchases[column] = purchases[column].astype("string").str.strip()
     for column in ["transaction_type", "item_type"]:
@@ -60,7 +62,32 @@ def load_source_purchases(input_path: str | Path) -> pd.DataFrame:
         purchases["purchase_date"], errors="coerce"
     ).dt.normalize()
     purchases["quantity"] = pd.to_numeric(purchases["quantity"], errors="coerce")
+    if include_turnover:
+        purchases["turnover_uah"] = pd.to_numeric(purchases["turnover_uah"], errors="coerce")
     return purchases
+
+
+def sku_median_prices_uah(paid: pd.DataFrame, product_ids: Sequence[str], cutoff: pd.Timestamp) -> dict[str, float]:
+    """Compute the median turnover per unit across unified pre-cutoff purchase records."""
+    dates = pd.to_datetime(paid["purchase_date"], format="mixed").dt.normalize()
+    prior = paid.loc[dates.lt(cutoff) & paid["product_id"].isin(product_ids)].copy()
+    prior["purchase_date"] = dates.loc[prior.index]
+    prior["complete_turnover"] = np.isfinite(prior["turnover_uah"]) & prior["turnover_uah"].ge(0)
+    events = prior.groupby(EVENT_KEY_COLUMNS, observed=True).agg(
+        quantity=("quantity", "sum"),
+        turnover=("turnover_uah", "sum"),
+        complete_turnover=("complete_turnover", "all"),
+    )
+    valid = events.loc[events["complete_turnover"] & events["turnover"].gt(0)]
+    unit_price = valid["turnover"] / valid["quantity"]
+    return unit_price.groupby(level="product_id").median().to_dict()
+
+
+def load_sku_median_prices_uah(
+    input_path: str | Path, product_ids: Sequence[str], cutoff: pd.Timestamp,
+) -> dict[str, float]:
+    paid = select_paid_purchases(load_source_purchases(input_path, include_turnover=True))
+    return sku_median_prices_uah(paid, product_ids, cutoff)
 
 
 def complete_history_row_mask(purchases: pd.DataFrame) -> pd.Series:

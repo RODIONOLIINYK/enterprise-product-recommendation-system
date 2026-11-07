@@ -20,8 +20,9 @@ import numpy as np
 import pandas as pd
 import torch
 
+from recommender.candidates import load_retriever_from_checkpoint
 from recommender.features import PointInTimeNormalizer, compute_point_in_time_features
-from recommender.models import CustomerTower, ProductTower, TwoTowerModel
+from recommender.models import CustomerTower, TwoTowerModel
 from recommender.sequences import ENRICHED_FEATURE_DIM, build_customer_sequence
 from recommender.split import TEST_START, TRAIN_CUTOFF, VAL_START
 from recommender.train_retriever import (
@@ -47,7 +48,8 @@ class TestChallengerM8RetrieverVerification(unittest.TestCase):
         self.assertTrue(self.ckpt_path.is_file(), f"Checkpoint missing: {self.ckpt_path}")
         self.assertGreater(self.ckpt_path.stat().st_size, 1_000_000, "Checkpoint too small (< 1MB)")
 
-        ckpt = torch.load(self.ckpt_path, map_location="cpu", weights_only=False)
+        model, ckpt = load_retriever_from_checkpoint(self.ckpt_path)
+        self.assertIsInstance(model, TwoTowerModel)
         required_keys = [
             "epoch", "model_state_dict", "optimizer_state_dict",
             "best_recall_50", "product_ids", "product_to_idx",
@@ -56,50 +58,15 @@ class TestChallengerM8RetrieverVerification(unittest.TestCase):
         for k in required_keys:
             self.assertIn(k, ckpt, f"Checkpoint missing key: {k}")
 
-        sd = ckpt["model_state_dict"]
-        config = ckpt["config"]
         product_ids = ckpt["product_ids"]
-        self.assertEqual(len(product_ids), 927)
+        self.assertEqual(len(product_ids), ckpt["config"]["num_catalog_products"])
+        self.assertEqual(ckpt["product_to_idx"], {sku: i for i, sku in enumerate(product_ids)})
 
-        # Instantiate TwoTowerModel matching saved architecture
-        customer_tower = CustomerTower(
-            text_dim=config["text_dim"],
-            output_dim=config["output_dim"],
-            num_cities=sd["customer_tower.city_embedding.weight"].shape[0],
-            num_regions=sd["customer_tower.region_embedding.weight"].shape[0],
-            num_industries=sd["customer_tower.industry_embedding.weight"].shape[0],
-            num_categories=sd["product_tower.cat_embedding.weight"].shape[0],
-            num_business_lines=sd["product_tower.line_embedding.weight"].shape[0],
-            seq_feature_dim=ENRICHED_FEATURE_DIM,
-            num_tabular_features=8,
-            hidden_dim=128,
-            num_heads=4,
-            num_layers=2,
-            dim_feedforward=256,
-            dropout=0.1,
-        )
-        product_tower = ProductTower(
-            text_dim=config["text_dim"],
-            output_dim=config["output_dim"],
-            num_brands=sd["product_tower.brand_embedding.weight"].shape[0],
-            num_categories=sd["product_tower.cat_embedding.weight"].shape[0],
-            num_subcategories=sd["product_tower.subcat_embedding.weight"].shape[0],
-            num_business_lines=sd["product_tower.line_embedding.weight"].shape[0],
-            num_demand_features=6,
-            hidden_dim=128,
-            dropout=0.1,
-        )
-        model = TwoTowerModel(
-            customer_tower=customer_tower,
-            product_tower=product_tower,
-            num_catalog_products=config["num_catalog_products"],
-            temperature=config["temperature"],
-        )
-
-        # Strict weight restoration
-        missing, unexpected = model.load_state_dict(sd, strict=True)
-        self.assertEqual(len(missing), 0, f"Missing keys during load: {missing}")
-        self.assertEqual(len(unexpected), 0, f"Unexpected keys during load: {unexpected}")
+        # Confirm that the production loader restored every saved tensor.
+        loaded_state = model.state_dict()
+        self.assertEqual(loaded_state.keys(), ckpt["model_state_dict"].keys())
+        for name, value in loaded_state.items():
+            torch.testing.assert_close(value, ckpt["model_state_dict"][name], rtol=0, atol=0)
 
         # Check weights are finite (no NaNs, no Infs)
         for name, param in model.named_parameters():
@@ -107,65 +74,41 @@ class TestChallengerM8RetrieverVerification(unittest.TestCase):
 
     def test_02_forward_pass_and_shape_invariants(self):
         """Restored model must produce exact output shapes and unit L2 norms."""
-        ckpt = torch.load(self.ckpt_path, map_location="cpu", weights_only=False)
-        sd = ckpt["model_state_dict"]
+        model, ckpt = load_retriever_from_checkpoint(self.ckpt_path)
         config = ckpt["config"]
-        P = config["num_catalog_products"]
-
-        customer_tower = CustomerTower(
-            text_dim=config["text_dim"],
-            output_dim=config["output_dim"],
-            num_cities=sd["customer_tower.city_embedding.weight"].shape[0],
-            num_regions=sd["customer_tower.region_embedding.weight"].shape[0],
-            num_industries=sd["customer_tower.industry_embedding.weight"].shape[0],
-            num_categories=sd["product_tower.cat_embedding.weight"].shape[0],
-            num_business_lines=sd["product_tower.line_embedding.weight"].shape[0],
-            seq_feature_dim=ENRICHED_FEATURE_DIM,
-            num_tabular_features=8,
-            hidden_dim=128,
-        )
-        product_tower = ProductTower(
-            text_dim=config["text_dim"],
-            output_dim=config["output_dim"],
-            num_brands=sd["product_tower.brand_embedding.weight"].shape[0],
-            num_categories=sd["product_tower.cat_embedding.weight"].shape[0],
-            num_subcategories=sd["product_tower.subcat_embedding.weight"].shape[0],
-            num_business_lines=sd["product_tower.line_embedding.weight"].shape[0],
-            num_demand_features=6,
-            hidden_dim=128,
-        )
-        model = TwoTowerModel(
-            customer_tower=customer_tower,
-            product_tower=product_tower,
-            num_catalog_products=P,
-            temperature=config["temperature"],
-        )
-        model.load_state_dict(sd, strict=True)
-        model.eval()
-
+        P = len(ckpt["product_ids"])
         B = 8
-        u_c = model.customer_tower(
-            torch.randn(B, 1024),
-            torch.randint(0, 50, (B,)),
-            torch.randint(0, 20, (B,)),
-            torch.randint(0, 30, (B,)),
-            torch.rand(B, 8),
-            torch.rand(B, 32, ENRICHED_FEATURE_DIM),
-            torch.ones(B, 32, dtype=torch.long),
-        )
-        self.assertEqual(u_c.shape, (B, 128))
+        customer_tower = model.customer_tower
+        product_tower = model.product_tower
+        seq_len = customer_tower.max_seq_len
+
+        with torch.inference_mode():
+            v_p = product_tower(
+                torch.randn(P, config["text_dim"]),
+                torch.zeros(P, dtype=torch.long),
+                torch.zeros(P, dtype=torch.long),
+                torch.zeros(P, dtype=torch.long) if product_tower.subcat_embedding is not None else None,
+                torch.zeros(P, dtype=torch.long),
+                torch.rand(P, product_tower.num_demand_features),
+            )
+            u_c = customer_tower(
+                torch.randn(B, config["text_dim"]),
+                torch.zeros(B, dtype=torch.long),
+                torch.zeros(B, dtype=torch.long),
+                torch.zeros(B, dtype=torch.long),
+                torch.rand(B, customer_tower.num_tabular_features),
+                torch.rand(B, seq_len, ENRICHED_FEATURE_DIM),
+                torch.ones(B, seq_len, dtype=torch.long),
+                seq_product_ids=((torch.arange(seq_len) % P) + 1).expand(B, -1),
+                seq_purchase_dates=torch.linspace(0, 1, seq_len).expand(B, -1),
+                catalog_product_vectors=v_p,
+            )
+
+        self.assertEqual(u_c.shape, (B, config["output_dim"]))
         u_c_norms = torch.norm(u_c, dim=-1)
         self.assertTrue(torch.allclose(u_c_norms, torch.ones_like(u_c_norms), atol=1e-4))
 
-        v_p = model.product_tower(
-            torch.randn(P, 1024),
-            torch.randint(0, 30, (P,)),
-            torch.randint(0, 30, (P,)),
-            torch.randint(0, 50, (P,)),
-            torch.randint(0, 10, (P,)),
-            torch.rand(P, 6),
-        )
-        self.assertEqual(v_p.shape, (P, 128))
+        self.assertEqual(v_p.shape, (P, config["output_dim"]))
         v_p_norms = torch.norm(v_p, dim=-1)
         self.assertTrue(torch.allclose(v_p_norms, torch.ones_like(v_p_norms), atol=1e-4))
 

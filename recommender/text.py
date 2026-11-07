@@ -15,6 +15,7 @@ DEFAULT_MODEL_NAME = "BAAI/bge-m3"
 DEFAULT_EMBEDDING_DIM = 1024
 DEFAULT_CACHE_DIR = Path("data/interim/embeddings")
 CATALOGUE_CACHE_WITHOUT_SUBCATEGORY = "bge_m3_catalogue_without_subcategory.parquet"
+COMPANY_CACHE_WITH_REGION = "bge_m3_company_with_region.parquet"
 
 
 def get_product_text(row: Union[pd.Series, Dict[str, Any]]) -> str:
@@ -48,13 +49,18 @@ def get_product_text(row: Union[pd.Series, Dict[str, Any]]) -> str:
     return " ".join(tokens).strip()
 
 
-def get_company_text(row: Union[pd.Series, Dict[str, Any]]) -> str:
+def get_company_text(
+    row: Union[pd.Series, Dict[str, Any]], *, include_region: bool = False,
+) -> str:
     """Format rich text description from company metadata."""
     tokens = []
     for field in ["company_name", "city", "description", "industry_branch"]:
         val = row.get(field)
         if pd.notna(val) and str(val).strip() and str(val).strip().upper() != "NULL":
             tokens.append(str(val).strip())
+    region = row.get("region_code")
+    if include_region and pd.notna(region) and str(region).strip().upper() not in ("", "NULL"):
+        tokens.append(f"Region {str(region).strip()}")
     return " ".join(tokens).strip()
 
 
@@ -143,6 +149,8 @@ def generate_company_embeddings(
     device: Optional[str] = None,
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
     force_refresh: bool = False,
+    *,
+    include_region: bool = False,
 ) -> Dict[str, np.ndarray]:
     """Generate 1024-d float32 embeddings for company/customer profiles with offline caching."""
     if cache_path is not None and not force_refresh:
@@ -161,7 +169,7 @@ def generate_company_embeddings(
 
     for idx, (_, row) in enumerate(unique_companies.iterrows()):
         cid = str(row["customer_id"])
-        txt = get_company_text(row)
+        txt = get_company_text(row, include_region=include_region)
         customer_ids.append(cid)
         texts.append(txt)
         if not txt:

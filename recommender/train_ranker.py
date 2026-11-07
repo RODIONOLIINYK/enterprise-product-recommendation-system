@@ -1,7 +1,7 @@
 """Stage 2: Unified Profile-Sequence Candidate-Aware Neural Ranker (UPS-CANR) Training Pipeline.
 
 Implements:
-1. Candidate slate precomputation and caching with strict top-50 retrieval for both splits.
+1. Candidate slate precomputation and caching with the same candidate policy for both splits.
 2. RankerDataset and DataLoader for grouped transition batches (B=64, C=50).
 3. Hybrid ranking objective: Multi-Label BCEWithLogitsLoss (pos_weight=10.0) +
    Listwise Softmax Cross-Entropy loss.
@@ -24,11 +24,13 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from recommender.candidates import CandidateRetriever
+from recommender.candidates import DEFAULT_HEURISTIC_FRACTION, NUM_PAIRWISE_FEATURES, CandidateRetriever
 from recommender.catalogue import load_product_catalogue, order_retriever_catalogue
 from recommender.company import load_companies
 from recommender.features import (
     LEGACY_PROFILE_FEATURES,
+    MEDIAN_BASKET_QUANTITY,
+    MEDIAN_PURCHASE_QUANTITY,
     PointInTimeNormalizer,
     compute_point_in_time_features,
 )
@@ -161,6 +163,9 @@ def precompute_candidate_slates_for_transitions(
     item_metadata: Dict[str, Dict[str, Any]],
     top_c: int = 50,
     batch_size: int = 128,
+    *,
+    heuristic_fraction: float = 0.0,
+    category_overdue: bool = False,
 ) -> Dict[str, Any]:
     """Precompute full customer memory tensors and CandidateRetriever slates for a transition list."""
     n_transitions = len(transitions)
@@ -179,6 +184,12 @@ def precompute_candidate_slates_for_transitions(
     all_seq_category_ids: List[np.ndarray] = []
     all_seq_subcat_ids: List[np.ndarray] = []
     all_seq_line_ids: List[np.ndarray] = []
+    retriever_length = retriever.model.customer_tower.max_seq_len
+    sequence_fields = (
+        "sequence", "attention_mask", "seq_product_ids", "seq_category_ids", "seq_purchase_dates",
+    )
+    separate_retriever_sequence = retriever_length != DEFAULT_SEQUENCE_LENGTH
+    retriever_rows = {name: [] for name in sequence_fields}
 
     # 1. Build customer memory feature representations
     for t in transitions:
@@ -199,7 +210,11 @@ def precompute_candidate_slates_for_transitions(
         all_industry_ids.append(int(meta.get("industry_id", 0)))
 
         # Tabular lifetime features
-        pit = compute_point_in_time_features(grp, cid, as_of, normalizer=normalizer)
+        pit = compute_point_in_time_features(
+            grp, cid, as_of, normalizer=normalizer,
+            include_median_quantity=MEDIAN_BASKET_QUANTITY in retriever.profile_features,
+            include_median_purchase_quantity=MEDIAN_PURCHASE_QUANTITY in retriever.profile_features,
+        )
         all_tab_feats.append([float(pit[name]) for name in LEGACY_PROFILE_FEATURES])
         all_retriever_tab_feats.append([float(pit[name]) for name in retriever.profile_features])
 
@@ -208,13 +223,23 @@ def precompute_candidate_slates_for_transitions(
             grp,
             customer_id=cid,
             as_of_date=as_of,
-            max_len=DEFAULT_SEQUENCE_LENGTH,
+            max_len=max(DEFAULT_SEQUENCE_LENGTH, retriever_length),
             feature_dim=ENRICHED_FEATURE_DIM,
             vocabularies=vocabs,
             item_metadata=item_metadata,
             enriched=True,
             quantity_reference=retriever.quantity_reference,
         )
+        if separate_retriever_sequence:
+            num_events = int(seq_res["attention_mask"].sum())
+            retriever_start = max(0, num_events - retriever_length)
+            for name in sequence_fields:
+                retriever_rows[name].append(seq_res[name][retriever_start:retriever_start + retriever_length])
+            ranker_start = max(0, num_events - DEFAULT_SEQUENCE_LENGTH)
+            seq_res = {
+                name: values[ranker_start:ranker_start + DEFAULT_SEQUENCE_LENGTH]
+                for name, values in seq_res.items()
+            }
         all_sequences.append(seq_res["sequence"].numpy())
         all_attention_masks.append(seq_res["attention_mask"].numpy())
         all_seq_product_ids.append(seq_res["seq_product_ids"].numpy())
@@ -236,6 +261,14 @@ def precompute_candidate_slates_for_transitions(
     t_cids = torch.from_numpy(np.array(all_seq_category_ids, dtype=np.int64))
     t_sub_ids = torch.from_numpy(np.array(all_seq_subcat_ids, dtype=np.int64))
     t_line_ids = torch.from_numpy(np.array(all_seq_line_ids, dtype=np.int64))
+    retriever_sequence = (
+        {name: torch.stack(rows) for name, rows in retriever_rows.items()}
+        if separate_retriever_sequence else {}
+    )
+    tower_inputs = retriever_sequence or {
+        "sequence": t_seq, "attention_mask": t_mask, "seq_product_ids": t_pids,
+        "seq_category_ids": t_cids, "seq_purchase_dates": t_dates,
+    }
 
     # 2. Batched Stage 1 retrieval and CandidateBatch generation
     all_cand_indices: List[torch.Tensor] = []
@@ -256,23 +289,14 @@ def precompute_candidate_slates_for_transitions(
             b_reg = t_region[start_idx:end_idx].to(device)
             b_ind = t_industry[start_idx:end_idx].to(device)
             b_tab = t_retriever_tab[start_idx:end_idx].to(device)
-            b_seq = t_seq[start_idx:end_idx].to(device)
-            b_mask = t_mask[start_idx:end_idx].to(device)
-            b_pids = t_pids[start_idx:end_idx].to(device)
-            b_cids = t_cids[start_idx:end_idx].to(device)
-
             u_c = retriever.model.customer_tower(
                 text_embedding=b_text,
                 city_id=b_city,
                 region_id=b_reg,
                 industry_id=b_ind,
                 tabular_features=b_tab,
-                sequence=b_seq,
-                attention_mask=b_mask,
-                seq_product_ids=b_pids,
-                seq_category_ids=b_cids,
                 catalog_product_vectors=product_vectors,
-                seq_purchase_dates=t_dates[start_idx:end_idx].to(device),
+                **{name: tensor[start_idx:end_idx].to(device) for name, tensor in tower_inputs.items()},
             )
 
             b_cids_list = [str(t["customer_id"]) for t in batch_slice]
@@ -287,6 +311,8 @@ def precompute_candidate_slates_for_transitions(
                 as_of_dates=b_dates,
                 positive_product_ids=b_pos_pids,
                 top_c=top_c,
+                heuristic_fraction=heuristic_fraction,
+                category_overdue=category_overdue,
             )
 
             all_cand_indices.append(batch_candidates.candidate_indices.cpu())
@@ -302,7 +328,7 @@ def precompute_candidate_slates_for_transitions(
     stacked_pw_feats = torch.cat(all_pairwise_feats, dim=0)
     stacked_labels = torch.cat(all_labels, dim=0)
 
-    return {
+    result = {
         "text_embedding": t_text,
         "city_id": t_city,
         "region_id": t_region,
@@ -324,10 +350,15 @@ def precompute_candidate_slates_for_transitions(
         "positive_pids": all_pos_pids,
         "customer_ids": all_cust_ids,
     }
+    if retriever_sequence:
+        result["retriever_sequence"] = retriever_sequence
+    return result
 
 
-def slate_cache_path(split: str) -> Path:
-    return Path("data/interim") / f"ranker_{split}_slates_v{SLATE_SCHEMA_VERSION}.pt"
+def slate_cache_path(split: str, heuristic_fraction: float = 0.0, *, category_overdue: bool = False) -> Path:
+    mix = f"_repeat_{heuristic_fraction}" if heuristic_fraction else ""
+    cadence = "_category_overdue" if category_overdue else ""
+    return Path("data/interim") / f"ranker_{split}_slates_v{SLATE_SCHEMA_VERSION}{mix}{cadence}.pt"
 
 
 def checkpoint_digest(path: Path) -> str:
@@ -335,9 +366,9 @@ def checkpoint_digest(path: Path) -> str:
         return hashlib.file_digest(source, "sha256").hexdigest()
 
 
-def company_embeddings_path(checkpoint_path: Path) -> Path:
-    local_path = checkpoint_path.parent / "bge_m3_company.parquet"
-    return local_path if local_path.is_file() else DEFAULT_CACHE_DIR / "bge_m3_company.parquet"
+def company_embeddings_path(checkpoint_path: Path, cache_name: str = "bge_m3_company.parquet") -> Path:
+    local_path = checkpoint_path.parent / cache_name
+    return local_path if local_path.is_file() else DEFAULT_CACHE_DIR / cache_name
 
 
 def catalogue_embeddings_path(include_subcategory: bool) -> Path:
@@ -353,10 +384,17 @@ def slate_cache_identity(
     companies: pd.DataFrame,
     *,
     include_subcategory: bool,
+    heuristic_fraction: float = 0.0,
+    company_cache_name: str = "bge_m3_company.parquet",
+    category_overdue: bool = False,
 ) -> str:
     """Bind cached model inputs and labels to their retriever and source data."""
     digest = hashlib.sha256(f"{SLATE_SCHEMA_VERSION}:{retriever_digest}".encode())
-    for path in (catalogue_embeddings_path(include_subcategory), company_embeddings_path(checkpoint_path)):
+    if heuristic_fraction:
+        digest.update(f":repeat_plus_popularity:{heuristic_fraction}".encode())
+    if category_overdue:
+        digest.update(b":category_overdue")
+    for path in (catalogue_embeddings_path(include_subcategory), company_embeddings_path(checkpoint_path, company_cache_name)):
         digest.update(checkpoint_digest(path).encode())
     for frame in (purchases, catalogue, companies):
         digest.update(repr(tuple(frame.dtypes.items())).encode())
@@ -377,11 +415,15 @@ def load_ranker_retriever(
     vocabs = ckpt["vocabs"]
     catalogue = order_retriever_catalogue(catalogue, product_ids)
     include_subcategory = "product_tower.subcat_embedding.weight" in ckpt["model_state_dict"]
+    config = ckpt.get("config", {})
     cat_embs = load_cached_embeddings(
         catalogue_embeddings_path(include_subcategory), id_column="product_id",
     )
     product_inputs = build_retriever_product_inputs(
         purchases, catalogue, cat_embs, product_ids, vocabs, include_subcategory=include_subcategory,
+        include_sku_median_quantity=config.get("include_sku_median_quantity", False),
+        container_encoding=config.get("container_encoding", "one_hot"),
+        sku_prices_uah=config.get("sku_prices_uah"),
     )
     retriever = CandidateRetriever.from_checkpoint(
         checkpoint_path,
@@ -437,7 +479,7 @@ def prepare_slate_inputs(
         "cust_groups": groups,
         "customer_metadata": build_customer_metadata(companies, customer_vocabs),
         "customer_embeddings": load_cached_embeddings(
-            company_embeddings_path(checkpoint_path), id_column="customer_id",
+            company_embeddings_path(checkpoint_path, retriever.company_cache_name), id_column="customer_id",
         ),
         "normalizer": normalizer,
         "vocabs": vocabs,
@@ -485,8 +527,11 @@ def load_or_precompute_slates(
     train_cache_path: Path,
     val_cache_path: Path,
     device: torch.device,
+    *,
+    heuristic_fraction: float = 0.0,
+    category_overdue: bool = False,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], torch.Tensor, List[str], Dict[str, Dict[str, int]]]:
-    """Load compatible slates or generate strict retrieval slates for both splits."""
+    """Load or generate slates for both splits using the configured mix."""
     retriever, vocabs = load_ranker_retriever(
         checkpoint_path, purchases_df, catalogue_df, companies_df, device,
     )
@@ -494,6 +539,9 @@ def load_or_precompute_slates(
     identity = slate_cache_identity(
         retriever_digest, checkpoint_path, purchases_df, catalogue_df, companies_df,
         include_subcategory=retriever.model.product_tower.subcat_embedding is not None,
+        heuristic_fraction=heuristic_fraction,
+        company_cache_name=retriever.company_cache_name,
+        category_overdue=category_overdue,
     )
     train_data = load_slate_cache(train_cache_path, f"{identity}:train")
     val_data = load_slate_cache(val_cache_path, f"{identity}:val")
@@ -502,6 +550,8 @@ def load_or_precompute_slates(
         slate_inputs = prepare_slate_inputs(
             retriever, checkpoint_path, purchases_df, catalogue_df, companies_df, train_transitions, vocabs,
         )
+        slate_inputs["heuristic_fraction"] = heuristic_fraction
+        slate_inputs["category_overdue"] = category_overdue
         if train_data is None:
             print(f"Precomputing {len(train_transitions)} training slates from retrieved candidates")
             train_data = build_slate_cache(
@@ -646,8 +696,13 @@ def train_ranker(
     device: Optional[str] = None,
     checkpoint_dir: Union[str, Path] = "checkpoints/ranker",
     retriever_checkpoint_path: Union[str, Path] = "checkpoints/retriever/best_retriever.pt",
+    *,
+    heuristic_fraction: float = DEFAULT_HEURISTIC_FRACTION,
+    category_overdue: bool = False,
 ) -> Dict[str, Any]:
     """Train Stage 2 UPS-CANR Ranker for 10 epochs and save checkpoints and history."""
+    if not 0.0 <= heuristic_fraction <= 1.0:
+        raise ValueError("heuristic_fraction must be between 0 and 1.")
     torch.manual_seed(42)
     np.random.seed(42)
 
@@ -677,9 +732,11 @@ def train_ranker(
         catalogue_df=catalogue_df,
         companies_df=companies_df,
         checkpoint_path=retriever_checkpoint_path,
-        train_cache_path=slate_cache_path("train"),
-        val_cache_path=slate_cache_path("val"),
+        train_cache_path=slate_cache_path("train", heuristic_fraction, category_overdue=category_overdue),
+        val_cache_path=slate_cache_path("val", heuristic_fraction, category_overdue=category_overdue),
         device=dev,
+        heuristic_fraction=heuristic_fraction,
+        category_overdue=category_overdue,
     )
 
     train_dataset = RankerDataset(train_data)
@@ -705,6 +762,7 @@ def train_ranker(
     model = UPSCANRRanker.from_retriever_checkpoint(
         checkpoint_path=retriever_checkpoint_path,
         device=dev,
+        num_pairwise_features=NUM_PAIRWISE_FEATURES + int(category_overdue),
     )
     if checkpoint_digest(retriever_checkpoint_path) != retriever_digest:
         raise RuntimeError("The retriever checkpoint changed during ranker setup. Restart ranker training.")
@@ -844,6 +902,8 @@ def train_ranker(
                     "vocabs": vocabs,
                     "retriever_digest": retriever_digest,
                     "slate_schema_version": SLATE_SCHEMA_VERSION,
+                    "heuristic_fraction": heuristic_fraction,
+                    "category_overdue": category_overdue,
                     "config": {
                         "hidden_dim": model.hidden_dim,
                         "num_heads": model.num_heads,

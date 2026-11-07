@@ -306,6 +306,57 @@ def test_candidate_slate_eval_no_injection():
     assert sum(slate_dict["labels"]) == 1.0
 
 
+def test_hybrid_slate_preserves_tower_ranks_and_uses_only_prior_sales():
+    purchases = pd.DataFrame(
+        [
+            ("customer", "B", "2025-01-02"),
+            ("other", "E", "2025-01-02"),
+            ("other", "E", "2025-01-03"),
+            ("customer", "D", "2025-01-04"),
+            ("other", "D", "2025-01-04"),
+        ],
+        columns=["customer_id", "product_id", "purchase_date"],
+    )
+    pids = list("ABCDE")
+    retriever = CandidateRetriever(
+        eligible_product_ids=pids, feature_store=PointInTimeFeatureStore(purchases),
+    )
+    logits = torch.tensor([[5.0, 4.0, 3.0, 2.0, 1.0]])
+    batch = retriever.generate_candidate_batch(
+        logits, ["customer"], ["2025-01-04"], [["D", "E"]],
+        top_k=4, top_c=4, heuristic_fraction=0.5,
+    )
+    assert batch.top100_pids == [list("ABCD")]
+    assert batch.candidate_pids == [list("BEAC")]
+    assert batch.candidate_indices.tolist() == [[1, 4, 0, 2]]
+    assert batch.candidate_scores.tolist() == [[4.0, 1.0, 5.0, 3.0]]
+    assert batch.labels.tolist() == [[0.0, 1.0, 0.0, 0.0]]
+    torch.testing.assert_close(batch.pairwise_features[0, :, 1], torch.tensor([0.5, 0.2, 1.0, 1 / 3]))
+    cold = retriever.generate_candidate_batch(
+        logits, ["cold"], ["2025-01-02"], top_k=4, top_c=4, heuristic_fraction=0.5,
+    )
+    assert cold.candidate_pids == [list("ABCD")]
+
+
+def test_category_overdue_counts_distinct_prior_dates_for_unseen_sku():
+    purchases = pd.DataFrame(
+        [("C1", "A", date) for date in ("2025-01-01", "2025-01-06", "2025-01-11", "2025-01-19")],
+        columns=["customer_id", "product_id", "purchase_date"],
+    )
+    catalogue = pd.DataFrame({"product_id": ["A", "B", "C"], "product_category": ["X", "X", "Y"]})
+    store = PointInTimeFeatureStore(purchases, catalogue)
+    result = store.compute_slate_pairwise_features(
+        "C1", "2025-01-19", ["B", "C"], [0.0, 0.0], [0, 1], category_overdue=True,
+    )
+    assert result.shape == (2, 13)
+    assert result[:, 2].tolist() == [0.0, 0.0]
+    assert result[:, -1].tolist() == [1.0, 0.0]
+    at_median = store.compute_slate_pairwise_features(
+        "C1", "2025-01-16", ["B"], [0.0], [0], category_overdue=True,
+    )
+    assert at_median[0, -1].item() == 0.0
+
+
 def test_candidate_batch_dict_access_and_device():
     """Validates CandidateBatch dataclass supports dict indexing, to_dict, and device transfer."""
     b_size, c_slate = 2, 5
@@ -374,7 +425,8 @@ def test_checkpoint_loading_and_retrieval():
 
     model, ckpt = load_retriever_from_checkpoint(ckpt_path)
     assert ckpt is not None
-    assert len(ckpt["product_ids"]) == 927
+    num_products = len(ckpt["product_ids"])
+    assert num_products == ckpt["config"]["num_catalog_products"]
 
     # Load sample real purchases
     purchases_path = Path("data/interim/cleaned_purchases.csv")
@@ -390,9 +442,9 @@ def test_checkpoint_loading_and_retrieval():
         feature_store=store,
     )
 
-    # Generate synthetic customer vectors (B=2, 128) and catalog product vectors (P=927, 128)
+    # Generate synthetic customer and catalog vectors with the saved dimensions.
     cust_vecs = torch.randn(2, 128)
-    prod_vecs = torch.randn(927, 128)
+    prod_vecs = torch.randn(num_products, 128)
 
     sample_cids = purchases_df["customer_id"].astype(str).unique()[:2].tolist()
     as_ofs = [pd.Timestamp("2025-09-01"), pd.Timestamp("2025-09-01")]

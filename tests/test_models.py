@@ -45,6 +45,18 @@ class TestTwoTowerModel(unittest.TestCase):
             num_catalog_products=self.num_products,
         )
 
+    def test_profile_only_retriever_ignores_purchase_records(self):
+        tower = CustomerTower(catalog_history_encoder="none", dropout=0.0).eval()
+        text = torch.randn(1, TEXT_DIM)
+        labels = torch.zeros(1, dtype=torch.long)
+        stats = torch.randn(1, 8)
+        mask = torch.ones(1, 32, dtype=torch.long)
+        first = tower(text, labels, labels, labels, stats, torch.zeros(1, 32, 4), mask)
+        second = tower(text, labels, labels, labels, stats, torch.ones(1, 32, 4), mask)
+        torch.testing.assert_close(first, second, rtol=0, atol=0)
+        torch.testing.assert_close(first, tower(text, labels, labels, labels, stats), rtol=0, atol=0)
+        self.assertNotIn("pos_embedding", tower.state_dict())
+
     def test_customer_tower_output_shape_and_unit_norm(self):
         """Customer Tower must output (B, 128) with unit L2 norm."""
         text_emb = torch.randn(self.batch_size, TEXT_DIM)

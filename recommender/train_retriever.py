@@ -22,8 +22,11 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 from recommender.catalogue import order_retriever_catalogue
+from recommender.merging import EVENT_KEY_COLUMNS, merge_purchase_events
 from recommender.features import (
     LEGACY_PROFILE_FEATURES,
+    MEDIAN_BASKET_QUANTITY,
+    MEDIAN_PURCHASE_QUANTITY,
     RETRIEVER_PROFILE_FEATURES,
     PointInTimeNormalizer,
     compute_point_in_time_features,
@@ -47,6 +50,7 @@ from recommender.sequences import (
 from recommender.split import TEST_START, TRAIN_CUTOFF
 from recommender.text import (
     CATALOGUE_CACHE_WITHOUT_SUBCATEGORY,
+    COMPANY_CACHE_WITH_REGION,
     DEFAULT_CACHE_DIR,
     generate_catalogue_embeddings,
     generate_company_embeddings,
@@ -408,18 +412,28 @@ class RetrieverDataset(Dataset):
             text = np.zeros(TEXT_DIM, dtype=np.float32)
         metadata = self.customer_metadata.get(cid, {})
 
-        profile = compute_point_in_time_features(history, cid, as_of, normalizer=self.normalizer)
-        sequence = build_customer_sequence(
-            history,
-            customer_id=cid,
-            as_of_date=as_of,
-            max_len=self.max_seq_len,
-            feature_dim=self.seq_feature_dim,
-            vocabularies=self.vocabularies,
-            item_metadata=self.product_metadata,
-            enriched=True,
-            quantity_reference=self.quantity_reference,
+        profile = compute_point_in_time_features(
+            history, cid, as_of, normalizer=self.normalizer,
+            include_median_quantity=MEDIAN_BASKET_QUANTITY in self.profile_features,
+            include_median_purchase_quantity=MEDIAN_PURCHASE_QUANTITY in self.profile_features,
         )
+        sequence_inputs = {}
+        if self.max_seq_len:
+            sequence = build_customer_sequence(
+                history,
+                customer_id=cid,
+                as_of_date=as_of,
+                max_len=self.max_seq_len,
+                feature_dim=self.seq_feature_dim,
+                vocabularies=self.vocabularies,
+                item_metadata=self.product_metadata,
+                enriched=True,
+                quantity_reference=self.quantity_reference,
+            )
+            sequence_inputs = {
+                name: sequence[name]
+                for name in ("sequence", "attention_mask", "seq_product_ids", "seq_purchase_dates", "seq_category_ids")
+            }
 
         target = torch.zeros(self.num_products, dtype=torch.float32)
         for product_id in transition["positive_product_ids"]:
@@ -432,11 +446,7 @@ class RetrieverDataset(Dataset):
             "region_id": torch.tensor(int(metadata.get("region_id", 0)), dtype=torch.long),
             "industry_id": torch.tensor(int(metadata.get("industry_id", 0)), dtype=torch.long),
             "tabular_features": torch.tensor([profile[name] for name in self.profile_features], dtype=torch.float32),
-            "sequence": sequence["sequence"],
-            "attention_mask": sequence["attention_mask"],
-            "seq_product_ids": sequence["seq_product_ids"],
-            "seq_purchase_dates": sequence["seq_purchase_dates"],
-            "seq_category_ids": sequence["seq_category_ids"],
+            **sequence_inputs,
             "target": target,
         }
 
@@ -500,14 +510,43 @@ def build_retriever_product_inputs(
     vocabs: Dict[str, Dict[str, int]],
     *,
     include_subcategory: bool,
+    include_sku_median_quantity: bool = False,
+    container_encoding: str = "one_hot",
+    sku_prices_uah: Optional[Dict[str, float]] = None,
 ) -> Dict[str, torch.Tensor]:
     """Share the training snapshot and product index order with downstream scoring."""
     ordered = order_retriever_catalogue(catalogue_df, product_ids)
     categories = ordered.set_index("product_id")["product_category"].dropna().to_dict()
     demand = compute_product_demand_features(purchases_df, TRAIN_CUTOFF, list(product_ids), categories)
-    return build_product_tower_inputs(
+    if include_sku_median_quantity:
+        prior = purchases_df.loc[pd.to_datetime(purchases_df["purchase_date"], format="mixed") < TRAIN_CUTOFF]
+        prior = merge_purchase_events(prior[[*EVENT_KEY_COLUMNS, "quantity"]])
+        medians = prior.groupby("product_id")["quantity"].median().reindex(product_ids, fill_value=0)
+        log_values = torch.log1p(torch.as_tensor(medians.to_numpy(dtype=np.float32)))
+        reference = math.log1p(fit_quantity_reference(medians))
+        demand = torch.cat([demand, (log_values / (log_values + reference)).unsqueeze(1)], dim=1)
+    if sku_prices_uah is not None:
+        prices = np.array([sku_prices_uah.get(sku, 0.0) for sku in product_ids], dtype=np.float32)
+        log_prices = torch.log1p(torch.from_numpy(prices))
+        reference = math.log1p(fit_quantity_reference(prices))
+        demand = torch.cat([demand, (log_prices / (log_prices + reference)).unsqueeze(1)], dim=1)
+    container_ids = None
+    if "container_vocab" in vocabs:
+        container_vocab = vocabs["container_vocab"]
+        container_types = ordered.get("container_type", pd.Series(index=ordered.index, dtype="string"))
+        ids = container_types.map(container_vocab).fillna(0).to_numpy(dtype=np.int64)
+        container_ids = torch.from_numpy(ids)
+        if container_encoding != "embedding_none":
+            indicators = torch.nn.functional.one_hot(container_ids, len(container_vocab) + 1)
+            if container_encoding == "one_hot":
+                indicators = indicators[:, 1:]
+            demand = torch.cat([demand, indicators.to(demand.dtype)], dim=1)
+    inputs = build_product_tower_inputs(
         ordered, catalogue_embeddings, demand, vocabs, include_subcategory=include_subcategory,
     )
+    if container_ids is not None and container_encoding == "embedding_none":
+        inputs["container_id"] = container_ids
+    return inputs
 
 
 def train_retriever(
@@ -525,6 +564,14 @@ def train_retriever(
     seed: int = 42,
     *,
     history_encoder: str = "attention",
+    max_seq_len: int = DEFAULT_SEQUENCE_LENGTH,
+    include_customer_median_quantity: bool = False,
+    include_customer_median_purchase_quantity: bool = True,
+    include_sku_median_quantity: bool = False,
+    include_container_type: bool = True,
+    container_encoding: str = "one_hot_none",
+    include_region_in_text: bool = False,
+    include_sku_price: bool = False,
 ) -> Dict[str, Any]:
     """Train Modular Two-Tower Retriever and save best checkpoint + metrics history.
 
@@ -533,8 +580,17 @@ def train_retriever(
     """
     torch.manual_seed(seed)
     np.random.seed(seed)
-    if history_encoder not in ("attention", "pool"):
-        raise ValueError("history_encoder must be 'attention' or 'pool'.")
+    if history_encoder not in ("attention", "pool", "none"):
+        raise ValueError("history_encoder must be 'attention', 'pool', or 'none'.")
+    if max_seq_len < 1:
+        raise ValueError("max_seq_len must be positive.")
+    if container_encoding not in ("one_hot", "one_hot_none", "embedding_none"):
+        raise ValueError("Unknown container encoding.")
+    profile_features = RETRIEVER_PROFILE_FEATURES
+    if include_customer_median_quantity:
+        profile_features = (*profile_features, MEDIAN_BASKET_QUANTITY)
+    if include_customer_median_purchase_quantity:
+        profile_features = (*profile_features, MEDIAN_PURCHASE_QUANTITY)
 
     dev = get_device(device)
     ckpt_dir = Path(checkpoint_dir)
@@ -551,6 +607,10 @@ def train_retriever(
 
     purchases_df = purchases_df.copy()
     purchases_df["purchase_date"] = pd.to_datetime(purchases_df["purchase_date"], format="mixed")
+    if include_customer_median_purchase_quantity:
+        purchases_df["purchase_date"] = purchases_df["purchase_date"].dt.normalize()
+        if purchases_df.duplicated(EVENT_KEY_COLUMNS).any():
+            purchases_df = merge_purchase_events(purchases_df)
     purchases_df = purchases_df.loc[purchases_df["purchase_date"] < TEST_START]
     train_purchases = purchases_df.loc[purchases_df["purchase_date"] < TRAIN_CUTOFF]
     quantity_reference = fit_quantity_reference(train_purchases.get("quantity", []))
@@ -574,13 +634,16 @@ def train_retriever(
             catalogue_df.drop(columns="product_subcategory", errors="ignore"), cache_path=cat_cache_path,
         )
 
-    comp_cache_path = ckpt_dir / "bge_m3_company.parquet"
+    company_cache_name = COMPANY_CACHE_WITH_REGION if include_region_in_text else "bge_m3_company.parquet"
+    comp_cache_path = ckpt_dir / company_cache_name
     if comp_cache_path.is_file():
         company_embeddings = load_cached_embeddings(comp_cache_path, id_column="customer_id")
-    elif (DEFAULT_CACHE_DIR / "bge_m3_company.parquet").is_file():
-        company_embeddings = load_cached_embeddings(DEFAULT_CACHE_DIR / "bge_m3_company.parquet", id_column="customer_id")
+    elif (DEFAULT_CACHE_DIR / company_cache_name).is_file():
+        company_embeddings = load_cached_embeddings(DEFAULT_CACHE_DIR / company_cache_name, id_column="customer_id")
     else:
-        company_embeddings = generate_company_embeddings(companies_df, cache_path=comp_cache_path)
+        company_embeddings = generate_company_embeddings(
+            companies_df, cache_path=comp_cache_path, include_region=include_region_in_text,
+        )
 
     # 3. Product Catalog Mapping and Attribute Vocabularies
     eligible_pids = sorted(catalogue_df["product_id"].astype(str).unique().tolist())
@@ -626,7 +689,10 @@ def train_retriever(
         cid = str(t["customer_id"])
         as_of = t["as_of_date"]
         c_df = cust_groups_train[cid]
-        raw_feat = compute_point_in_time_features(c_df, cid, as_of, normalizer=None)
+        raw_feat = compute_point_in_time_features(
+            c_df, cid, as_of, include_median_quantity=include_customer_median_quantity,
+            include_median_purchase_quantity=include_customer_median_purchase_quantity,
+        )
         train_feat_rows.append(raw_feat)
 
     if train_feat_rows:
@@ -647,6 +713,11 @@ def train_retriever(
         "business_line_vocab": line_vocab,
         "product_vocab": {pid: i + 1 for i, pid in enumerate(eligible_pids)},
     }
+    if include_container_type:
+        container_types = catalogue_df.get("container_type", pd.Series(dtype="string"))
+        vocabs["container_vocab"] = {
+            value: i + 1 for i, value in enumerate(sorted(container_types.dropna().unique()))
+        }
     prod_meta = (
         catalogue_df.drop_duplicates(subset=["product_id"])
         .set_index("product_id")[["product_category", "product_subcategory", "business_line"]]
@@ -663,8 +734,9 @@ def train_retriever(
         vocabularies=vocabs,
         product_metadata=prod_meta,
         preload=True,
-        profile_features=RETRIEVER_PROFILE_FEATURES,
+        profile_features=profile_features,
         quantity_reference=quantity_reference,
+        max_seq_len=max_seq_len if history_encoder != "none" else 0,
     )
     val_ds = RetrieverDataset(
         transitions=val_transitions,
@@ -676,19 +748,29 @@ def train_retriever(
         vocabularies=vocabs,
         product_metadata=prod_meta,
         preload=True,
-        profile_features=RETRIEVER_PROFILE_FEATURES,
+        profile_features=profile_features,
         quantity_reference=quantity_reference,
+        max_seq_len=max_seq_len if history_encoder != "none" else 0,
     )
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
-    history_gap_reference_days = fit_history_gap_reference(
-        train_ds.preloaded["seq_purchase_dates"], train_ds.preloaded["attention_mask"],
+    history_gap_reference_days = (
+        fit_history_gap_reference(train_ds.preloaded["seq_purchase_dates"], train_ds.preloaded["attention_mask"])
+        if history_encoder != "none" else None
     )
 
     # 7. Build the fixed product snapshot shared with downstream scoring.
+    sku_prices_uah = None
+    if include_sku_price:
+        from recommender.data import load_sku_median_prices_uah
+        from recommender.scope import get_datasets_locs
+        sku_prices_uah = load_sku_median_prices_uah(get_datasets_locs("purchases"), eligible_pids, TRAIN_CUTOFF)
     prod_inputs = build_retriever_product_inputs(
         purchases_df, catalogue_df, catalogue_embeddings, eligible_pids, vocabs, include_subcategory=False,
+        include_sku_median_quantity=include_sku_median_quantity,
+        container_encoding=container_encoding,
+        sku_prices_uah=sku_prices_uah,
     )
     # Move product inputs to device
     for k in prod_inputs:
@@ -706,7 +788,8 @@ def train_retriever(
         seq_feature_dim=2,
         catalog_history_encoder=history_encoder,
         history_gap_reference_days=history_gap_reference_days,
-        num_tabular_features=len(RETRIEVER_PROFILE_FEATURES),
+        max_seq_len=max_seq_len,
+        num_tabular_features=len(profile_features),
         hidden_dim=128,
         num_heads=4,
         num_layers=2,
@@ -720,7 +803,8 @@ def train_retriever(
         num_categories=max(len(cat_vocab) + 2, 50),
         num_subcategories=0,
         num_business_lines=max(len(line_vocab) + 2, 30),
-        num_demand_features=6,
+        num_demand_features=prod_inputs["demand_features"].size(1),
+        num_containers=len(vocabs["container_vocab"]) + 1 if "container_id" in prod_inputs else 0,
         hidden_dim=128,
         dropout=0.1,
     )
@@ -764,10 +848,11 @@ def train_retriever(
             region_id = batch["region_id"].to(dev)
             industry_id = batch["industry_id"].to(dev)
             tab_feats = batch["tabular_features"].to(dev)
-            seq = batch["sequence"].to(dev)
-            mask = batch["attention_mask"].to(dev)
-            seq_pids = batch["seq_product_ids"].to(dev)
-            seq_dates = batch["seq_purchase_dates"].to(dev)
+            sequence_inputs = {
+                name: batch[name].to(dev)
+                for name in ("sequence", "attention_mask", "seq_product_ids", "seq_purchase_dates")
+                if name in batch
+            }
             targets = batch["target"].to(dev)
 
             optimizer.zero_grad()
@@ -779,6 +864,7 @@ def train_retriever(
                 None,
                 prod_inputs["business_line_id"],
                 prod_inputs["demand_features"],
+                container_id=prod_inputs.get("container_id"),
             )
             u_c = model.customer_tower(
                 text_emb,
@@ -786,11 +872,8 @@ def train_retriever(
                 region_id,
                 industry_id,
                 tab_feats,
-                seq,
-                mask,
-                seq_product_ids=seq_pids,
                 catalog_product_vectors=v_p,
-                seq_purchase_dates=seq_dates,
+                **sequence_inputs,
             )
 
             logits = model.compute_logits(u_c, v_p, product_indices=product_indices_all)
@@ -819,6 +902,7 @@ def train_retriever(
                 None,
                 prod_inputs["business_line_id"],
                 prod_inputs["demand_features"],
+                container_id=prod_inputs.get("container_id"),
             )
 
             for batch in val_loader:
@@ -827,10 +911,11 @@ def train_retriever(
                 region_id = batch["region_id"].to(dev)
                 industry_id = batch["industry_id"].to(dev)
                 tab_feats = batch["tabular_features"].to(dev)
-                seq = batch["sequence"].to(dev)
-                mask = batch["attention_mask"].to(dev)
-                seq_pids = batch["seq_product_ids"].to(dev)
-                seq_dates = batch["seq_purchase_dates"].to(dev)
+                sequence_inputs = {
+                    name: batch[name].to(dev)
+                    for name in ("sequence", "attention_mask", "seq_product_ids", "seq_purchase_dates")
+                    if name in batch
+                }
                 targets = batch["target"].to(dev)
 
                 u_c = model.customer_tower(
@@ -839,11 +924,8 @@ def train_retriever(
                     region_id,
                     industry_id,
                     tab_feats,
-                    seq,
-                    mask,
-                    seq_product_ids=seq_pids,
                     catalog_product_vectors=v_p,
-                    seq_purchase_dates=seq_dates,
+                    **sequence_inputs,
                 )
                 logits = model.compute_logits(u_c, v_p, product_indices=product_indices_all)
                 loss = model.compute_multi_label_loss(logits, targets, pos_weight=pos_weight_t)
@@ -914,8 +996,14 @@ def train_retriever(
                         "num_catalog_products": num_products,
                         "temperature": DEFAULT_TEMPERATURE,
                         "pos_weight": pos_weight,
-                        "profile_features": list(RETRIEVER_PROFILE_FEATURES),
+                        "profile_features": list(profile_features),
+                        "company_cache_name": company_cache_name,
+                        "include_sku_median_quantity": include_sku_median_quantity,
+                        "num_product_features": product_tower.num_demand_features,
+                        "container_encoding": container_encoding,
+                        "sku_prices_uah": sku_prices_uah,
                         "catalog_history_encoder": history_encoder,
+                        "max_seq_len": max_seq_len,
                         "history_gap_reference_days": history_gap_reference_days,
                         "profile_normalizer": normalizer.to_state(),
                         "quantity_reference": quantity_reference,

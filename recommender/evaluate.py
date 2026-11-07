@@ -29,7 +29,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
-from recommender.candidates import CandidateRetriever
+from recommender.candidates import NUM_PAIRWISE_FEATURES, CandidateRetriever, rank_personal_repeat
 from recommender.catalogue import load_product_catalogue
 from recommender.company import load_companies
 from recommender.ranker import UPSCANRRanker
@@ -184,25 +184,7 @@ def build_personal_repeat_ranking(
             cnt, last_dt = stats[pid]
             stats[pid] = (cnt + 1, max(last_dt, dt))
 
-    eligible_set = set(global_popularity)
-    personal_ranked = [
-        pid
-        for pid, _ in sorted(
-            stats.items(),
-            key=lambda kv: (-kv[1][0], -kv[1][1].value, kv[0]),
-        )
-        if pid in eligible_set
-    ]
-
-    seen = set(personal_ranked)
-    for pid in global_popularity:
-        if len(personal_ranked) >= max_k:
-            break
-        if pid not in seen:
-            personal_ranked.append(pid)
-            seen.add(pid)
-
-    return personal_ranked[:max_k]
+    return rank_personal_repeat(stats, global_popularity, max_k)
 
 
 def evaluate_split(
@@ -230,15 +212,18 @@ def evaluate_split(
 
     # Compute prior basket count for each transition for Cold/Light vs Warm breakdown
     prior_basket_counts: List[int] = []
+    prior_products: List[Set[str]] = []
     for t in transitions:
         cid = str(t["customer_id"])
         as_of = pd.Timestamp(t["as_of_date"])
         grp = cust_groups.get(cid)
         if grp is None or grp.empty:
             prior_basket_counts.append(0)
+            prior_products.append(set())
         else:
-            prior_dates = grp.loc[grp["purchase_date"] < as_of, "purchase_date"].nunique()
-            prior_basket_counts.append(int(prior_dates))
+            prior = grp.loc[grp["purchase_date"] < as_of]
+            prior_basket_counts.append(int(prior["purchase_date"].nunique()))
+            prior_products.append(set(prior["product_id"].astype(str)))
 
     # 1. Global Popularity & 2. Personal Repeat-Purchase Baselines
     pop_metrics_list: List[Dict[str, float]] = []
@@ -260,6 +245,11 @@ def evaluate_split(
     # 3. Stage 1 Retriever & 4. Stage 2 UPS-CANR Ranker
     stage1_metrics_list: List[Dict[str, float]] = []
     stage2_metrics_list: List[Dict[str, float]] = []
+    slate_recalls: List[float] = []
+    target_counts = {"repeat": 0, "new_to_customer": 0}
+    tower_hits = dict(target_counts)
+    slate_hits = dict(target_counts)
+    reranked_top10_hits = dict(target_counts)
     token0_weights_all: List[float] = []
     history_weights_all: List[float] = []
     token0_weights_cold: List[float] = []
@@ -268,6 +258,7 @@ def evaluate_split(
     retriever.model.eval()
     ranker.eval()
     cat_vectors_dev = catalog_product_vectors.to(device)
+    retriever_sequence = slates_data.get("retriever_sequence")
 
     trans_cursor = 0
     with torch.no_grad():
@@ -292,18 +283,22 @@ def evaluate_split(
 
             # Stage 1 full-catalog top-100 ranking
             purchase_dates = batch["seq_purchase_dates"]
+            tower_inputs = {
+                name: tensor[trans_cursor:trans_cursor + b_size].to(device)
+                for name, tensor in retriever_sequence.items()
+            } if retriever_sequence else {
+                "sequence": seq, "attention_mask": mask, "seq_product_ids": seq_pids,
+                "seq_category_ids": seq_cids,
+                "seq_purchase_dates": purchase_dates.to(device) if purchase_dates is not None else None,
+            }
             u_c = retriever.model.customer_tower(
                 text_embedding=t_emb,
                 city_id=city_id,
                 region_id=reg_id,
                 industry_id=ind_id,
                 tabular_features=retriever_tab_f,
-                sequence=seq,
-                attention_mask=mask,
-                seq_product_ids=seq_pids,
-                seq_category_ids=seq_cids,
                 catalog_product_vectors=cat_vectors_dev,
-                seq_purchase_dates=purchase_dates.to(device) if purchase_dates is not None else None,
+                **tower_inputs,
             )
             full_logits = retriever.compute_logits(u_c, cat_vectors_dev)
             _, top100_idx = torch.topk(full_logits, k=min(100, len(eligible_pids)), dim=-1)
@@ -349,12 +344,22 @@ def evaluate_split(
                     compute_single_transition_metrics(s1_pids, targets)
                 )
 
-                # Stage 2 top-50 reranked + Stage 1 51..100 tail
+                # Measure candidate coverage before scoring, then rerank.
                 c_pids = batch["candidate_pids"][b]
+                slate_top50 = set(c_pids[:50])
+                tower_top50 = set(s1_pids[:50])
+                prior = prior_products[trans_cursor + b]
+                slate_recalls.append(len(targets & slate_top50) / len(targets) if targets else 0.0)
                 order = np.argsort(-ranker_logits_np[b])
                 s2_top50 = [c_pids[i] for i in order]
                 s2_seen = set(s2_top50)
                 s2_full100 = s2_top50 + [p for p in s1_pids if p not in s2_seen]
+                final_top10 = set(s2_full100[:10])
+                for group, subset in (("repeat", targets & prior), ("new_to_customer", targets - prior)):
+                    target_counts[group] += len(subset)
+                    tower_hits[group] += len(subset & tower_top50)
+                    slate_hits[group] += len(subset & slate_top50)
+                    reranked_top10_hits[group] += len(subset & final_top10)
                 stage2_metrics_list.append(
                     compute_single_transition_metrics(s2_full100[:100], targets)
                 )
@@ -377,6 +382,18 @@ def evaluate_split(
             "stage2_ups_canr_ranker": aggregate_transition_metrics(
                 stage2_metrics_list, prior_basket_counts
             ),
+        },
+        "stage2_candidate_coverage": {
+            "recall@50": float(np.mean(slate_recalls)) if slate_recalls else 0.0,
+            "by_target": {
+                group: {
+                    "count": count,
+                    "stage1_recall@50": tower_hits[group] / count if count else 0.0,
+                    "stage2_slate_recall@50": slate_hits[group] / count if count else 0.0,
+                    "stage2_reranked_recall@10": reranked_top10_hits[group] / count if count else 0.0,
+                }
+                for group, count in target_counts.items()
+            },
         },
         "attention_diagnostics": {
             "overall_token0_profile_weight": float(np.mean(token0_weights_all)) if token0_weights_all else 0.0,
@@ -410,6 +427,8 @@ def run_full_evaluation(
             "The ranker checkpoint does not match this retriever and slate version. "
             "Train the ranker with the selected retriever before running evaluation."
         )
+    heuristic_fraction = ranker_ckpt.get("heuristic_fraction", 0.0)
+    category_overdue = ranker_ckpt.get("category_overdue", False)
 
     purchases_df = pd.read_csv(
         "data/interim/cleaned_purchases.csv",
@@ -430,6 +449,7 @@ def run_full_evaluation(
     ranker = UPSCANRRanker.from_retriever_checkpoint(
         checkpoint_path=retriever_checkpoint_path,
         device=dev,
+        num_pairwise_features=NUM_PAIRWISE_FEATURES + int(category_overdue),
     )
     ranker.load_state_dict(ranker_ckpt["model_state_dict"])
     ranker.eval()
@@ -440,14 +460,19 @@ def run_full_evaluation(
     val_identity = slate_cache_identity(
         retriever_digest, retriever_checkpoint_path, purchases_df, catalogue_df, companies_df,
         include_subcategory=retriever.model.product_tower.subcat_embedding is not None,
+        heuristic_fraction=heuristic_fraction,
+        company_cache_name=retriever.company_cache_name,
+        category_overdue=category_overdue,
     )
-    val_path = slate_cache_path("val")
+    val_path = slate_cache_path("val", heuristic_fraction, category_overdue=category_overdue)
     val_slates = load_slate_cache(val_path, f"{val_identity}:val")
     if val_slates is None:
         slate_inputs = prepare_slate_inputs(
             retriever, retriever_checkpoint_path, purchases_df, catalogue_df, companies_df,
             train_transitions, vocabs,
         )
+        slate_inputs["heuristic_fraction"] = heuristic_fraction
+        slate_inputs["category_overdue"] = category_overdue
         val_slates = build_slate_cache(val_path, f"{val_identity}:val", val_transitions, slate_inputs)
 
     print(f"Evaluating on Validation split ({len(val_transitions)} transitions)...")
@@ -477,6 +502,8 @@ def run_full_evaluation(
 
     report: Dict[str, Any] = {
         "architecture_name": "Modular Two-Tower Retriever + Unified Profile-Sequence Candidate-Aware Neural Ranker (UPS-CANR)",
+        "heuristic_fraction": heuristic_fraction,
+        "category_overdue": category_overdue,
         "validation_gate": {
             "passed": validation_gate_passed,
             "stage1_val_ndcg@10": s1_val_ndcg,
@@ -497,14 +524,19 @@ def run_full_evaluation(
         test_identity = slate_cache_identity(
             retriever_digest, retriever_checkpoint_path, all_purchases, catalogue_df, test_companies,
             include_subcategory=test_retriever.model.product_tower.subcat_embedding is not None,
+            heuristic_fraction=heuristic_fraction,
+            company_cache_name=test_retriever.company_cache_name,
+            category_overdue=category_overdue,
         )
-        test_path = slate_cache_path("test")
+        test_path = slate_cache_path("test", heuristic_fraction, category_overdue=category_overdue)
         test_slates = load_slate_cache(test_path, f"{test_identity}:test")
         if test_slates is None:
             slate_inputs = prepare_slate_inputs(
                 test_retriever, retriever_checkpoint_path, all_purchases, catalogue_df,
                 test_companies, train_transitions, test_vocabs,
             )
+            slate_inputs["heuristic_fraction"] = heuristic_fraction
+            slate_inputs["category_overdue"] = category_overdue
             test_slates = build_slate_cache(
                 test_path, f"{test_identity}:test", test_transitions, slate_inputs,
             )

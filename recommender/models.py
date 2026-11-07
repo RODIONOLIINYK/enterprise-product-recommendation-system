@@ -55,6 +55,7 @@ class CustomerTower(nn.Module):
         history_feature_indices: Optional[tuple[int, ...]] = None,
         catalog_history_encoder: Optional[str] = None,
         history_gap_reference_days: Optional[float] = None,
+        max_seq_len: int = DEFAULT_SEQUENCE_LENGTH,
     ):
         super().__init__()
         self.output_dim = output_dim
@@ -62,9 +63,10 @@ class CustomerTower(nn.Module):
         self.seq_feature_dim = seq_feature_dim
         self.num_tabular_features = num_tabular_features
         self.history_feature_indices = history_feature_indices
-        if catalog_history_encoder not in (None, "attention", "pool"):
-            raise ValueError("History encoder must be 'attention' or 'pool'.")
+        if catalog_history_encoder not in (None, "attention", "pool", "none"):
+            raise ValueError("History encoder must be 'attention', 'pool', or 'none'.")
         self.catalog_history_encoder = catalog_history_encoder
+        self.max_seq_len = max_seq_len
         if history_gap_reference_days is not None and (
             not math.isfinite(history_gap_reference_days) or history_gap_reference_days <= 0
         ):
@@ -94,65 +96,67 @@ class CustomerTower(nn.Module):
             nn.LayerNorm(hidden_dim),
         )
 
-        # Module 3: Purchase History
-        if catalog_history_encoder is not None:
-            self.product_embedding = None
-            self.cat_embedding = None
-            self.event_cont_proj = None
-            self.event_proj = None
-            self.token_proj = nn.Sequential(
-                nn.Linear(output_dim + 2, hidden_dim),
+        if catalog_history_encoder != "none":
+            # Module 3: Purchase History
+            if catalog_history_encoder is not None:
+                self.product_embedding = None
+                self.cat_embedding = None
+                self.event_cont_proj = None
+                self.event_proj = None
+                self.token_proj = nn.Sequential(
+                    nn.Linear(output_dim + 2, hidden_dim),
+                    nn.LayerNorm(hidden_dim),
+                    nn.GELU(),
+                )
+            elif num_products is not None and num_products > 0:
+                self.product_embedding = nn.Embedding(num_products, 64, padding_idx=0)
+                self.cat_embedding = nn.Embedding(num_categories, 32, padding_idx=0)
+                self.event_cont_proj = nn.Linear(seq_feature_dim, 32)
+                self.token_proj = nn.Sequential(
+                    nn.Linear(64 + 32 + 32, hidden_dim),
+                    nn.LayerNorm(hidden_dim),
+                    nn.GELU(),
+                )
+                self.event_proj = None
+            else:
+                self.product_embedding = None
+                self.cat_embedding = None
+                self.event_cont_proj = None
+                self.token_proj = None
+                self.event_proj = nn.Sequential(
+                    nn.Linear(seq_feature_dim, hidden_dim),
+                    nn.LayerNorm(hidden_dim),
+                    nn.GELU(),
+                )
+
+            self.pos_embedding = nn.Parameter(
+                torch.randn(1, max_seq_len, hidden_dim) * 0.02
+            )
+
+            self.transformer = None
+            if catalog_history_encoder != "pool":
+                encoder_layer = nn.TransformerEncoderLayer(
+                    d_model=hidden_dim,
+                    nhead=num_heads,
+                    dim_feedforward=dim_feedforward,
+                    dropout=dropout,
+                    activation="gelu",
+                    batch_first=True,
+                )
+                self.transformer = nn.TransformerEncoder(
+                    encoder_layer, num_layers=num_layers, enable_nested_tensor=False
+                )
+
+            self.history_pooling = nn.Sequential(
+                nn.Linear(hidden_dim * 2, hidden_dim),
                 nn.LayerNorm(hidden_dim),
                 nn.GELU(),
             )
-        elif num_products is not None and num_products > 0:
-            self.product_embedding = nn.Embedding(num_products, 64, padding_idx=0)
-            self.cat_embedding = nn.Embedding(num_categories, 32, padding_idx=0)
-            self.event_cont_proj = nn.Linear(seq_feature_dim, 32)
-            self.token_proj = nn.Sequential(
-                nn.Linear(64 + 32 + 32, hidden_dim),
-                nn.LayerNorm(hidden_dim),
-                nn.GELU(),
-            )
-            self.event_proj = None
-        else:
-            self.product_embedding = None
-            self.cat_embedding = None
-            self.event_cont_proj = None
-            self.token_proj = None
-            self.event_proj = nn.Sequential(
-                nn.Linear(seq_feature_dim, hidden_dim),
-                nn.LayerNorm(hidden_dim),
-                nn.GELU(),
-            )
 
-        self.pos_embedding = nn.Parameter(
-            torch.randn(1, DEFAULT_SEQUENCE_LENGTH, hidden_dim) * 0.02
-        )
-
-        self.transformer = None
-        if catalog_history_encoder != "pool":
-            encoder_layer = nn.TransformerEncoderLayer(
-                d_model=hidden_dim,
-                nhead=num_heads,
-                dim_feedforward=dim_feedforward,
-                dropout=dropout,
-                activation="gelu",
-                batch_first=True,
-            )
-            self.transformer = nn.TransformerEncoder(
-                encoder_layer, num_layers=num_layers, enable_nested_tensor=False
-            )
-
-        self.history_pooling = nn.Sequential(
-            nn.Linear(hidden_dim * 2, hidden_dim),
-            nn.LayerNorm(hidden_dim),
-            nn.GELU(),
-        )
-
-        # Late Fusion MLP (384 -> 256 -> 128)
+        # Late fusion of available branches.
+        fusion_inputs = hidden_dim * (2 if catalog_history_encoder == "none" else 3)
         self.late_fusion = nn.Sequential(
-            nn.Linear(hidden_dim * 3, hidden_dim * 2),
+            nn.Linear(fusion_inputs, hidden_dim * 2),
             nn.LayerNorm(hidden_dim * 2),
             nn.GELU(),
             nn.Dropout(dropout),
@@ -166,8 +170,8 @@ class CustomerTower(nn.Module):
         region_id: torch.Tensor,
         industry_id: torch.Tensor,
         tabular_features: torch.Tensor,
-        sequence: torch.Tensor,
-        attention_mask: torch.Tensor,
+        sequence: Optional[torch.Tensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
         seq_product_ids: Optional[torch.Tensor] = None,
         seq_category_ids: Optional[torch.Tensor] = None,
         *,
@@ -209,7 +213,12 @@ class CustomerTower(nn.Module):
         tab_cat = torch.cat([c_emb, r_emb, i_emb, tabular_features], dim=-1)
         h_tab = self.tabular_proj(tab_cat)
 
+        if self.catalog_history_encoder == "none":
+            return F.normalize(self.late_fusion(torch.cat([h_text, h_tab], dim=-1)), p=2, dim=-1)
+
         # Module 3: Purchase tokens
+        if sequence is None or attention_mask is None:
+            raise ValueError("This customer tower requires a purchase sequence and attention mask.")
         if self.catalog_history_encoder is not None:
             if catalog_product_vectors is None or seq_product_ids is None or seq_purchase_dates is None:
                 raise ValueError("Catalogue history requires product vectors, SKU IDs, and purchase dates.")
@@ -293,9 +302,12 @@ class ProductTower(nn.Module):
         num_demand_features: int = 6,
         hidden_dim: int = 128,
         dropout: float = 0.1,
+        *,
+        num_containers: int = 0,
     ):
         super().__init__()
         self.output_dim = output_dim
+        self.num_demand_features = num_demand_features
 
         # Categorical embeddings
         self.brand_embedding = nn.Embedding(num_brands, 16, padding_idx=0)
@@ -303,6 +315,7 @@ class ProductTower(nn.Module):
         # Keep the optional subcategory embedding for older checkpoints.
         self.subcat_embedding = nn.Embedding(num_subcategories, 16, padding_idx=0) if num_subcategories else None
         self.line_embedding = nn.Embedding(num_business_lines, 16, padding_idx=0)
+        self.container_embedding = nn.Embedding(num_containers, 16) if num_containers else None
 
         # Text projection (1024 -> 128)
         self.text_proj = nn.Sequential(
@@ -312,6 +325,8 @@ class ProductTower(nn.Module):
         )
 
         categorical_dim = 48 if self.subcat_embedding is None else 64
+        if self.container_embedding is not None:
+            categorical_dim += self.container_embedding.embedding_dim
         total_input_dim = hidden_dim + categorical_dim + num_demand_features
         self.mlp = nn.Sequential(
             nn.Linear(total_input_dim, hidden_dim * 2),
@@ -328,6 +343,8 @@ class ProductTower(nn.Module):
         subcategory_id: Optional[torch.Tensor],
         business_line_id: torch.Tensor,
         demand_features: torch.Tensor,
+        *,
+        container_id: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """Forward pass generating L2-normalized product vector v_p.
 
@@ -335,7 +352,8 @@ class ProductTower(nn.Module):
             text_embedding: FloatTensor of shape (P, 1024)
             brand_id, category_id, business_line_id: LongTensors of shape (P,)
             subcategory_id: Legacy Product Tower input, required only for those checkpoints
-            demand_features: FloatTensor of shape (P, 6)
+            demand_features: FloatTensor of shape (P, num_demand_features)
+            container_id: LongTensor of shape (P,), with 0 for unspecified packaging
 
         Returns:
             v_p: FloatTensor of shape (P, 128) with unit L2 norm.
@@ -350,6 +368,10 @@ class ProductTower(nn.Module):
             if subcategory_id is None:
                 raise ValueError("This Product Tower checkpoint requires subcategory IDs.")
             features.append(self.subcat_embedding(subcategory_id))
+        if self.container_embedding is not None:
+            if container_id is None:
+                container_id = torch.zeros_like(brand_id)
+            features.append(self.container_embedding(container_id))
         concat = torch.cat([*features, l_emb, demand_features], dim=-1)
         v_p = self.mlp(concat)
         return F.normalize(v_p, p=2, dim=-1)

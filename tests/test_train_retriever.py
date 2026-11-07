@@ -13,6 +13,7 @@ import torch
 
 from recommender.sequences import ENRICHED_FEATURE_DIM, HISTORY_AGE_INDEX, build_customer_sequence
 from recommender.train_retriever import (
+    build_retriever_product_inputs,
     build_retriever_transitions,
     compute_product_demand_features,
     compute_retrieval_metrics,
@@ -40,6 +41,21 @@ class MockSentenceTransformer:
 
 
 class TestTrainRetriever(unittest.TestCase):
+    def test_unspecified_container_has_its_own_one_hot_slot_and_embedding_id(self):
+        catalogue = pd.DataFrame(
+            {"product_id": ["A", "B"], "product_category": ["X", "X"], "container_type": ["БОЧКА", None]},
+        )
+        sales = pd.DataFrame(
+            {"customer_id": ["C1", "C2"], "product_id": ["A", "B"],
+             "purchase_date": pd.to_datetime(["2025-01-01", "2025-01-01"]), "quantity": [1, 2]},
+        )
+        args = (sales, catalogue, {}, ["A", "B"], {"container_vocab": {"БОЧКА": 1}})
+        one_hot = build_retriever_product_inputs(*args, include_subcategory=False, container_encoding="one_hot_none")
+        embedded = build_retriever_product_inputs(*args, include_subcategory=False, container_encoding="embedding_none")
+        self.assertEqual(one_hot["demand_features"][:, -2:].tolist(), [[0.0, 1.0], [1.0, 0.0]])
+        self.assertEqual(embedded["container_id"].tolist(), [1, 0])
+        self.assertEqual(embedded["demand_features"].shape, (2, 6))
+
     def test_build_retriever_transitions_temporal_bounds(self):
         """Transitions must strictly observe chronological boundaries."""
         records = [
@@ -329,14 +345,16 @@ class TestTrainRetriever(unittest.TestCase):
                 self.assertEqual(ckpt["val_metrics"]["recall@100"], 0.75)
 
                 from recommender.candidates import CandidateRetriever
-                from recommender.features import RETRIEVER_PROFILE_FEATURES
+                from recommender.features import MEDIAN_PURCHASE_QUANTITY, RETRIEVER_PROFILE_FEATURES
 
                 retriever = CandidateRetriever.from_checkpoint(best_ckpt, purchases)
                 self.assertIsNone(retriever.model.product_tower.subcat_embedding)
                 self.assertEqual(retriever.quantity_reference, 3.0)
-                self.assertEqual(retriever.profile_features, RETRIEVER_PROFILE_FEATURES)
+                self.assertEqual(retriever.profile_features, (*RETRIEVER_PROFILE_FEATURES, MEDIAN_PURCHASE_QUANTITY))
+                self.assertEqual(ckpt["config"]["container_encoding"], "one_hot_none")
+                self.assertIsNone(ckpt["config"]["sku_prices_uah"])
                 tower = retriever.model.customer_tower
-                self.assertEqual(tower.num_tabular_features, 5)
+                self.assertEqual(tower.num_tabular_features, 6)
                 self.assertIsNone(tower.product_embedding)
                 self.assertIsNotNone(retriever.profile_normalizer)
                 self.assertEqual(tower.catalog_history_encoder, "attention")
@@ -350,7 +368,7 @@ class TestTrainRetriever(unittest.TestCase):
                     "city_id": torch.zeros(1, dtype=torch.long),
                     "region_id": torch.zeros(1, dtype=torch.long),
                     "industry_id": torch.zeros(1, dtype=torch.long),
-                    "tabular_features": torch.zeros(1, 5),
+                    "tabular_features": torch.zeros(1, tower.num_tabular_features),
                     "attention_mask": torch.ones(1, 2, dtype=torch.long),
                     "seq_product_ids": torch.tensor([[1, 2]]),
                     "catalog_product_vectors": catalog_vectors,
@@ -376,6 +394,7 @@ class TestTrainRetriever(unittest.TestCase):
                         best_ckpt, purchases, catalogue, companies, torch.device("cpu"),
                     )
                 self.assertNotIn("subcategory_id", slate_retriever.product_inputs)
+                torch.testing.assert_close(slate_retriever.product_inputs["demand_features"][:, -1], torch.ones(3))
                 self.assertEqual(slate_retriever.get_product_vectors().shape, (3, tower.output_dim))
                 ranker = UPSCANRRanker.from_retriever_checkpoint(best_ckpt)
                 self.assertIsNone(ranker.product_tower.subcat_embedding)

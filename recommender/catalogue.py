@@ -14,8 +14,14 @@ ITEM_COLUMN_MAPPING = {
     1: "product_id", 3: "short_name", 5: "product_type", 6: "unit",
     50: "item_type", 59: "business_line", 83: "brand",
     84: "product_category", 86: "product_subcategory",
+    100: "container_type",
     121: "ukrainian_name", 125: "product_family",
     132: "product_name", 133: "base_name",
+}
+
+CONTAINER_TYPES = {
+    "БОЧКА", "ВЕДРО", "КАНИСТРА", "ТУБА", "СПРЕЙ", "ДОЙ-ПАК",
+    "BULK", "РАСПЫЛИТ.", "FLEX", "МЕШОК", "БАНКА",
 }
 
 
@@ -37,6 +43,9 @@ def load_product_catalogue(input_path: str | Path) -> pd.DataFrame:
     for column in ["item_type", "product_category", "business_line", "brand", "product_subcategory"]:
         if column in products:
             products[column] = products[column].str.upper()
+    if "container_type" in products:
+        values = products["container_type"].str.upper()
+        products["container_type"] = values.where(values.isin(CONTAINER_TYPES))
     return merge_records(products, keys=["product_id"])
 
 

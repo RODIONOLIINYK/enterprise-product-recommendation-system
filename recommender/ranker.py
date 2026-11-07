@@ -379,6 +379,7 @@ class UPSCANRRanker(nn.Module):
         candidate_subcat_ids: Optional[torch.Tensor] = None,
         candidate_line_ids: Optional[torch.Tensor] = None,
         candidate_demand_feats: Optional[torch.Tensor] = None,
+        candidate_container_ids: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """Resolve or compute candidate query representations z_candidate (B, C, 128)."""
         if candidate_vectors is not None:
@@ -398,9 +399,14 @@ class UPSCANRRanker(nn.Module):
             f_cat = candidate_cat_ids.view(-1) if candidate_cat_ids is not None else torch.zeros(b_size * c_dim, dtype=torch.long, device=candidate_text_emb.device)
             f_sub = candidate_subcat_ids.view(-1) if candidate_subcat_ids is not None else torch.zeros(b_size * c_dim, dtype=torch.long, device=candidate_text_emb.device)
             f_line = candidate_line_ids.view(-1) if candidate_line_ids is not None else torch.zeros(b_size * c_dim, dtype=torch.long, device=candidate_text_emb.device)
-            f_dem = candidate_demand_feats.view(-1, 6) if candidate_demand_feats is not None else torch.zeros(b_size * c_dim, 6, dtype=candidate_text_emb.dtype, device=candidate_text_emb.device)
+            width = self.product_tower.num_demand_features
+            f_dem = (
+                candidate_demand_feats.reshape(b_size * c_dim, width) if candidate_demand_feats is not None
+                else candidate_text_emb.new_zeros((b_size * c_dim, width))
+            )
 
-            v_p = self.product_tower(f_text, f_brand, f_cat, f_sub, f_line, f_dem)
+            f_container = candidate_container_ids.reshape(-1) if candidate_container_ids is not None else None
+            v_p = self.product_tower(f_text, f_brand, f_cat, f_sub, f_line, f_dem, container_id=f_container)
             return v_p.view(b_size, c_dim, self.memory_dim)
 
         raise ValueError(
@@ -436,6 +442,7 @@ class UPSCANRRanker(nn.Module):
         candidate_subcat_ids: Optional[torch.Tensor] = None,
         candidate_line_ids: Optional[torch.Tensor] = None,
         candidate_demand_feats: Optional[torch.Tensor] = None,
+        candidate_container_ids: Optional[torch.Tensor] = None,
     ) -> RankerOutput:
         """Forward pass of Stage 2 UPS-CANR ranker."""
         b_size = text_embedding.size(0)
@@ -468,6 +475,7 @@ class UPSCANRRanker(nn.Module):
             candidate_subcat_ids=candidate_subcat_ids,
             candidate_line_ids=candidate_line_ids,
             candidate_demand_feats=candidate_demand_feats,
+            candidate_container_ids=candidate_container_ids,
         )
         c_slate = z_cand.size(1)
 
@@ -552,6 +560,7 @@ class UPSCANRRanker(nn.Module):
         ind_size = state.get("customer_tower.industry_embedding.weight", torch.zeros(100, 16)).shape[0]
         cat_size = state.get("product_tower.cat_embedding.weight", torch.zeros(100, 16)).shape[0]
         product_subcategories = state.get("product_tower.subcat_embedding.weight")
+        containers = state.get("product_tower.container_embedding.weight")
         product_subcat_size = product_subcategories.shape[0] if product_subcategories is not None else 0
         subcat_size = product_subcat_size or max(len(ckpt.get("vocabs", {}).get("subcategory_vocab", {})) + 1, 150)
         line_size = state.get("product_tower.line_embedding.weight", torch.zeros(50, 16)).shape[0]
@@ -569,7 +578,8 @@ class UPSCANRRanker(nn.Module):
             num_categories=cat_size,
             num_subcategories=product_subcat_size,
             num_business_lines=line_size,
-            num_demand_features=6,
+            num_demand_features=config.get("num_product_features", 6),
+            num_containers=containers.size(0) if containers is not None else 0,
         )
 
         # Build ranker
