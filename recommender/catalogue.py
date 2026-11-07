@@ -1,9 +1,11 @@
 """Read source classification and expose the shared inference product scope."""
 
 from pathlib import Path
+from collections.abc import Sequence
 
 import pandas as pd
 
+from recommender.merging import merge_records
 from recommender.scope import ProductScope, eligible_product_mask, sellable_product_mask
 
 
@@ -30,12 +32,12 @@ def load_product_catalogue(input_path: str | Path) -> pd.DataFrame:
     for column in products.columns:
         products[column] = products[column].str.strip()
         products[column] = products[column].mask(products[column].isin(["", "NULL"]))
-    if products["product_id"].isna().any() or products["product_id"].duplicated().any():
-        raise ValueError("Item export contains missing or duplicate product IDs.")
-    for column in ["item_type", "product_category", "business_line"]:
+    if products["product_id"].isna().any():
+        raise ValueError("Item export contains missing product IDs.")
+    for column in ["item_type", "product_category", "business_line", "brand", "product_subcategory"]:
         if column in products:
             products[column] = products[column].str.upper()
-    return products
+    return merge_records(products, keys=["product_id"])
 
 
 def select_sellable_products(
@@ -44,8 +46,9 @@ def select_sellable_products(
     """Classify for-sale products; candidate eligibility also requires prior paid sales."""
     if "product_id" not in products:
         raise ValueError("Product catalogue requires product_id.")
-    if products["product_id"].isna().any() or products["product_id"].duplicated().any():
-        raise ValueError("Product catalogue contains missing or duplicate product IDs.")
+    if products["product_id"].isna().any():
+        raise ValueError("Product catalogue contains missing product IDs.")
+    products = merge_records(products, keys=["product_id"])
     return products.loc[sellable_product_mask(products, scope=scope)].copy()
 
 
@@ -68,3 +71,11 @@ def load_eligible_products(
     return select_eligible_products(
         load_product_catalogue(input_path), purchases, scoring_time, scope=scope
     )
+
+
+def order_retriever_catalogue(products: pd.DataFrame, product_ids: Sequence[str]) -> pd.DataFrame:
+    """Align every product tensor to the checkpoint's score and label indices."""
+    indexed = products.assign(product_id=products["product_id"].astype(str)).set_index("product_id")
+    if not indexed.index.is_unique or len(set(product_ids)) != len(product_ids):
+        raise ValueError("Retriever catalogue product IDs must be unique.")
+    return indexed.loc[list(product_ids)].reset_index()

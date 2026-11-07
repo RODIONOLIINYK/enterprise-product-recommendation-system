@@ -1,0 +1,11 @@
+# Relative paths are resolved from this config's directory, regardless of cwd.
+# Absolute paths are also supported.
+companies = "../data/raw/customers.csv"
+purchases = "../data/raw/dataset.xlsx"
+items = "../data/raw/items.csv"
+
+[pipeline]
+# Stages run from left to right. Omit stages you do not need.
+# The purchases loader also reads items internally to validate product scope.
+# Companies require purchase history; put purchases first to reuse that table.
+order = ["companies", "items", "purchases"]

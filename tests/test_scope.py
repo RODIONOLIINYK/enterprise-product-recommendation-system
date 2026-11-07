@@ -76,7 +76,7 @@ class ProductScopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "actual-purchase columns"):
             eligible_product_mask(product_catalogue(), purchase_records().drop(columns="transaction_type"), "2026-01-20")
 
-    def test_catalogue_positions_and_duplicate_identity_validation(self):
+    def test_catalogue_positions_and_duplicate_metadata_merging(self):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "items.csv"
             rows = []
@@ -87,8 +87,23 @@ class ProductScopeTests(unittest.TestCase):
             pd.DataFrame(rows).to_csv(path, sep=";", header=False, index=False)
             self.assertEqual(load_eligible_products(path, purchase_records(), "2026-01-20").product_id.tolist(), ["OIL"])
             pd.DataFrame([rows[0], rows[0]]).to_csv(path, sep=";", header=False, index=False)
-            with self.assertRaisesRegex(ValueError, "duplicate"):
+            self.assertEqual(load_product_catalogue(path).product_id.tolist(), ["OIL"])
+            conflicting = rows[0].copy()
+            conflicting[50] = "ЗАПАСЫ"
+            pd.DataFrame([rows[0], conflicting]).to_csv(path, sep=";", header=False, index=False)
+            with self.assertRaisesRegex(ValueError, "Conflicting metadata.*item_type"):
                 load_product_catalogue(path)
+
+    def test_duplicate_sale_lines_are_one_prior_purchase_event(self):
+        policy = ProductScope(version=1, allowed_item_types=frozenset({"ТОВАР"}), minimum_prior_purchases=2)
+        first = purchase_records().iloc[[0]].copy()
+        repeated_lines = pd.concat([first, first], ignore_index=True)
+        self.assertTrue(select_eligible_products(product_catalogue(), repeated_lines, "2026-01-20", scope=policy).empty)
+        second_day = first.copy()
+        second_day["purchase_date"] = pd.Timestamp("2026-01-11")
+        self.assertEqual(select_eligible_products(
+            product_catalogue(), pd.concat([repeated_lines, second_day]), "2026-01-20", scope=policy,
+        ).product_id.tolist(), ["OIL"])
 
     def test_policy_cannot_allow_unsold_products(self):
         with self.assertRaisesRegex(ValueError, "minimum_prior_purchases"):

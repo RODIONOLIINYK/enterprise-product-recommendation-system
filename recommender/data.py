@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from recommender.catalogue import load_product_catalogue, select_sellable_products
+from recommender.merging import EVENT_KEY_COLUMNS, merge_purchase_events
 from recommender.scope import ProductScope, actual_purchase_mask
 
 
@@ -30,7 +31,6 @@ HISTORY_COLUMNS = [
     "item_type", "transaction_type",
 ]
 REQUIRED_HISTORY_COLUMNS = set(HISTORY_COLUMNS)
-EVENT_KEY_COLUMNS = ["customer_id", "purchase_date", "product_id"]
 
 
 def load_source_purchases(input_path: str | Path) -> pd.DataFrame:
@@ -95,21 +95,10 @@ def select_paid_purchases(
 
 
 def aggregate_purchases(paid_purchases: pd.DataFrame) -> pd.DataFrame:
-    """Reuse company/date/product aggregation without remapping any SKU."""
-    cleaned = (
-        paid_purchases.groupby(EVENT_KEY_COLUMNS, as_index=False, sort=False)
-        .agg(
-            quantity=("quantity", "sum"),
-            product_category=("product_category", "first"),
-            business_line=("business_line", "first"),
-            product_name=("product_name", "first"),
-            item_type=("item_type", "first"),
-            transaction_type=("transaction_type", "first"),
-        )
-        .sort_values(EVENT_KEY_COLUMNS)
-        .reset_index(drop=True)
-    )
-    return cleaned[HISTORY_COLUMNS]
+    """Use the shared quantity-preserving merge without remapping any SKU."""
+    cleaned = merge_purchase_events(paid_purchases)
+    extra_columns = [column for column in cleaned.columns if column not in HISTORY_COLUMNS]
+    return cleaned[[*HISTORY_COLUMNS, *extra_columns]]
 
 
 def validate_purchases(

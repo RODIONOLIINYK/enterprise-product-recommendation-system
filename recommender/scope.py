@@ -7,9 +7,30 @@ import tomllib
 import numpy as np
 import pandas as pd
 
+from recommender.merging import merge_purchase_events
 
 DEFAULT_SCOPE_PATH = Path(__file__).resolve().parents[1] / "configs" / "product_scope.toml"
+DEFAULT_DATASETS_PATH = Path(__file__).resolve().parents[1] / "configs" / "datasets_links.toml"
 
+
+def get_datasets_locs(
+    dataset: str, path: str | Path = DEFAULT_DATASETS_PATH,
+) -> Path:
+    """Resolve a configured dataset path relative to the TOML file's directory.
+
+    ``customers`` is accepted as an alias for the ``companies`` dataset.
+    Absolute paths are also supported. No dataset is read by this helper.
+    """
+    dataset = "companies" if dataset == "customers" else dataset
+    if dataset not in {"companies", "purchases", "items"}:
+        raise ValueError(f"Unknown dataset: {dataset!r}. Use companies, purchases or items.")
+    path = Path(path).resolve()
+    with Path(path).open("rb") as source:
+        config = tomllib.load(source)
+    location = config.get(dataset)
+    if not isinstance(location, str) or not location.strip():
+        raise ValueError(f"Dataset config requires a nonempty {dataset!r} path.")
+    return (path.parent / Path(location.strip()).expanduser()).resolve()
 
 @dataclass(frozen=True)
 class ProductScope:
@@ -96,7 +117,7 @@ def eligible_product_mask(
         raise ValueError("A valid scoring_time is required for historical product eligibility.")
     paid_mask = actual_purchase_mask(purchases, scope=scope)
     dates = pd.to_datetime(purchases["purchase_date"], errors="coerce")
-    prior = purchases.loc[paid_mask & dates.lt(cutoff)]
+    prior = merge_purchase_events(purchases.loc[paid_mask & dates.lt(cutoff)])
     counts = prior["product_id"].astype("string").str.strip().value_counts()
     product_ids = products["product_id"].astype("string").str.strip()
     return sellable_product_mask(products, scope=scope) & product_ids.map(counts).fillna(0).ge(
