@@ -19,7 +19,7 @@ import math
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Subset
 
 from recommender.catalogue import order_retriever_catalogue
 from recommender.merging import EVENT_KEY_COLUMNS, merge_purchase_events
@@ -553,7 +553,7 @@ def train_retriever(
     purchases_df: Optional[pd.DataFrame] = None,
     companies_df: Optional[pd.DataFrame] = None,
     catalogue_df: Optional[pd.DataFrame] = None,
-    epochs: int = 10,
+    epochs: int = 30,
     batch_size: int = 256,
     lr: float = 1e-3,
     weight_decay: float = 1e-4,
@@ -572,6 +572,14 @@ def train_retriever(
     container_encoding: str = "one_hot_none",
     include_region_in_text: bool = False,
     include_sku_price: bool = False,
+    one_hot_product_fields: Sequence[str] = (),
+    tower_hidden_dim: int = 128,
+    history_layers: int = 2,
+    extra_tower_mlp_layer: bool = False,
+    output_dim: int = OUTPUT_DIM,
+    dropout: float = 0.1,
+    train_eval_size: int = 0,
+    memorization_baskets: int = 0,
 ) -> Dict[str, Any]:
     """Train Modular Two-Tower Retriever and save best checkpoint + metrics history.
 
@@ -586,6 +594,16 @@ def train_retriever(
         raise ValueError("max_seq_len must be positive.")
     if container_encoding not in ("one_hot", "one_hot_none", "embedding_none"):
         raise ValueError("Unknown container encoding.")
+    if not set(one_hot_product_fields) <= {"brand", "category", "business_line"}:
+        raise ValueError("One-hot product fields must be brand, category, or business_line.")
+    if tower_hidden_dim < 4 or tower_hidden_dim % 4:
+        raise ValueError("The tower hidden width must be a positive multiple of four attention heads.")
+    if history_layers < 1:
+        raise ValueError("The history Transformer must have at least one layer.")
+    if output_dim < 1 or train_eval_size < 0 or memorization_baskets < 0:
+        raise ValueError("The output dimension must be positive and diagnostic sizes must be nonnegative.")
+    if memorization_baskets and dry_run:
+        raise ValueError("A memorization check and a dry run cannot be combined.")
     profile_features = RETRIEVER_PROFILE_FEATURES
     if include_customer_median_quantity:
         profile_features = (*profile_features, MEDIAN_BASKET_QUANTITY)
@@ -674,6 +692,14 @@ def train_retriever(
 
     # 4. Transitions
     train_transitions, val_transitions, _ = build_retriever_transitions(purchases_df)
+    diagnostic_rng = np.random.default_rng(seed)
+    if memorization_baskets:
+        if len(train_transitions) < memorization_baskets:
+            raise ValueError("The training split is too small for the requested memorization sample.")
+        sample = diagnostic_rng.choice(len(train_transitions), memorization_baskets, replace=False)
+        train_transitions = [train_transitions[i] for i in sorted(sample)]
+        val_transitions = []
+        train_eval_size = memorization_baskets
     if dry_run:
         train_transitions = train_transitions[:64]
         val_transitions = val_transitions[:32]
@@ -755,6 +781,13 @@ def train_retriever(
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
+    train_eval_indices = sorted(diagnostic_rng.choice(
+        len(train_ds), min(train_eval_size, len(train_ds)), replace=False,
+    )) if train_eval_size else []
+    train_eval_loader = DataLoader(
+        Subset(train_ds, train_eval_indices), batch_size=batch_size,
+        generator=torch.Generator().manual_seed(seed),
+    ) if train_eval_indices else None
     history_gap_reference_days = (
         fit_history_gap_reference(train_ds.preloaded["seq_purchase_dates"], train_ds.preloaded["attention_mask"])
         if history_encoder != "none" else None
@@ -779,7 +812,7 @@ def train_retriever(
     # 8. Model Initialization
     customer_tower = CustomerTower(
         text_dim=TEXT_DIM,
-        output_dim=OUTPUT_DIM,
+        output_dim=output_dim,
         num_cities=max(len(customer_vocabs['city_vocab']) + 2, 100),
         num_regions=max(len(customer_vocabs['region_vocab']) + 2, 50),
         num_industries=max(len(customer_vocabs['industry_vocab']) + 2, 100),
@@ -790,23 +823,33 @@ def train_retriever(
         history_gap_reference_days=history_gap_reference_days,
         max_seq_len=max_seq_len,
         num_tabular_features=len(profile_features),
-        hidden_dim=128,
+        hidden_dim=tower_hidden_dim,
         num_heads=4,
-        num_layers=2,
-        dim_feedforward=256,
-        dropout=0.1,
+        num_layers=history_layers,
+        dim_feedforward=2 * tower_hidden_dim,
+        dropout=dropout,
+        extra_mlp_layer=extra_tower_mlp_layer,
     )
+    product_embedding_sizes = {
+        "brand": max(len(brand_vocab) + 2, 50),
+        "category": max(len(cat_vocab) + 2, 50),
+        "business_line": max(len(line_vocab) + 2, 30),
+    }
+    vocab_sizes = {"brand": len(brand_vocab), "category": len(cat_vocab), "business_line": len(line_vocab)}
+    product_one_hot_sizes = {field: vocab_sizes[field] for field in one_hot_product_fields}
     product_tower = ProductTower(
         text_dim=TEXT_DIM,
-        output_dim=OUTPUT_DIM,
-        num_brands=max(len(brand_vocab) + 2, 50),
-        num_categories=max(len(cat_vocab) + 2, 50),
+        output_dim=output_dim,
+        num_brands=product_embedding_sizes["brand"],
+        num_categories=product_embedding_sizes["category"],
         num_subcategories=0,
-        num_business_lines=max(len(line_vocab) + 2, 30),
+        num_business_lines=product_embedding_sizes["business_line"],
         num_demand_features=prod_inputs["demand_features"].size(1),
         num_containers=len(vocabs["container_vocab"]) + 1 if "container_id" in prod_inputs else 0,
-        hidden_dim=128,
-        dropout=0.1,
+        one_hot_sizes=product_one_hot_sizes,
+        extra_mlp_layer=extra_tower_mlp_layer,
+        hidden_dim=tower_hidden_dim,
+        dropout=dropout,
     )
     model = TwoTowerModel(
         customer_tower=customer_tower,
@@ -829,157 +872,131 @@ def train_retriever(
     print(f"Starting Stage 1 Retriever training on {dev}: {len(train_transitions)} train transitions, "
           f"{len(val_transitions)} val transitions, {num_products} products, {epochs} epochs.")
 
-    # Preserve the complete basket denominator, including items outside the fixed catalogue.
-    val_targets = []
-    for transition in val_transitions:
-        known = {product_to_idx[pid] for pid in transition["positive_product_ids"] if pid in product_to_idx}
-        unknown = len(transition["positive_product_ids"]) - len(known)
-        val_targets.append(known.union(range(-unknown, 0)))
+    def target_indices(product_ids: Sequence[str]) -> Set[int]:
+        # Count targets outside the catalogue as misses.
+        known = {product_to_idx[pid] for pid in product_ids if pid in product_to_idx}
+        return known.union(range(len(known) - len(product_ids), 0))
 
-    # 9. Training Loop
+    val_targets = [target_indices(t["positive_product_ids"]) for t in val_transitions]
+    val_new_targets = []
+    for transition in val_transitions:
+        history = val_ds.histories[str(transition["customer_id"])]
+        prior = set(history.loc[history["purchase_date"] < transition["as_of_date"], "product_id"].astype(str))
+        val_new_targets.append(target_indices([pid for pid in transition["positive_product_ids"] if pid not in prior]))
+    val_new_count = sum(map(len, val_new_targets))
+    train_eval_targets = [target_indices(train_transitions[i]["positive_product_ids"]) for i in train_eval_indices]
+
+    def product_vectors() -> torch.Tensor:
+        return model.product_tower(
+            prod_inputs["text_embedding"], prod_inputs["brand_id"], prod_inputs["category_id"],
+            None, prod_inputs["business_line_id"], prod_inputs["demand_features"],
+            container_id=prod_inputs.get("container_id"),
+        )
+
+    def score_batch(batch: Dict[str, torch.Tensor], vectors: torch.Tensor) -> torch.Tensor:
+        sequence_inputs = {
+            name: batch[name].to(dev)
+            for name in ("sequence", "attention_mask", "seq_product_ids", "seq_purchase_dates")
+            if name in batch
+        }
+        customers = model.customer_tower(
+            batch["text_embedding"].to(dev), batch["city_id"].to(dev), batch["region_id"].to(dev),
+            batch["industry_id"].to(dev), batch["tabular_features"].to(dev),
+            catalog_product_vectors=vectors, **sequence_inputs,
+        )
+        return model.compute_logits(customers, vectors, product_indices=product_indices_all)
+
+    def evaluate_batches(loader: DataLoader, vectors: torch.Tensor, top_k: int) -> Tuple[float, np.ndarray]:
+        total_loss = 0.0
+        topk_rows = []
+        for batch in loader:
+            logits = score_batch(batch, vectors)
+            targets = batch["target"].to(dev)
+            total_loss += model.compute_multi_label_loss(logits, targets, pos_weight=pos_weight_t).item()
+            topk_rows.append(torch.topk(logits, k=min(top_k, num_products), dim=-1).indices.cpu().numpy())
+        topk = np.concatenate(topk_rows, axis=0) if topk_rows else np.zeros((0, top_k), dtype=np.int64)
+        return total_loss / max(len(loader), 1), topk
+
+    best_selection_loss = math.inf
     for epoch in range(1, epochs + 1):
         model.train()
         total_train_loss = 0.0
-        train_batches = 0
 
         for batch in train_loader:
-            text_emb = batch["text_embedding"].to(dev)
-            city_id = batch["city_id"].to(dev)
-            region_id = batch["region_id"].to(dev)
-            industry_id = batch["industry_id"].to(dev)
-            tab_feats = batch["tabular_features"].to(dev)
-            sequence_inputs = {
-                name: batch[name].to(dev)
-                for name in ("sequence", "attention_mask", "seq_product_ids", "seq_purchase_dates")
-                if name in batch
-            }
-            targets = batch["target"].to(dev)
-
             optimizer.zero_grad()
-
-            v_p = model.product_tower(
-                prod_inputs["text_embedding"],
-                prod_inputs["brand_id"],
-                prod_inputs["category_id"],
-                None,
-                prod_inputs["business_line_id"],
-                prod_inputs["demand_features"],
-                container_id=prod_inputs.get("container_id"),
-            )
-            u_c = model.customer_tower(
-                text_emb,
-                city_id,
-                region_id,
-                industry_id,
-                tab_feats,
-                catalog_product_vectors=v_p,
-                **sequence_inputs,
-            )
-
-            logits = model.compute_logits(u_c, v_p, product_indices=product_indices_all)
-            loss = model.compute_multi_label_loss(logits, targets, pos_weight=pos_weight_t)
-
+            logits = score_batch(batch, product_vectors())
+            loss = model.compute_multi_label_loss(logits, batch["target"].to(dev), pos_weight=pos_weight_t)
             loss.backward()
             optimizer.step()
-
             total_train_loss += loss.item()
-            train_batches += 1
 
         scheduler.step()
-        avg_train_loss = total_train_loss / max(train_batches, 1)
+        avg_train_loss = total_train_loss / max(len(train_loader), 1)
 
-        # 10. Validation Evaluation
         model.eval()
-        total_val_loss = 0.0
-        val_batches = 0
-        all_topk_indices: List[np.ndarray] = []
-
+        val_metrics: Dict[str, float] = {}
+        train_eval_metrics: Dict[str, float] = {}
         with torch.no_grad():
-            v_p = model.product_tower(
-                prod_inputs["text_embedding"],
-                prod_inputs["brand_id"],
-                prod_inputs["category_id"],
-                None,
-                prod_inputs["business_line_id"],
-                prod_inputs["demand_features"],
-                container_id=prod_inputs.get("container_id"),
-            )
-
-            for batch in val_loader:
-                text_emb = batch["text_embedding"].to(dev)
-                city_id = batch["city_id"].to(dev)
-                region_id = batch["region_id"].to(dev)
-                industry_id = batch["industry_id"].to(dev)
-                tab_feats = batch["tabular_features"].to(dev)
-                sequence_inputs = {
-                    name: batch[name].to(dev)
-                    for name in ("sequence", "attention_mask", "seq_product_ids", "seq_purchase_dates")
-                    if name in batch
-                }
-                targets = batch["target"].to(dev)
-
-                u_c = model.customer_tower(
-                    text_emb,
-                    city_id,
-                    region_id,
-                    industry_id,
-                    tab_feats,
-                    catalog_product_vectors=v_p,
-                    **sequence_inputs,
-                )
-                logits = model.compute_logits(u_c, v_p, product_indices=product_indices_all)
-                loss = model.compute_multi_label_loss(logits, targets, pos_weight=pos_weight_t)
-
-                total_val_loss += loss.item()
-                val_batches += 1
-
-                top_k = min(100, num_products)
-                topk_idx = torch.topk(logits, k=top_k, dim=-1).indices
-                all_topk_indices.append(topk_idx.cpu().numpy())
-
-        avg_val_loss = total_val_loss / max(val_batches, 1)
-        stacked_topk = np.concatenate(all_topk_indices, axis=0) if all_topk_indices else np.zeros((0, 10))
-        val_metrics = compute_retrieval_metrics(stacked_topk, val_targets, k_list=(10, 50, 100))
-
-        rec10 = val_metrics["recall@10"]
-        rec50 = val_metrics["recall@50"]
-        rec100 = val_metrics["recall@100"]
-        ndcg10 = val_metrics["ndcg@10"]
-        mrr = val_metrics["mrr"]
+            vectors = product_vectors()
+            if not memorization_baskets:
+                avg_val_loss, val_topk = evaluate_batches(val_loader, vectors, 100)
+                val_metrics = compute_retrieval_metrics(val_topk, val_targets, k_list=(10, 50, 100))
+                if val_new_count:
+                    new_hits = sum(len(targets.intersection(predicted[:50])) for targets, predicted in zip(val_new_targets, val_topk))
+                    val_metrics["new_to_customer_recall@50"] = new_hits / val_new_count
+            if train_eval_loader is not None:
+                train_eval_loss, train_topk = evaluate_batches(train_eval_loader, vectors, 50)
+                train_eval_metrics = compute_retrieval_metrics(train_topk, train_eval_targets, k_list=(10, 50))
 
         epoch_record = {
             "epoch": epoch,
             "train_loss": avg_train_loss,
-            "val_loss": avg_val_loss,
-            "val_recall@10": rec10,
-            "val_recall@50": rec50,
-            "val_recall@100": rec100,
-            "val_ndcg@10": ndcg10,
-            "val_mrr": mrr,
             "Train Loss": avg_train_loss,
-            "Val Loss": avg_val_loss,
-            "Val Recall@10": rec10,
-            "Val Recall@50": rec50,
-            "Val Recall@100": rec100,
-            "Val NDCG@10": ndcg10,
-            "Val MRR": mrr,
         }
+        summary = f"Epoch {epoch:2d}/{epochs:2d} | Train Loss: {avg_train_loss:.4f}"
+        if train_eval_metrics:
+            epoch_record.update({
+                "train_eval_loss": train_eval_loss,
+                "train_eval_recall@10": train_eval_metrics["recall@10"],
+                "train_eval_recall@50": train_eval_metrics["recall@50"],
+            })
+            summary += f" | Train Eval Loss: {train_eval_loss:.4f} | Train Recall@10: {train_eval_metrics['recall@10']:.4f}"
+        if val_metrics:
+            rec10, rec50, rec100 = (val_metrics[f"recall@{k}"] for k in (10, 50, 100))
+            ndcg10, mrr = val_metrics["ndcg@10"], val_metrics["mrr"]
+            epoch_record.update({
+                "val_loss": avg_val_loss,
+                "val_recall@10": rec10,
+                "val_recall@50": rec50,
+                "val_recall@100": rec100,
+                "val_ndcg@10": ndcg10,
+                "val_mrr": mrr,
+                "Val Loss": avg_val_loss,
+                "Val Recall@10": rec10,
+                "Val Recall@50": rec50,
+                "Val Recall@100": rec100,
+                "Val NDCG@10": ndcg10,
+                "Val MRR": mrr,
+            })
+            summary += (
+                f" | Val Loss: {avg_val_loss:.4f} | Val Recall@10: {rec10:.4f} | Val Recall@50: {rec50:.4f}"
+                f" | Val Recall@100: {rec100:.4f} | Val NDCG@10: {ndcg10:.4f} | Val MRR: {mrr:.4f}"
+            )
+            if "new_to_customer_recall@50" in val_metrics:
+                novel = val_metrics["new_to_customer_recall@50"]
+                epoch_record["val_new_to_customer_recall@50"] = novel
+                summary += f" | Val New Recall@50: {novel:.4f}"
         training_history.append(epoch_record)
+        print(summary)
 
-        print(
-            f"Epoch {epoch:2d}/{epochs:2d} | "
-            f"Train Loss: {avg_train_loss:.4f} | "
-            f"Val Loss: {avg_val_loss:.4f} | "
-            f"Val Recall@10: {rec10:.4f} | "
-            f"Val Recall@50: {rec50:.4f} | "
-            f"Val Recall@100: {rec100:.4f} | "
-            f"Val NDCG@10: {ndcg10:.4f} | "
-            f"Val MRR: {mrr:.4f}"
-        )
-
-        # 11. Checkpoint Best Model
-        if rec50 > best_recall_50:
-            best_recall_50 = rec50
+        # Select by validation coverage. The memorization diagnostic only uses the training sample.
+        selection = train_eval_metrics["recall@50"] if memorization_baskets else val_metrics["recall@50"]
+        selection_loss = train_eval_loss if memorization_baskets else avg_val_loss
+        if selection > best_recall_50 or (
+            memorization_baskets and selection == best_recall_50 and selection_loss < best_selection_loss
+        ):
+            best_recall_50 = selection
+            best_selection_loss = selection_loss
             torch.save(
                 {
                     "epoch": epoch,
@@ -989,9 +1006,11 @@ def train_retriever(
                     "product_ids": eligible_pids,
                     "product_to_idx": product_to_idx,
                     "val_metrics": val_metrics,
+                    "train_eval_metrics": train_eval_metrics,
                     "vocabs": vocabs,
                     "config": {
-                        "output_dim": OUTPUT_DIM,
+                        "output_dim": output_dim,
+                        "training_epochs": epochs,
                         "text_dim": TEXT_DIM,
                         "num_catalog_products": num_products,
                         "temperature": DEFAULT_TEMPERATURE,
@@ -1000,6 +1019,12 @@ def train_retriever(
                         "company_cache_name": company_cache_name,
                         "include_sku_median_quantity": include_sku_median_quantity,
                         "num_product_features": product_tower.num_demand_features,
+                        "product_embedding_sizes": product_embedding_sizes,
+                        "product_one_hot_sizes": product_one_hot_sizes,
+                        "tower_hidden_dim": tower_hidden_dim,
+                        "history_layers": history_layers,
+                        "extra_tower_mlp_layer": extra_tower_mlp_layer,
+                        "dropout": dropout,
                         "container_encoding": container_encoding,
                         "sku_prices_uah": sku_prices_uah,
                         "catalog_history_encoder": history_encoder,

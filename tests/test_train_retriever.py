@@ -325,6 +325,11 @@ class TestTrainRetriever(unittest.TestCase):
                         device="cpu",
                         checkpoint_dir=ckpt_dir,
                         seed=42,
+                        tower_hidden_dim=64,
+                        history_layers=3,
+                        extra_tower_mlp_layer=True,
+                        output_dim=96,
+                        train_eval_size=4,
                     )
                 self.assertNotIn("product_subcategory", generate.call_args.args[0].columns)
                 self.assertTrue(cat_cache.is_file())
@@ -341,6 +346,7 @@ class TestTrainRetriever(unittest.TestCase):
                 self.assertIn("optimizer_state_dict", ckpt)
                 self.assertIn("product_ids", ckpt)
                 self.assertIn("val_metrics", ckpt)
+                self.assertEqual(ckpt["config"]["training_epochs"], 1)
                 self.assertEqual(len(ckpt["product_ids"]), 3)
                 self.assertEqual(ckpt["val_metrics"]["recall@100"], 0.75)
 
@@ -355,6 +361,10 @@ class TestTrainRetriever(unittest.TestCase):
                 self.assertIsNone(ckpt["config"]["sku_prices_uah"])
                 tower = retriever.model.customer_tower
                 self.assertEqual(tower.num_tabular_features, 6)
+                self.assertEqual(tower.hidden_dim, 64)
+                self.assertEqual(tower.output_dim, 96)
+                self.assertEqual(len(tower.transformer.layers), 3)
+                self.assertEqual(sum(isinstance(layer, torch.nn.Linear) for layer in tower.late_fusion), 3)
                 self.assertIsNone(tower.product_embedding)
                 self.assertIsNotNone(retriever.profile_normalizer)
                 self.assertEqual(tower.catalog_history_encoder, "attention")
@@ -398,6 +408,8 @@ class TestTrainRetriever(unittest.TestCase):
                 self.assertEqual(slate_retriever.get_product_vectors().shape, (3, tower.output_dim))
                 ranker = UPSCANRRanker.from_retriever_checkpoint(best_ckpt)
                 self.assertIsNone(ranker.product_tower.subcat_embedding)
+                self.assertEqual(ranker.product_tower.text_proj[0].out_features, 64)
+                self.assertEqual(sum(isinstance(layer, torch.nn.Linear) for layer in ranker.product_tower.mlp), 3)
                 self.assertGreater(ranker.subcat_embedding.num_embeddings, len(ckpt["vocabs"]["subcategory_vocab"]))
 
                 # Validate training history JSON
@@ -406,6 +418,9 @@ class TestTrainRetriever(unittest.TestCase):
 
                 self.assertEqual(len(history), 1)
                 entry = history[0]
+                self.assertIn("train_eval_loss", entry)
+                self.assertIn("train_eval_recall@10", entry)
+                self.assertIn("val_new_to_customer_recall@50", entry)
                 for required_key in [
                     "epoch", "train_loss", "val_loss",
                     "val_recall@10", "val_recall@50", "val_recall@100",

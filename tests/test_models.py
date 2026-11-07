@@ -57,6 +57,24 @@ class TestTwoTowerModel(unittest.TestCase):
         torch.testing.assert_close(first, tower(text, labels, labels, labels, stats), rtol=0, atol=0)
         self.assertNotIn("pos_embedding", tower.state_dict())
 
+    def test_product_one_hot_replaces_selected_embedding(self):
+        tower = ProductTower(
+            text_dim=4, hidden_dim=8, num_subcategories=0,
+            one_hot_sizes={"category": 3}, dropout=0.0,
+        )
+        captured = []
+        hook = tower.mlp[0].register_forward_pre_hook(lambda _layer, inputs: captured.append(inputs[0]))
+        zeros = torch.zeros(2, dtype=torch.long)
+        try:
+            result = tower(torch.zeros(2, 4), zeros, torch.tensor([0, 3]), None, zeros, torch.zeros(2, 6))
+        finally:
+            hook.remove()
+        self.assertIsNone(tower.cat_embedding)
+        self.assertIsNotNone(tower.brand_embedding)
+        self.assertIsNotNone(tower.line_embedding)
+        self.assertEqual(result.shape, (2, tower.output_dim))
+        torch.testing.assert_close(captured[0][:, 24:27], torch.tensor([[0., 0., 0.], [0., 0., 1.]]))
+
     def test_customer_tower_output_shape_and_unit_norm(self):
         """Customer Tower must output (B, 128) with unit L2 norm."""
         text_emb = torch.randn(self.batch_size, TEXT_DIM)

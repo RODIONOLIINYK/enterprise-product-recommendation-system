@@ -1,7 +1,22 @@
 # Evaluation & Training Report: Modular Two-Tower Retriever + UPS-CANR Ranker
 
-This report records the original checkpoints. The retriever input schema, quantity scaling,
-and slate construction have since changed. The tables below describe the earlier run.
+## Stage 1 validation with the 30-epoch schedule
+
+The retriever uses 128-dimensional output vectors, 32 purchase records, and a two-layer history
+Transformer. Training uses a 30-epoch cosine learning-rate schedule. Epoch 21 had the highest
+validation Recall@50 on 6,191 baskets from the 790-SKU catalogue.
+
+| Stage 1 run | Checkpoint epoch | Validation loss | Recall@50 | New-to-customer Recall@50 |
+| --- | ---: | ---: | ---: | ---: |
+| Previous 10-epoch schedule | 10 | 0.08235 | 79.74% | 43.19% |
+| **30-epoch schedule** | **21** | **0.07543** | **83.12%** | **44.53%** |
+
+The selected Stage 1 checkpoint and full training history are saved locally in
+`checkpoints/retriever-128d-30epochs/`. This run evaluated Stage 1 on validation. The standard
+two-stage evaluation uses the earlier matching retriever and ranker checkpoints.
+
+The remaining sections document the original run. The input schema, quantity scaling, and slate
+construction have since changed.
 
 ## 1. Architecture Overview
 **Official Architecture Name:**

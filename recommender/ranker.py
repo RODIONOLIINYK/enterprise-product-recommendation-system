@@ -558,13 +558,15 @@ class UPSCANRRanker(nn.Module):
         city_size = state.get("customer_tower.city_embedding.weight", torch.zeros(1000, 16)).shape[0]
         reg_size = state.get("customer_tower.region_embedding.weight", torch.zeros(100, 16)).shape[0]
         ind_size = state.get("customer_tower.industry_embedding.weight", torch.zeros(100, 16)).shape[0]
-        cat_size = state.get("product_tower.cat_embedding.weight", torch.zeros(100, 16)).shape[0]
+        product_sizes = config.get("product_embedding_sizes") or {
+            "brand": state.get("product_tower.brand_embedding.weight", torch.zeros(100, 16)).shape[0],
+            "category": state.get("product_tower.cat_embedding.weight", torch.zeros(100, 16)).shape[0],
+            "business_line": state.get("product_tower.line_embedding.weight", torch.zeros(50, 16)).shape[0],
+        }
         product_subcategories = state.get("product_tower.subcat_embedding.weight")
         containers = state.get("product_tower.container_embedding.weight")
         product_subcat_size = product_subcategories.shape[0] if product_subcategories is not None else 0
         subcat_size = product_subcat_size or max(len(ckpt.get("vocabs", {}).get("subcategory_vocab", {})) + 1, 150)
-        line_size = state.get("product_tower.line_embedding.weight", torch.zeros(50, 16)).shape[0]
-        brand_size = state.get("product_tower.brand_embedding.weight", torch.zeros(100, 16)).shape[0]
 
         num_products = len(ckpt.get("product_ids", []))
         if num_products == 0:
@@ -574,12 +576,16 @@ class UPSCANRRanker(nn.Module):
         product_tower = ProductTower(
             text_dim=config.get("text_dim", TEXT_DIM),
             output_dim=config.get("output_dim", OUTPUT_DIM),
-            num_brands=brand_size,
-            num_categories=cat_size,
+            num_brands=product_sizes["brand"],
+            num_categories=product_sizes["category"],
             num_subcategories=product_subcat_size,
-            num_business_lines=line_size,
+            num_business_lines=product_sizes["business_line"],
             num_demand_features=config.get("num_product_features", 6),
             num_containers=containers.size(0) if containers is not None else 0,
+            one_hot_sizes=config.get("product_one_hot_sizes"),
+            hidden_dim=config.get("tower_hidden_dim", 128),
+            dropout=config.get("dropout", 0.1),
+            extra_mlp_layer=config.get("extra_tower_mlp_layer", False),
         )
 
         # Build ranker
@@ -590,10 +596,10 @@ class UPSCANRRanker(nn.Module):
             num_regions=reg_size,
             num_industries=ind_size,
             num_products=num_products + 1,
-            num_brands=brand_size,
-            num_categories=cat_size,
+            num_brands=product_sizes["brand"],
+            num_categories=product_sizes["category"],
             num_subcategories=subcat_size,
-            num_business_lines=line_size,
+            num_business_lines=product_sizes["business_line"],
             product_tower=product_tower,
         )
         ranker_kwargs.update(kwargs)
@@ -617,8 +623,9 @@ class UPSCANRRanker(nn.Module):
                 transferred += 1
 
             # Text projection
-            if f"{cust_prefix}text_proj.0.weight" in state:
-                model.text_proj[0].weight.copy_(state[f"{cust_prefix}text_proj.0.weight"])
+            source_text = state.get(f"{cust_prefix}text_proj.0.weight")
+            if source_text is not None and source_text.shape == model.text_proj[0].weight.shape:
+                model.text_proj[0].weight.copy_(source_text)
                 model.text_proj[0].bias.copy_(state[f"{cust_prefix}text_proj.0.bias"])
                 transferred += 1
 

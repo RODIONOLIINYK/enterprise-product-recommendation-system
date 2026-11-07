@@ -721,15 +721,18 @@ def load_retriever_from_checkpoint(
         if "customer_tower.cat_embedding.weight" in state
         else 50
     )
-    prod_brand_size = state["product_tower.brand_embedding.weight"].shape[0]
-    prod_cat_size = state["product_tower.cat_embedding.weight"].shape[0]
+    product_sizes = config.get("product_embedding_sizes") or {
+        "brand": state["product_tower.brand_embedding.weight"].shape[0],
+        "category": state["product_tower.cat_embedding.weight"].shape[0],
+        "business_line": state["product_tower.line_embedding.weight"].shape[0],
+    }
     prod_subcat = state.get("product_tower.subcat_embedding.weight")
     containers = state.get("product_tower.container_embedding.weight")
-    prod_line_size = state["product_tower.line_embedding.weight"].shape[0]
     sku_embeddings = state.get("customer_tower.product_embedding.weight")
     profile_features = config.get("profile_features", LEGACY_PROFILE_FEATURES)
     history_feature_indices = config.get("history_feature_indices")
     catalog_history_encoder = config.get("catalog_history_encoder")
+    tower_hidden_dim = config.get("tower_hidden_dim", 128)
     legacy_projection = state.get("customer_tower.event_cont_proj.weight")
     if legacy_projection is None:
         legacy_projection = state.get("customer_tower.event_proj.0.weight")
@@ -741,8 +744,13 @@ def load_retriever_from_checkpoint(
         num_regions=reg_emb_size,
         num_industries=ind_emb_size,
         num_categories=cat_emb_size,
-        num_business_lines=prod_line_size,
+        num_business_lines=product_sizes["business_line"],
         seq_feature_dim=legacy_projection.shape[1] if legacy_projection is not None else 2,
+        hidden_dim=tower_hidden_dim,
+        dim_feedforward=2 * tower_hidden_dim,
+        dropout=config.get("dropout", 0.1),
+        num_layers=config.get("history_layers", 2),
+        extra_mlp_layer=config.get("extra_tower_mlp_layer", False),
         history_feature_indices=tuple(history_feature_indices) if history_feature_indices is not None else None,
         catalog_history_encoder=catalog_history_encoder,
         max_seq_len=config.get("max_seq_len", DEFAULT_SEQUENCE_LENGTH),
@@ -753,12 +761,16 @@ def load_retriever_from_checkpoint(
     product_tower = ProductTower(
         text_dim=config.get("text_dim", TEXT_DIM),
         output_dim=config.get("output_dim", OUTPUT_DIM),
-        num_brands=prod_brand_size,
-        num_categories=prod_cat_size,
+        num_brands=product_sizes["brand"],
+        num_categories=product_sizes["category"],
         num_subcategories=prod_subcat.shape[0] if prod_subcat is not None else 0,
-        num_business_lines=prod_line_size,
+        num_business_lines=product_sizes["business_line"],
         num_demand_features=config.get("num_product_features", 6),
         num_containers=containers.size(0) if containers is not None else 0,
+        one_hot_sizes=config.get("product_one_hot_sizes"),
+        hidden_dim=tower_hidden_dim,
+        dropout=config.get("dropout", 0.1),
+        extra_mlp_layer=config.get("extra_tower_mlp_layer", False),
     )
     model = TwoTowerModel(
         customer_tower=customer_tower,

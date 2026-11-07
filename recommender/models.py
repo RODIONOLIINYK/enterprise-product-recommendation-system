@@ -56,6 +56,8 @@ class CustomerTower(nn.Module):
         catalog_history_encoder: Optional[str] = None,
         history_gap_reference_days: Optional[float] = None,
         max_seq_len: int = DEFAULT_SEQUENCE_LENGTH,
+        *,
+        extra_mlp_layer: bool = False,
     ):
         super().__init__()
         self.output_dim = output_dim
@@ -155,13 +157,20 @@ class CustomerTower(nn.Module):
 
         # Late fusion of available branches.
         fusion_inputs = hidden_dim * (2 if catalog_history_encoder == "none" else 3)
-        self.late_fusion = nn.Sequential(
+        fusion_layers = [
             nn.Linear(fusion_inputs, hidden_dim * 2),
             nn.LayerNorm(hidden_dim * 2),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim * 2, output_dim),
-        )
+        ]
+        if extra_mlp_layer:
+            fusion_layers.extend([
+                nn.Linear(hidden_dim * 2, hidden_dim * 2),
+                nn.LayerNorm(hidden_dim * 2),
+                nn.GELU(),
+                nn.Dropout(dropout),
+            ])
+        self.late_fusion = nn.Sequential(*fusion_layers, nn.Linear(hidden_dim * 2, output_dim))
 
     def forward(
         self,
@@ -304,17 +313,20 @@ class ProductTower(nn.Module):
         dropout: float = 0.1,
         *,
         num_containers: int = 0,
+        one_hot_sizes: Optional[dict[str, int]] = None,
+        extra_mlp_layer: bool = False,
     ):
         super().__init__()
         self.output_dim = output_dim
         self.num_demand_features = num_demand_features
+        self.one_hot_sizes = dict(one_hot_sizes or {})
 
-        # Categorical embeddings
-        self.brand_embedding = nn.Embedding(num_brands, 16, padding_idx=0)
-        self.cat_embedding = nn.Embedding(num_categories, 16, padding_idx=0)
+        # An experimental field uses its vocabulary indicators in place of an embedding.
+        self.brand_embedding = None if "brand" in self.one_hot_sizes else nn.Embedding(num_brands, 16, padding_idx=0)
+        self.cat_embedding = None if "category" in self.one_hot_sizes else nn.Embedding(num_categories, 16, padding_idx=0)
         # Keep the optional subcategory embedding for older checkpoints.
         self.subcat_embedding = nn.Embedding(num_subcategories, 16, padding_idx=0) if num_subcategories else None
-        self.line_embedding = nn.Embedding(num_business_lines, 16, padding_idx=0)
+        self.line_embedding = None if "business_line" in self.one_hot_sizes else nn.Embedding(num_business_lines, 16, padding_idx=0)
         self.container_embedding = nn.Embedding(num_containers, 16) if num_containers else None
 
         # Text projection (1024 -> 128)
@@ -324,16 +336,24 @@ class ProductTower(nn.Module):
             nn.LayerNorm(hidden_dim),
         )
 
-        categorical_dim = 48 if self.subcat_embedding is None else 64
+        categorical_dim = sum(self.one_hot_sizes.get(field, 16) for field in ("brand", "category", "business_line"))
+        if self.subcat_embedding is not None:
+            categorical_dim += self.subcat_embedding.embedding_dim
         if self.container_embedding is not None:
             categorical_dim += self.container_embedding.embedding_dim
         total_input_dim = hidden_dim + categorical_dim + num_demand_features
-        self.mlp = nn.Sequential(
+        mlp_layers = [
             nn.Linear(total_input_dim, hidden_dim * 2),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim * 2, output_dim),
-        )
+        ]
+        if extra_mlp_layer:
+            mlp_layers.extend([
+                nn.Linear(hidden_dim * 2, hidden_dim * 2),
+                nn.GELU(),
+                nn.Dropout(dropout),
+            ])
+        self.mlp = nn.Sequential(*mlp_layers, nn.Linear(hidden_dim * 2, output_dim))
 
     def forward(
         self,
@@ -359,9 +379,9 @@ class ProductTower(nn.Module):
             v_p: FloatTensor of shape (P, 128) with unit L2 norm.
         """
         t_proj = self.text_proj(text_embedding)
-        b_emb = self.brand_embedding(brand_id)
-        c_emb = self.cat_embedding(category_id)
-        l_emb = self.line_embedding(business_line_id)
+        b_emb = self._encode_attribute("brand", brand_id, self.brand_embedding, t_proj.dtype)
+        c_emb = self._encode_attribute("category", category_id, self.cat_embedding, t_proj.dtype)
+        l_emb = self._encode_attribute("business_line", business_line_id, self.line_embedding, t_proj.dtype)
 
         features = [t_proj, b_emb, c_emb]
         if self.subcat_embedding is not None:
@@ -375,6 +395,14 @@ class ProductTower(nn.Module):
         concat = torch.cat([*features, l_emb, demand_features], dim=-1)
         v_p = self.mlp(concat)
         return F.normalize(v_p, p=2, dim=-1)
+
+    def _encode_attribute(
+        self, field: str, ids: torch.Tensor, embedding: Optional[nn.Embedding], dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if embedding is not None:
+            return embedding(ids)
+        # As with the padding embedding, ID 0 contributes no feature values.
+        return F.one_hot(ids, num_classes=self.one_hot_sizes[field] + 1)[..., 1:].to(dtype=dtype)
 
 
 class TwoTowerModel(nn.Module):
