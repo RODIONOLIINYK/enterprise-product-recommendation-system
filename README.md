@@ -145,6 +145,18 @@ It saves under `checkpoints/retriever-discovery-reference/` and selects the best
 by new-to-customer Recall@25. The standard two-stage commands above use the paired
 retriever and ranker in their own checkpoint directories.
 
+Run `python -m recommender.evaluate_stage1` to compare Stage 1 against heuristics
+with the default rolling candidate pool. A SKU becomes eligible after its first
+observed paid sale, subject to block status known before the query date.
+Use `--compare-pools` to include the training-sold and broader merchandise controls.
+The replay writes to `checkpoints/stage1-rolling-discovery/`. The item export supplies
+the block flag and last-modified date. Warehouse stock requires a separate feed.
+
+For Stage 1 scoring from customer vectors, use
+`recommender.stage1_catalogue.load_stage1_discovery` and call
+`discover_from_vectors` on the returned retriever. It returns the available unseen
+SKUs for each customer's query date.
+
 Evaluation defaults to the validation split. Run the test suite with:
 
 ```bash

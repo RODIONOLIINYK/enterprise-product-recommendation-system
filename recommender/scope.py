@@ -70,7 +70,7 @@ def load_product_scope(path: str | Path = DEFAULT_SCOPE_PATH) -> ProductScope:
 def sellable_product_mask(
     records: pd.DataFrame, *, scope: ProductScope | None = None
 ) -> pd.Series:
-    """Identify products for sale from source classification, not names or prefixes."""
+    """Match the configured merchandise posting groups."""
     missing = sorted({"item_type"} - set(records.columns))
     if missing:
         raise ValueError(f"Missing product eligibility columns: {missing}")
@@ -108,7 +108,7 @@ def eligible_product_mask(
     products: pd.DataFrame, purchases: pd.DataFrame, scoring_time: str | pd.Timestamp,
     *, scope: ProductScope | None = None,
 ) -> pd.Series:
-    """Require for-sale classification and a genuine prior sale at the same cutoff."""
+    """Require merchandise classification and a genuine sale before the cutoff."""
     if "product_id" not in products:
         raise ValueError("Product catalogue requires product_id.")
     scope = scope if scope is not None else load_product_scope()

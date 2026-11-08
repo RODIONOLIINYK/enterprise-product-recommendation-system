@@ -24,6 +24,16 @@ Reproduce with `python -m recommender.train_retriever --discovery-reference`. Th
 checkpoint, training history, validation comparison, and checksums are saved locally in
 `checkpoints/retriever-discovery-reference/`. These results measure Stage 1 discovery.
 
+### Default discovery candidate pool
+
+The default replay admits merchandise with a genuine paid sale strictly before the
+query date and excludes blocks known before that date. Previously purchased SKUs are
+excluded from discovery picks and can still enter the repeat slots. On 6,191 validation
+baskets, the rolling pool had 735–771 candidates per date. It retrieved 652 of 1,857
+new-to-customer targets in its top 25 (35.11%). Its mixed 50-item slate reached
+41.09% new-to-customer recall and 87.48% overall recall. Run
+`python -m recommender.evaluate_stage1` to reproduce the replay.
+
 ## Stage 1 validation with the 30-epoch schedule
 
 The retriever uses 128-dimensional output vectors, 32 purchase records, and a two-layer history

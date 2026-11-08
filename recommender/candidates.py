@@ -41,6 +41,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+from recommender.catalogue import RollingCandidatePool
 from recommender.features import LEGACY_PROFILE_FEATURES, PointInTimeNormalizer
 from recommender.familiarity import FamiliarityStore
 from recommender.models import (
@@ -52,6 +53,7 @@ from recommender.models import (
     ProductTower,
     TwoTowerModel,
 )
+from recommender.scope import actual_purchase_mask
 from recommender.split import TRAIN_CUTOFF
 
 PAIRWISE_FEATURE_NAMES: List[str] = [
@@ -93,6 +95,32 @@ def rank_personal_repeat(
             ranked.append(sku)
             seen.add(sku)
     return ranked[:max_k]
+
+
+def rank_unseen_candidates(
+    scores: torch.Tensor,
+    product_ids: Sequence[str],
+    eligible_by_query: Sequence[set[str]],
+    seen_by_query: Sequence[set[str]],
+    top_k: int,
+) -> List[List[str]]:
+    """Rank available unseen SKUs and return shorter lists for sparse pools."""
+    if top_k < 1 or scores.shape != (len(eligible_by_query), len(product_ids)):
+        raise ValueError("Discovery scores, catalogue IDs, query pools and top_k must align.")
+    if len(seen_by_query) != len(eligible_by_query):
+        raise ValueError("Discovery requires one seen-SKU set per query.")
+    if not product_ids:
+        return [[] for _ in eligible_by_query]
+    index = {sku: i for i, sku in enumerate(product_ids)}
+    excluded = torch.ones(scores.shape, dtype=torch.bool)
+    allowed = [eligible - seen for eligible, seen in zip(eligible_by_query, seen_by_query)]
+    for row, products in enumerate(allowed):
+        excluded[row, [index[sku] for sku in products if sku in index]] = False
+    ranked = scores.masked_fill(excluded.to(scores.device), -torch.inf).topk(min(top_k, len(index)), dim=-1)
+    return [
+        [product_ids[i] for i in row if product_ids[i] in products]
+        for row, products in zip(ranked.indices.tolist(), allowed)
+    ]
 
 
 @dataclass
@@ -809,6 +837,7 @@ class CandidateRetriever:
         customer_vocabs: Optional[Dict[str, Dict[str, int]]] = None,
         company_cache_name: str = "bge_m3_company.parquet",
         familiarity: Optional[FamiliarityStore] = None,
+        rolling_pool: Optional[RollingCandidatePool] = None,
     ):
         self.device = torch.device(device) if device is not None else torch.device("cpu")
         self.model = model
@@ -827,6 +856,7 @@ class CandidateRetriever:
         self.customer_vocabs = customer_vocabs or {}
         self.company_cache_name = company_cache_name
         self.familiarity = familiarity
+        self.rolling_pool = rolling_pool
 
         self._cached_product_vectors: Optional[torch.Tensor] = None
 
@@ -839,11 +869,35 @@ class CandidateRetriever:
         companies_df: Optional[pd.DataFrame] = None,
         product_inputs: Optional[Dict[str, torch.Tensor]] = None,
         device: Optional[Union[str, torch.device]] = None,
+        *,
+        candidate_product_ids: Optional[Sequence[str]] = None,
+        rolling_pool: Optional[RollingCandidatePool] = None,
     ) -> "CandidateRetriever":
-        """Instantiate CandidateRetriever directly from trained checkpoint."""
+        """Load the checkpoint, optionally appending cold candidates in input order."""
         model, ckpt = load_retriever_from_checkpoint(checkpoint_path, device=device)
-        eligible_pids = ckpt.get("product_ids", [])
+        trained_pids = list(ckpt.get("product_ids", []))
+        eligible_pids = trained_pids
+        if candidate_product_ids is not None:
+            eligible_pids = list(candidate_product_ids)
+            if (
+                len(trained_pids) != model.product_bias.numel()
+                or eligible_pids[:len(trained_pids)] != trained_pids
+                or len(eligible_pids) != len(set(eligible_pids))
+            ):
+                raise ValueError("Expanded candidates must start with the checkpoint SKU order and contain unique IDs.")
+            if product_inputs is not None and any(tensor.size(0) != len(eligible_pids) for tensor in product_inputs.values()):
+                raise ValueError("Product inputs must cover the expanded candidate order.")
+            extra = len(eligible_pids) - len(trained_pids)
+            if extra:
+                bias = model.product_bias.detach()
+                model.product_bias = torch.nn.Parameter(torch.cat((bias, bias.new_zeros(extra))), requires_grad=False)
         config = ckpt.get("config", {})
+        if config.get("discovery_only"):
+            purchases_df = purchases_df.loc[actual_purchase_mask(purchases_df)]
+            if rolling_pool is None:
+                if catalogue_df is None:
+                    raise ValueError("Discovery retrieval requires the merchandise catalogue.")
+                rolling_pool = RollingCandidatePool(catalogue_df, purchases_df)
         normalizer_state = config.get("profile_normalizer")
         vocabs = ckpt.get("vocabs", {})
         familiarity = None
@@ -871,6 +925,7 @@ class CandidateRetriever:
             quantity_reference=config.get("quantity_reference"),
             company_cache_name=config.get("company_cache_name", "bge_m3_company.parquet"),
             familiarity=familiarity,
+            rolling_pool=rolling_pool,
             customer_vocabs={
                 key: vocabs[key] for key in ("city_vocab", "region_vocab", "industry_vocab") if key in vocabs
             },
@@ -927,6 +982,33 @@ class CandidateRetriever:
 
         # Standalone vector dot-product fallback
         return torch.matmul(u_c, v_p.t()) / DEFAULT_TEMPERATURE
+
+    def discover_from_vectors(
+        self,
+        customer_vectors: torch.Tensor,
+        customer_ids: Sequence[str],
+        as_of_dates: Sequence[Union[str, pd.Timestamp]],
+        product_vectors: Optional[torch.Tensor] = None,
+        *,
+        top_k: int = 25,
+    ) -> List[List[str]]:
+        """Return up to top_k unseen SKUs per query from the rolling candidate pool."""
+        if self.rolling_pool is None or self.feature_store is None:
+            raise ValueError("Discovery requires a rolling catalogue and point-in-time purchase history.")
+        if top_k < 1 or not len(customer_vectors) == len(customer_ids) == len(as_of_dates):
+            raise ValueError("Discovery requires a positive top_k and one customer and date per vector.")
+        scores = self.compute_logits(
+            customer_vectors, product_vectors=product_vectors, customer_ids=customer_ids, as_of_dates=as_of_dates,
+        )
+        dated = {}
+        eligible, seen = [], []
+        for cid, date in zip(customer_ids, as_of_dates):
+            date = pd.Timestamp(date).normalize()
+            if date not in dated:
+                dated[date] = self.rolling_pool.eligible_on(date)
+            eligible.append(dated[date])
+            seen.append(set(self.feature_store.get_customer_snapshot(cid, date).sku_stats))
+        return rank_unseen_candidates(scores, self.eligible_product_ids, eligible, seen, top_k)
 
     def generate_candidate_batch(
         self,

@@ -6,12 +6,14 @@ from collections.abc import Sequence
 import pandas as pd
 
 from recommender.merging import merge_records
-from recommender.scope import ProductScope, eligible_product_mask, sellable_product_mask
+from recommender.scope import ProductScope, actual_purchase_mask, eligible_product_mask, sellable_product_mask
 
 
 # Zero-based export positions; source CSV has no header.
 ITEM_COLUMN_MAPPING = {
     1: "product_id", 3: "short_name", 5: "product_type", 6: "unit",
+    # Stored Dynamics NAV item fields immediately before pricing and posting groups.
+    46: "blocked", 47: "last_date_modified",
     50: "item_type", 59: "business_line", 83: "brand",
     84: "product_category", 86: "product_subcategory",
     100: "container_type",
@@ -46,19 +48,58 @@ def load_product_catalogue(input_path: str | Path) -> pd.DataFrame:
     if "container_type" in products:
         values = products["container_type"].str.upper()
         products["container_type"] = values.where(values.isin(CONTAINER_TYPES))
+    if "blocked" in products:
+        products["blocked"] = products["blocked"].map({"0": False, "1": True}).astype("boolean")
+    if "last_date_modified" in products:
+        modified = pd.to_datetime(products["last_date_modified"], format="mixed", errors="coerce").dt.normalize()
+        products["last_date_modified"] = modified.mask(modified.eq(pd.Timestamp("1753-01-01")))
     return merge_records(products, keys=["product_id"])
 
 
 def select_sellable_products(
     products: pd.DataFrame, *, scope: ProductScope | None = None
 ) -> pd.DataFrame:
-    """Classify for-sale products; candidate eligibility also requires prior paid sales."""
+    """Select merchandise by posting group, independently of block status."""
     if "product_id" not in products:
         raise ValueError("Product catalogue requires product_id.")
     if products["product_id"].isna().any():
         raise ValueError("Product catalogue contains missing product IDs.")
     products = merge_records(products, keys=["product_id"])
     return products.loc[sellable_product_mask(products, scope=scope)].copy()
+
+
+def catalogue_blocked_mask(
+    products: pd.DataFrame, as_of_date: str | pd.Timestamp | None = None,
+) -> pd.Series:
+    """Use current block status, or only snapshot blocks known before a historical date."""
+    blocked = products.get("blocked", pd.Series(False, index=products.index)).eq(True).fillna(False)
+    if as_of_date is None:
+        return blocked
+    cutoff = pd.Timestamp(as_of_date).normalize()
+    if pd.isna(cutoff):
+        raise ValueError("Catalogue block checks require a valid scoring date.")
+    modified = products.get("last_date_modified", pd.Series(pd.NaT, index=products.index))
+    return blocked & pd.to_datetime(modified).lt(cutoff)
+
+
+class RollingCandidatePool:
+    """Merchandise with a paid sale before the query and no known block."""
+
+    def __init__(self, catalogue: pd.DataFrame, purchases: pd.DataFrame):
+        self.merchandise = select_sellable_products(catalogue)
+        self.product_ids = set(self.merchandise["product_id"].astype(str))
+        paid = purchases.loc[actual_purchase_mask(purchases), ["product_id", "purchase_date"]].copy()
+        paid["product_id"] = paid["product_id"].astype(str).str.strip()
+        paid["purchase_date"] = pd.to_datetime(paid["purchase_date"], format="mixed").dt.normalize()
+        self.first_sales = paid.groupby("product_id")["purchase_date"].min()
+
+    def blocked_on(self, date: str | pd.Timestamp) -> set[str]:
+        return set(self.merchandise.loc[catalogue_blocked_mask(self.merchandise, date), "product_id"].astype(str))
+
+    def eligible_on(self, date: str | pd.Timestamp) -> set[str]:
+        cutoff = pd.Timestamp(date).normalize()
+        prior = set(self.first_sales.index[self.first_sales.lt(cutoff)])
+        return (prior & self.product_ids) - self.blocked_on(cutoff)
 
 
 def select_eligible_products(
