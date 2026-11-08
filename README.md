@@ -135,6 +135,16 @@ python -m recommender.train_ranker
 python -m recommender.evaluate
 ```
 
+For Stage 1 discovery experiments, use the 128D four-flag reference:
+
+```bash
+python -m recommender.train_retriever --discovery-reference
+```
+
+It saves under `checkpoints/retriever-discovery-reference/` and selects the best epoch
+by new-to-customer Recall@25. The standard two-stage commands above use the paired
+retriever and ranker in their own checkpoint directories.
+
 Evaluation defaults to the validation split. Run the test suite with:
 
 ```bash

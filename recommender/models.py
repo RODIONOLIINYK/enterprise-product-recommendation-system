@@ -322,11 +322,19 @@ class ProductTower(nn.Module):
         self.one_hot_sizes = dict(one_hot_sizes or {})
 
         # An experimental field uses its vocabulary indicators in place of an embedding.
-        self.brand_embedding = None if "brand" in self.one_hot_sizes else nn.Embedding(num_brands, 16, padding_idx=0)
-        self.cat_embedding = None if "category" in self.one_hot_sizes else nn.Embedding(num_categories, 16, padding_idx=0)
+        self.brand_embedding = (
+            nn.Embedding(num_brands, 16, padding_idx=0) if num_brands and "brand" not in self.one_hot_sizes else None
+        )
+        self.cat_embedding = (
+            nn.Embedding(num_categories, 16, padding_idx=0)
+            if num_categories and "category" not in self.one_hot_sizes else None
+        )
         # Keep the optional subcategory embedding for older checkpoints.
         self.subcat_embedding = nn.Embedding(num_subcategories, 16, padding_idx=0) if num_subcategories else None
-        self.line_embedding = None if "business_line" in self.one_hot_sizes else nn.Embedding(num_business_lines, 16, padding_idx=0)
+        self.line_embedding = (
+            nn.Embedding(num_business_lines, 16, padding_idx=0)
+            if num_business_lines and "business_line" not in self.one_hot_sizes else None
+        )
         self.container_embedding = nn.Embedding(num_containers, 16) if num_containers else None
 
         # Text projection (1024 -> 128)
@@ -336,7 +344,12 @@ class ProductTower(nn.Module):
             nn.LayerNorm(hidden_dim),
         )
 
-        categorical_dim = sum(self.one_hot_sizes.get(field, 16) for field in ("brand", "category", "business_line"))
+        categorical_dim = sum(
+            self.one_hot_sizes.get(field, 16 if embedding is not None else 0)
+            for field, embedding in (
+                ("brand", self.brand_embedding), ("category", self.cat_embedding), ("business_line", self.line_embedding)
+            )
+        )
         if self.subcat_embedding is not None:
             categorical_dim += self.subcat_embedding.embedding_dim
         if self.container_embedding is not None:
@@ -401,6 +414,8 @@ class ProductTower(nn.Module):
     ) -> torch.Tensor:
         if embedding is not None:
             return embedding(ids)
+        if field not in self.one_hot_sizes:
+            return torch.empty((*ids.shape, 0), dtype=dtype, device=ids.device)
         # As with the padding embedding, ID 0 contributes no feature values.
         return F.one_hot(ids, num_classes=self.one_hot_sizes[field] + 1)[..., 1:].to(dtype=dtype)
 
@@ -414,6 +429,7 @@ class TwoTowerModel(nn.Module):
         product_tower: ProductTower,
         num_catalog_products: int = 1000,
         temperature: float = DEFAULT_TEMPERATURE,
+        num_familiarity_features: int = 0,
     ):
         super().__init__()
         self.customer_tower = customer_tower
@@ -422,19 +438,25 @@ class TwoTowerModel(nn.Module):
 
         # Learnable product bias term
         self.product_bias = nn.Parameter(torch.zeros(num_catalog_products))
+        self.familiarity_weights = (
+            nn.Parameter(torch.zeros(num_familiarity_features)) if num_familiarity_features else None
+        )
 
     def compute_logits(
         self,
         customer_vectors: torch.Tensor,
         product_vectors: torch.Tensor,
         product_indices: Optional[torch.Tensor] = None,
+        *,
+        familiarity_features: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """Compute scaled dot-product similarity scores.
+        """Compute scaled dot-product similarity scores with optional familiarity.
 
         Args:
             customer_vectors: FloatTensor of shape (B, 128)
             product_vectors: FloatTensor of shape (P, 128)
             product_indices: Optional LongTensor of shape (P,) for product bias lookup.
+            familiarity_features: Point-in-time attribute matches of shape (B, P, F) when enabled.
 
         Returns:
             logits: FloatTensor of shape (B, P)
@@ -443,6 +465,11 @@ class TwoTowerModel(nn.Module):
         if product_indices is not None:
             bias = self.product_bias[product_indices]  # (P,)
             scores = scores + bias.unsqueeze(0)
+        if self.familiarity_weights is not None:
+            expected = (*scores.shape, self.familiarity_weights.numel())
+            if familiarity_features is None or familiarity_features.shape != expected:
+                raise ValueError("Familiarity-aware retrieval requires an attribute match for each customer and candidate.")
+            scores = scores + familiarity_features.to(scores) @ self.familiarity_weights
         return scores
 
     def compute_multi_label_loss(

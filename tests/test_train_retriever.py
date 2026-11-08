@@ -13,8 +13,10 @@ import torch
 
 from recommender.sequences import ENRICHED_FEATURE_DIM, HISTORY_AGE_INDEX, build_customer_sequence
 from recommender.train_retriever import (
+    RetrieverDataset,
     build_retriever_product_inputs,
     build_retriever_transitions,
+    compute_discovery_loss,
     compute_product_demand_features,
     compute_retrieval_metrics,
     train_retriever,
@@ -41,6 +43,41 @@ class MockSentenceTransformer:
 
 
 class TestTrainRetriever(unittest.TestCase):
+    def test_unseen_candidates_use_the_full_history_before_the_target_basket(self):
+        purchases = pd.DataFrame(
+            {
+                "customer_id": ["C1"] * 5,
+                "purchase_date": pd.to_datetime(
+                    ["2024-12-31", "2025-01-01", "2025-01-02", "2025-01-02", "2025-01-03"]
+                ),
+                "product_id": ["D", "A", "A", "B", "C"],
+                "quantity": [1.0] * 5,
+            }
+        )
+        transition = {
+            "customer_id": "C1",
+            "as_of_date": pd.Timestamp("2025-01-02"),
+            "positive_product_ids": ["A", "B"],
+        }
+        dataset = RetrieverDataset(
+            [transition], purchases, {"A": 0, "B": 1, "C": 2, "D": 3}, {}, {},
+            vocabularies={"product_vocab": {"A": 1, "B": 2, "C": 3, "D": 4}},
+            include_unseen_candidates=True,
+            max_seq_len=1,
+        )
+        example = dataset[0]
+        self.assertEqual(example["target"].tolist(), [1.0, 1.0, 0.0, 0.0])
+        self.assertEqual(example["unseen_candidates"].tolist(), [False, True, True, False])
+        self.assertEqual(example["seq_product_ids"][example["attention_mask"].bool()].tolist(), [1])
+
+    def test_discovery_loss_ignores_seen_skus_and_repeat_only_baskets(self):
+        logits = torch.zeros((2, 3), requires_grad=True)
+        targets = torch.tensor([[1.0, 1.0, 0.0], [1.0, 0.0, 0.0]])
+        unseen = torch.tensor([[False, True, True], [False, True, True]])
+        loss = compute_discovery_loss(logits, targets, unseen, torch.tensor([20.0]))
+        loss.backward()
+        torch.testing.assert_close(logits.grad, torch.tensor([[0.0, -5.0, 0.25], [0.0, 0.0, 0.0]]))
+
     def test_unspecified_container_has_its_own_one_hot_slot_and_embedding_id(self):
         catalogue = pd.DataFrame(
             {"product_id": ["A", "B"], "product_category": ["X", "X"], "container_type": ["БОЧКА", None]},

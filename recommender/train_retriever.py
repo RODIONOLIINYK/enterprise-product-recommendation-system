@@ -12,6 +12,7 @@ Implements:
    and full metric history to checkpoints/retriever/training_history.json.
 """
 
+import argparse
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 import json
@@ -19,9 +20,11 @@ import math
 import numpy as np
 import pandas as pd
 import torch
+from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, Subset
 
-from recommender.catalogue import order_retriever_catalogue
+from recommender.catalogue import load_product_catalogue, order_retriever_catalogue, select_eligible_products
+from recommender.familiarity import ATTRIBUTE_COLUMNS, BASE_FAMILIARITY_FIELDS, FamiliarityStore
 from recommender.merging import EVENT_KEY_COLUMNS, merge_purchase_events
 from recommender.features import (
     LEGACY_PROFILE_FEATURES,
@@ -352,6 +355,27 @@ def build_customer_metadata(
     }
 
 
+def prior_customer_products(history: pd.DataFrame, as_of_date: pd.Timestamp) -> Set[str]:
+    prior = history.loc[pd.to_datetime(history["purchase_date"], format="mixed") < as_of_date, "product_id"]
+    return set(prior.astype(str))
+
+
+def new_to_customer_targets(
+    history: pd.DataFrame, as_of_date: pd.Timestamp, target_ids: Sequence[str],
+) -> List[str]:
+    seen = prior_customer_products(history, as_of_date)
+    return [product_id for product_id in target_ids if product_id not in seen]
+
+
+def compute_discovery_loss(
+    logits: torch.Tensor, targets: torch.Tensor, unseen: torch.Tensor, pos_weight: torch.Tensor,
+) -> torch.Tensor:
+    """Learn from unseen candidates in baskets with at least one eligible new purchase."""
+    eligible = unseen & (targets.bool() & unseen).any(dim=-1, keepdim=True)
+    losses = F.binary_cross_entropy_with_logits(logits, targets, pos_weight=pos_weight, reduction="none")
+    return losses.masked_fill(~eligible, 0).sum() / eligible.sum().clamp_min(1)
+
+
 class RetrieverDataset(Dataset):
     """Build the same retrieval inputs for training and preloaded or lazy scoring."""
 
@@ -371,6 +395,7 @@ class RetrieverDataset(Dataset):
         *,
         profile_features: Sequence[str] = LEGACY_PROFILE_FEATURES,
         quantity_reference: Optional[float] = None,
+        include_unseen_candidates: bool = False,
     ):
         self.transitions = transitions
         self.product_to_idx = product_to_idx
@@ -384,6 +409,7 @@ class RetrieverDataset(Dataset):
         self.seq_feature_dim = seq_feature_dim
         self.profile_features = tuple(profile_features)
         self.quantity_reference = quantity_reference
+        self.include_unseen_candidates = include_unseen_candidates
         self.histories = {str(cid): rows for cid, rows in purchases_df.groupby("customer_id")}
         self.empty_history = purchases_df.iloc[:0]
         self.preloaded = None
@@ -435,12 +461,13 @@ class RetrieverDataset(Dataset):
                 for name in ("sequence", "attention_mask", "seq_product_ids", "seq_purchase_dates", "seq_category_ids")
             }
 
+        target_ids = transition["positive_product_ids"]
         target = torch.zeros(self.num_products, dtype=torch.float32)
-        for product_id in transition["positive_product_ids"]:
+        for product_id in target_ids:
             if product_id in self.product_to_idx:
                 target[self.product_to_idx[product_id]] = 1.0
 
-        return {
+        item = {
             "text_embedding": torch.as_tensor(text, dtype=torch.float32),
             "city_id": torch.tensor(int(metadata.get("city_id", 0)), dtype=torch.long),
             "region_id": torch.tensor(int(metadata.get("region_id", 0)), dtype=torch.long),
@@ -449,6 +476,13 @@ class RetrieverDataset(Dataset):
             **sequence_inputs,
             "target": target,
         }
+        if self.include_unseen_candidates:
+            unseen = torch.ones(self.num_products, dtype=torch.bool)
+            for product_id in prior_customer_products(history, as_of):
+                if product_id in self.product_to_idx:
+                    unseen[self.product_to_idx[product_id]] = False
+            item["unseen_candidates"] = unseen
+        return item
 
 
 def build_product_tower_inputs(
@@ -580,6 +614,9 @@ def train_retriever(
     dropout: float = 0.1,
     train_eval_size: int = 0,
     memorization_baskets: int = 0,
+    discovery_only: bool = False,
+    familiarity_fields: Sequence[str] = (),
+    remove_product_attribute_embeddings: bool = False,
 ) -> Dict[str, Any]:
     """Train Modular Two-Tower Retriever and save best checkpoint + metrics history.
 
@@ -604,6 +641,14 @@ def train_retriever(
         raise ValueError("The output dimension must be positive and diagnostic sizes must be nonnegative.")
     if memorization_baskets and dry_run:
         raise ValueError("A memorization check and a dry run cannot be combined.")
+    if discovery_only and memorization_baskets:
+        raise ValueError("Discovery-only training cannot be combined with memorization.")
+    if len(set(familiarity_fields)) != len(familiarity_fields) or not set(familiarity_fields) <= ATTRIBUTE_COLUMNS.keys():
+        raise ValueError("Invalid or duplicate familiarity field.")
+    if remove_product_attribute_embeddings and (
+        one_hot_product_fields or not set(BASE_FAMILIARITY_FIELDS) <= set(familiarity_fields)
+    ):
+        raise ValueError("Replacing product attribute embeddings requires all three familiarity flags and no one-hot fields.")
     profile_features = RETRIEVER_PROFILE_FEATURES
     if include_customer_median_quantity:
         profile_features = (*profile_features, MEDIAN_BASKET_QUANTITY)
@@ -633,11 +678,11 @@ def train_retriever(
     train_purchases = purchases_df.loc[purchases_df["purchase_date"] < TRAIN_CUTOFF]
     quantity_reference = fit_quantity_reference(train_purchases.get("quantity", []))
 
+    familiarity_catalogue = catalogue_df
     if catalogue_df is None:
-        from recommender.catalogue import load_eligible_products
         from recommender.scope import get_datasets_locs
-        items_path = get_datasets_locs("items")
-        catalogue_df = load_eligible_products(items_path, train_purchases, TRAIN_CUTOFF)
+        familiarity_catalogue = load_product_catalogue(get_datasets_locs("items"))
+        catalogue_df = select_eligible_products(familiarity_catalogue, train_purchases, TRAIN_CUTOFF)
 
     if companies_df is None:
         from recommender.company import load_companies
@@ -763,6 +808,7 @@ def train_retriever(
         profile_features=profile_features,
         quantity_reference=quantity_reference,
         max_seq_len=max_seq_len if history_encoder != "none" else 0,
+        include_unseen_candidates=discovery_only,
     )
     val_ds = RetrieverDataset(
         transitions=val_transitions,
@@ -777,9 +823,30 @@ def train_retriever(
         profile_features=profile_features,
         quantity_reference=quantity_reference,
         max_seq_len=max_seq_len if history_encoder != "none" else 0,
+        include_unseen_candidates=discovery_only,
     )
 
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
+    if familiarity_fields:
+        store = FamiliarityStore(purchases_df, familiarity_catalogue, eligible_pids, familiarity_fields)
+        for dataset in (train_ds, val_ds):
+            if dataset.preloaded is not None:
+                dataset.preloaded["familiarity_features"] = store.batch_features(
+                    [t["customer_id"] for t in dataset.transitions],
+                    [t["as_of_date"] for t in dataset.transitions],
+                )
+
+    train_examples = train_ds
+    if discovery_only:
+        if train_ds.preloaded is None:
+            raise ValueError("Discovery-only training requires training baskets.")
+        novel_targets = train_ds.preloaded["target"].bool() & train_ds.preloaded["unseen_candidates"]
+        discovery_rows = torch.where(novel_targets.any(dim=-1))[0].tolist()
+        if not discovery_rows:
+            raise ValueError("Discovery-only training requires at least one eligible first-time purchase.")
+        train_examples = Subset(train_ds, discovery_rows)
+        print(f"Discovery objective uses {len(discovery_rows)} training baskets with "
+              f"{int(novel_targets.sum())} eligible new targets.")
+    train_loader = DataLoader(train_examples, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
     train_eval_indices = sorted(diagnostic_rng.choice(
         len(train_ds), min(train_eval_size, len(train_ds)), replace=False,
@@ -831,9 +898,9 @@ def train_retriever(
         extra_mlp_layer=extra_tower_mlp_layer,
     )
     product_embedding_sizes = {
-        "brand": max(len(brand_vocab) + 2, 50),
-        "category": max(len(cat_vocab) + 2, 50),
-        "business_line": max(len(line_vocab) + 2, 30),
+        "brand": 0 if remove_product_attribute_embeddings else max(len(brand_vocab) + 2, 50),
+        "category": 0 if remove_product_attribute_embeddings else max(len(cat_vocab) + 2, 50),
+        "business_line": 0 if remove_product_attribute_embeddings else max(len(line_vocab) + 2, 30),
     }
     vocab_sizes = {"brand": len(brand_vocab), "category": len(cat_vocab), "business_line": len(line_vocab)}
     product_one_hot_sizes = {field: vocab_sizes[field] for field in one_hot_product_fields}
@@ -856,6 +923,7 @@ def train_retriever(
         product_tower=product_tower,
         num_catalog_products=num_products,
         temperature=DEFAULT_TEMPERATURE,
+        num_familiarity_features=len(familiarity_fields),
     ).to(dev)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -864,6 +932,7 @@ def train_retriever(
     pos_weight_t = torch.tensor([pos_weight], device=dev, dtype=torch.float32)
     product_indices_all = torch.arange(num_products, device=dev)
 
+    best_selection = -1.0
     best_recall_50 = -1.0
     best_checkpoint_path = ckpt_dir / "best_retriever.pt"
     history_path = ckpt_dir / "training_history.json"
@@ -881,9 +950,12 @@ def train_retriever(
     val_new_targets = []
     for transition in val_transitions:
         history = val_ds.histories[str(transition["customer_id"])]
-        prior = set(history.loc[history["purchase_date"] < transition["as_of_date"], "product_id"].astype(str))
-        val_new_targets.append(target_indices([pid for pid in transition["positive_product_ids"] if pid not in prior]))
+        val_new_targets.append(target_indices(new_to_customer_targets(
+            history, transition["as_of_date"], transition["positive_product_ids"],
+        )))
     val_new_count = sum(map(len, val_new_targets))
+    if discovery_only and not val_new_count:
+        raise ValueError("Discovery-only checkpoint selection requires first-time purchases in validation.")
     train_eval_targets = [target_indices(train_transitions[i]["positive_product_ids"]) for i in train_eval_indices]
 
     def product_vectors() -> torch.Tensor:
@@ -904,18 +976,46 @@ def train_retriever(
             batch["industry_id"].to(dev), batch["tabular_features"].to(dev),
             catalog_product_vectors=vectors, **sequence_inputs,
         )
-        return model.compute_logits(customers, vectors, product_indices=product_indices_all)
+        return model.compute_logits(
+            customers, vectors, product_indices=product_indices_all,
+            familiarity_features=batch.get("familiarity_features"),
+        )
 
-    def evaluate_batches(loader: DataLoader, vectors: torch.Tensor, top_k: int) -> Tuple[float, np.ndarray]:
+    def evaluate_batches(
+        loader: DataLoader, vectors: torch.Tensor, top_k: int,
+    ) -> Tuple[float, np.ndarray, Dict[str, float]]:
         total_loss = 0.0
         topk_rows = []
+        discovery_loss = 0.0
+        discovery_pairs = 0
+        discovery_targets = 0
+        discovery_hits = {25: 0, 50: 0}
         for batch in loader:
             logits = score_batch(batch, vectors)
             targets = batch["target"].to(dev)
             total_loss += model.compute_multi_label_loss(logits, targets, pos_weight=pos_weight_t).item()
             topk_rows.append(torch.topk(logits, k=min(top_k, num_products), dim=-1).indices.cpu().numpy())
+            if discovery_only:
+                unseen = batch["unseen_candidates"].to(dev)
+                positives = targets.bool() & unseen
+                pairs = int((unseen & positives.any(dim=-1, keepdim=True)).sum().item())
+                if pairs:
+                    discovery_loss += compute_discovery_loss(logits, targets, unseen, pos_weight_t).item() * pairs
+                    discovery_pairs += pairs
+                discovery_targets += int(positives.sum().item())
+                indices = logits.masked_fill(~unseen, -torch.inf).topk(min(50, num_products), dim=-1).indices
+                hits = positives.gather(1, indices)
+                for k in discovery_hits:
+                    discovery_hits[k] += int(hits[:, :k].sum().item())
         topk = np.concatenate(topk_rows, axis=0) if topk_rows else np.zeros((0, top_k), dtype=np.int64)
-        return total_loss / max(len(loader), 1), topk
+        discovery_metrics = {}
+        if discovery_only:
+            discovery_metrics = {
+                "discovery_loss": discovery_loss / max(discovery_pairs, 1),
+                "discovery_targets": discovery_targets,
+                **{f"discovery_hits@{k}": count for k, count in discovery_hits.items()},
+            }
+        return total_loss / max(len(loader), 1), topk, discovery_metrics
 
     best_selection_loss = math.inf
     for epoch in range(1, epochs + 1):
@@ -925,7 +1025,11 @@ def train_retriever(
         for batch in train_loader:
             optimizer.zero_grad()
             logits = score_batch(batch, product_vectors())
-            loss = model.compute_multi_label_loss(logits, batch["target"].to(dev), pos_weight=pos_weight_t)
+            targets = batch["target"].to(dev)
+            if discovery_only:
+                loss = compute_discovery_loss(logits, targets, batch["unseen_candidates"].to(dev), pos_weight_t)
+            else:
+                loss = model.compute_multi_label_loss(logits, targets, pos_weight=pos_weight_t)
             loss.backward()
             optimizer.step()
             total_train_loss += loss.item()
@@ -939,13 +1043,17 @@ def train_retriever(
         with torch.no_grad():
             vectors = product_vectors()
             if not memorization_baskets:
-                avg_val_loss, val_topk = evaluate_batches(val_loader, vectors, 100)
+                avg_val_loss, val_topk, val_discovery = evaluate_batches(val_loader, vectors, 100)
                 val_metrics = compute_retrieval_metrics(val_topk, val_targets, k_list=(10, 50, 100))
                 if val_new_count:
                     new_hits = sum(len(targets.intersection(predicted[:50])) for targets, predicted in zip(val_new_targets, val_topk))
                     val_metrics["new_to_customer_recall@50"] = new_hits / val_new_count
+                if discovery_only:
+                    val_metrics.update(val_discovery)
+                    for k in (25, 50):
+                        val_metrics[f"discovery_recall@{k}"] = val_discovery[f"discovery_hits@{k}"] / val_new_count
             if train_eval_loader is not None:
-                train_eval_loss, train_topk = evaluate_batches(train_eval_loader, vectors, 50)
+                train_eval_loss, train_topk, train_discovery = evaluate_batches(train_eval_loader, vectors, 50)
                 train_eval_metrics = compute_retrieval_metrics(train_topk, train_eval_targets, k_list=(10, 50))
 
         epoch_record = {
@@ -961,6 +1069,11 @@ def train_retriever(
                 "train_eval_recall@50": train_eval_metrics["recall@50"],
             })
             summary += f" | Train Eval Loss: {train_eval_loss:.4f} | Train Recall@10: {train_eval_metrics['recall@10']:.4f}"
+            if discovery_only:
+                epoch_record["train_eval_discovery_loss"] = train_discovery["discovery_loss"]
+                epoch_record["train_discovery_recall@25"] = (
+                    train_discovery["discovery_hits@25"] / max(train_discovery["discovery_targets"], 1)
+                )
         if val_metrics:
             rec10, rec50, rec100 = (val_metrics[f"recall@{k}"] for k in (10, 50, 100))
             ndcg10, mrr = val_metrics["ndcg@10"], val_metrics["mrr"]
@@ -986,16 +1099,24 @@ def train_retriever(
                 novel = val_metrics["new_to_customer_recall@50"]
                 epoch_record["val_new_to_customer_recall@50"] = novel
                 summary += f" | Val New Recall@50: {novel:.4f}"
+            if discovery_only:
+                epoch_record.update({f"val_{key}": value for key, value in val_discovery.items()})
+                epoch_record.update({f"val_discovery_recall@{k}": val_metrics[f"discovery_recall@{k}"] for k in (25, 50)})
+                summary += (f" | Val Discovery Loss: {val_discovery['discovery_loss']:.4f}"
+                            f" | Val Discovery Recall@25: {val_metrics['discovery_recall@25']:.4f}")
         training_history.append(epoch_record)
         print(summary)
 
         # Select by validation coverage. The memorization diagnostic only uses the training sample.
-        selection = train_eval_metrics["recall@50"] if memorization_baskets else val_metrics["recall@50"]
+        selected_metrics = train_eval_metrics if memorization_baskets else val_metrics
+        selection_metric = "discovery_recall@25" if discovery_only else "recall@50"
+        selection = selected_metrics[selection_metric]
         selection_loss = train_eval_loss if memorization_baskets else avg_val_loss
-        if selection > best_recall_50 or (
+        if selection > best_selection or (
             memorization_baskets and selection == best_recall_50 and selection_loss < best_selection_loss
         ):
-            best_recall_50 = selection
+            best_selection = selection
+            best_recall_50 = selected_metrics["recall@50"]
             best_selection_loss = selection_loss
             torch.save(
                 {
@@ -1003,6 +1124,7 @@ def train_retriever(
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                     "best_recall_50": best_recall_50,
+                    "selection_metric": selection_metric,
                     "product_ids": eligible_pids,
                     "product_to_idx": product_to_idx,
                     "val_metrics": val_metrics,
@@ -1015,6 +1137,8 @@ def train_retriever(
                         "num_catalog_products": num_products,
                         "temperature": DEFAULT_TEMPERATURE,
                         "pos_weight": pos_weight,
+                        "discovery_only": discovery_only,
+                        "familiarity_fields": list(familiarity_fields),
                         "profile_features": list(profile_features),
                         "company_cache_name": company_cache_name,
                         "include_sku_median_quantity": include_sku_median_quantity,
@@ -1048,9 +1172,31 @@ def train_retriever(
         "final_history": training_history,
         "num_products": num_products,
         "num_train_transitions": len(train_transitions),
+        "num_optimizer_transitions": len(train_examples),
         "num_val_transitions": len(val_transitions),
     }
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Train a Stage 1 retriever.")
+    parser.add_argument(
+        "--discovery-reference", action="store_true",
+        help="Train the 128D discovery reference with four familiarity flags.",
+    )
+    args = parser.parse_args()
+    if args.discovery_reference:
+        train_retriever(
+            epochs=30,
+            output_dim=128,
+            train_eval_size=2048,
+            checkpoint_dir="checkpoints/retriever-discovery-reference",
+            discovery_only=True,
+            familiarity_fields=(*BASE_FAMILIARITY_FIELDS, "family"),
+            remove_product_attribute_embeddings=True,
+        )
+    else:
+        train_retriever()
+
+
 if __name__ == "__main__":
-    train_retriever()
+    main()

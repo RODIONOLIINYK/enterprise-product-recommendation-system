@@ -1,5 +1,7 @@
 # Implementation and training plan
 
+The Stage 1 discovery reference includes `container_type` as one-hot packaging with an explicit `none` value, following discussion with the user. Its training recipe and validation results are recorded in `EVALUATION_RESULTS.md`.
+
 ## Objective and current state
 
 Build a local next-basket recommendation system: **two-tower retrieval → hybrid cross-encoder ranking → top-K products**. Train on the Apple Silicon Mac with 16 GB of memory. Preserve exact sellable product IDs, including separate package variants. Default to 100 retrieval candidates and 10 final recommendations.

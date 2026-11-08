@@ -42,6 +42,7 @@ import pandas as pd
 import torch
 
 from recommender.features import LEGACY_PROFILE_FEATURES, PointInTimeNormalizer
+from recommender.familiarity import FamiliarityStore
 from recommender.models import (
     DEFAULT_SEQUENCE_LENGTH,
     DEFAULT_TEMPERATURE,
@@ -777,6 +778,7 @@ def load_retriever_from_checkpoint(
         product_tower=product_tower,
         num_catalog_products=num_products,
         temperature=config.get("temperature", DEFAULT_TEMPERATURE),
+        num_familiarity_features=len(config.get("familiarity_fields", ())),
     )
 
     model.load_state_dict(state)
@@ -806,6 +808,7 @@ class CandidateRetriever:
         quantity_reference: Optional[float] = None,
         customer_vocabs: Optional[Dict[str, Dict[str, int]]] = None,
         company_cache_name: str = "bge_m3_company.parquet",
+        familiarity: Optional[FamiliarityStore] = None,
     ):
         self.device = torch.device(device) if device is not None else torch.device("cpu")
         self.model = model
@@ -823,6 +826,7 @@ class CandidateRetriever:
         self.quantity_reference = quantity_reference
         self.customer_vocabs = customer_vocabs or {}
         self.company_cache_name = company_cache_name
+        self.familiarity = familiarity
 
         self._cached_product_vectors: Optional[torch.Tensor] = None
 
@@ -842,6 +846,11 @@ class CandidateRetriever:
         config = ckpt.get("config", {})
         normalizer_state = config.get("profile_normalizer")
         vocabs = ckpt.get("vocabs", {})
+        familiarity = None
+        if model.familiarity_weights is not None:
+            if catalogue_df is None:
+                raise ValueError("Familiarity-aware retrieval requires catalogue attributes.")
+            familiarity = FamiliarityStore(purchases_df, catalogue_df, eligible_pids, config["familiarity_fields"])
 
         feature_store = PointInTimeFeatureStore(
             purchases_df=purchases_df,
@@ -861,6 +870,7 @@ class CandidateRetriever:
             ),
             quantity_reference=config.get("quantity_reference"),
             company_cache_name=config.get("company_cache_name", "bge_m3_company.parquet"),
+            familiarity=familiarity,
             customer_vocabs={
                 key: vocabs[key] for key in ("city_vocab", "region_vocab", "industry_vocab") if key in vocabs
             },
@@ -895,14 +905,25 @@ class CandidateRetriever:
         self,
         customer_vectors: torch.Tensor,
         product_vectors: Optional[torch.Tensor] = None,
+        *,
+        customer_ids: Optional[Sequence[str]] = None,
+        as_of_dates: Optional[Sequence[Union[str, pd.Timestamp]]] = None,
     ) -> torch.Tensor:
-        """Compute Stage 1 retrieval logits (B, P) using scaled dot-product and product bias."""
+        """Score products, using query dates and customer IDs for contextual features."""
         u_c = customer_vectors.to(self.device)
         v_p = product_vectors.to(self.device) if product_vectors is not None else self.get_product_vectors()
 
         if self.model is not None:
             prod_idx = torch.arange(v_p.size(0), device=self.device)
-            return self.model.compute_logits(u_c, v_p, product_indices=prod_idx)
+            familiarity_features = None
+            if self.model.familiarity_weights is not None:
+                if self.familiarity is None or customer_ids is None or as_of_dates is None:
+                    raise ValueError("Familiarity-aware retrieval requires customer IDs and scoring dates.")
+                familiarity_features = self.familiarity.batch_features(customer_ids, as_of_dates)
+            return self.model.compute_logits(
+                u_c, v_p, product_indices=prod_idx,
+                familiarity_features=familiarity_features,
+            )
 
         # Standalone vector dot-product fallback
         return torch.matmul(u_c, v_p.t()) / DEFAULT_TEMPERATURE
@@ -1058,7 +1079,9 @@ class CandidateRetriever:
         top_c: int = DEFAULT_TOP_C,
     ) -> CandidateBatch:
         """Retrieve candidates and construct CandidateBatch given precomputed customer vectors."""
-        logits = self.compute_logits(customer_vectors, product_vectors=product_vectors)
+        logits = self.compute_logits(
+            customer_vectors, product_vectors=product_vectors, customer_ids=customer_ids, as_of_dates=as_of_dates,
+        )
         return self.generate_candidate_batch(
             logits=logits,
             customer_ids=customer_ids,

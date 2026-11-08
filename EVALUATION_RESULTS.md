@@ -1,5 +1,29 @@
 # Evaluation & Training Report: Modular Two-Tower Retriever + UPS-CANR Ranker
 
+## Stage 1 discovery reference
+
+The reference uses 128D towers, 32 purchase records, and a two-layer history Transformer.
+Stage 1 scores whether the customer previously bought a SKU with the candidate's brand,
+category, business line, or product family. Each flag uses the full history before the
+target date. The Product Tower uses its existing text and other inputs, with the three
+learned brand, category, and business-line embedding tables removed.
+
+| 128D discovery run | Selected epoch | New-to-customer Recall@25 | New-to-customer Recall@50 |
+| --- | ---: | ---: | ---: |
+| Previous discovery reference | 23 | 34.95% (649) | 48.25% (896) |
+| Three flags replace embeddings | 23 | 34.46% (640) | 48.73% (905) |
+| Four flags with embeddings | 23 | 34.89% (648) | 49.33% (916) |
+| **Four flags replace embeddings** | **23** | **35.00% (650)** | **49.43% (918)** |
+| Four flags replace embeddings + customer median unit price | 21 | 34.89% (648) | 49.00% (910) |
+
+Each row uses a 30-epoch run with seed 42. Checkpoints were selected by Recall@25 among
+previously unbought SKUs. The validation denominator is 1,857 first-time targets across
+6,191 baskets. The reference trained on 8,773 baskets with eligible first-time purchases.
+
+Reproduce with `python -m recommender.train_retriever --discovery-reference`. The selected
+checkpoint, training history, validation comparison, and checksums are saved locally in
+`checkpoints/retriever-discovery-reference/`. These results measure Stage 1 discovery.
+
 ## Stage 1 validation with the 30-epoch schedule
 
 The retriever uses 128-dimensional output vectors, 32 purchase records, and a two-layer history
