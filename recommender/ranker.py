@@ -16,30 +16,35 @@ Implements the official Stage 2 neural ranking architecture for next-basket reco
 3. Candidate-Aware Multi-Head Cross-Attention:
    - Query Q attends to Unified Memory (K, V) via 4-head cross-attention, producing attended
      context h_attended (B, C, 128) and attention weights alpha (B, C, 33).
-4. Scoring & Residual Fusion Head:
+4. Scoring Head:
    - Concatenates [z_candidate (128), h_attended (128), z_candidate * h_attended (128),
-     pairwise_features (12)] -> 396-d MLP (396 -> 256 -> 128 -> 64 -> 1).
-   - Learnable residual skip connection on Stage 1 retrieval score:
-     s_final = s_raw + skip_weight * stage1_score.
+     pairwise_features (13)] -> 397-d MLP (397 -> 256 -> 128 -> 64 -> 1).
 5. RankerLoss:
    - Multi-label BCEWithLogitsLoss (pos_weight=10.0) + Listwise Softmax Cross-Entropy.
 """
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from recommender.candidates import NUM_PAIRWISE_FEATURES
 from recommender.features import LEGACY_PROFILE_FEATURES
 from recommender.models import OUTPUT_DIM, TEXT_DIM, ProductTower
+from recommender.sequences import DAYS_PER_YEAR, HISTORY_AGE_INDEX, normalize_purchase_history_gaps
 
 DEFAULT_MEMORY_DIM: int = OUTPUT_DIM
 DEFAULT_NUM_HEADS: int = 4
 DEFAULT_SEQUENCE_LENGTH: int = 32
-DEFAULT_NUM_PAIRWISE_FEATURES: int = 12
-DEFAULT_RESIDUAL_WEIGHT_INIT: float = 0.5
+
+
+def _fit_feature_width(values: torch.Tensor, width: int) -> torch.Tensor:
+    if values.size(-1) < width:
+        return F.pad(values, (0, width - values.size(-1)))
+    return values[..., :width]
 
 
 @dataclass
@@ -48,7 +53,7 @@ class RankerOutput:
 
     Attributes:
         scores: FloatTensor of shape (B, C) with final ranking logits.
-        raw_scores: FloatTensor of shape (B, C) with MLP scores before residual skip.
+        raw_scores: FloatTensor of shape (B, C) with MLP scores.
         attn_weights: FloatTensor of shape (B, C, 33) with cross-attention weights.
         h_attended: FloatTensor of shape (B, C, 128) with attended context vectors.
         z_candidate: FloatTensor of shape (B, C, 128) with candidate query vectors.
@@ -73,7 +78,7 @@ class RankerOutput:
 
     @property
     def mlp_score(self) -> torch.Tensor:
-        """Alias for raw MLP scores before residual skip."""
+        """Alias for the MLP scores."""
         return self.raw_scores
 
     @property
@@ -124,16 +129,31 @@ class UPSCANRRanker(nn.Module):
         num_subcategories: int = 200,
         num_business_lines: int = 50,
         num_tabular_features: int = 8,
-        num_pairwise_features: int = DEFAULT_NUM_PAIRWISE_FEATURES,
+        num_pairwise_features: int = NUM_PAIRWISE_FEATURES,
         seq_feature_dim: int = 9,
         hidden_dim: Optional[int] = None,
         num_heads: int = DEFAULT_NUM_HEADS,
         dropout: float = 0.1,
-        residual_weight_init: float = DEFAULT_RESIDUAL_WEIGHT_INIT,
         catalog_text_embeddings: Optional[torch.Tensor] = None,
         product_tower: Optional[ProductTower] = None,
+        history_gap_reference_days: Optional[float] = None,
+        adapt_candidate_query: bool = False,
+        history_age_attention: bool = False,
+        statistics_attention: bool = False,
+        num_history_brands: Optional[int] = None,
+        excluded_statistics: tuple[str, ...] = (),
+        precomputed_purchase_age: bool = False,
     ):
         super().__init__()
+        if statistics_attention and (history_age_attention or adapt_candidate_query or history_gap_reference_days is not None):
+            raise ValueError("Statistics attention uses the reference vectors and replaces the age-only bias.")
+        if precomputed_purchase_age and not statistics_attention:
+            raise ValueError("Precomputed purchase age requires statistics attention.")
+        if excluded_statistics and (
+            not statistics_attention or precomputed_purchase_age
+            or not set(excluded_statistics) <= {"history_month", "history_repeat", "candidate_repeat"}
+        ):
+            raise ValueError("Unknown exclusion or incompatible statistics attention schema.")
         dim = hidden_dim if hidden_dim is not None else memory_dim
         self.text_dim = text_dim
         self.memory_dim = dim
@@ -142,6 +162,9 @@ class UPSCANRRanker(nn.Module):
         self.num_tabular_features = num_tabular_features
         self.num_pairwise_features = num_pairwise_features
         self.seq_feature_dim = seq_feature_dim
+        self.history_gap_reference_days = history_gap_reference_days
+        self.excluded_statistics = tuple(excluded_statistics)
+        self.precomputed_purchase_age = precomputed_purchase_age
 
         # -------------------------------------------------------------
         # 1. Customer Profile (Token 0) Modules
@@ -181,7 +204,10 @@ class UPSCANRRanker(nn.Module):
         # -------------------------------------------------------------
         self.product_embedding = nn.Embedding(num_products, 64, padding_idx=0)
         self.cat_embedding = nn.Embedding(num_categories, 32, padding_idx=0)
-        self.subcat_embedding = nn.Embedding(num_subcategories, 16, padding_idx=0)
+        self.subcat_embedding = nn.Embedding(num_subcategories, 16, padding_idx=0) if num_history_brands is None else None
+        self.history_brand_embedding = (
+            nn.Embedding(num_history_brands, 16, padding_idx=0) if num_history_brands is not None else None
+        )
         self.line_embedding = nn.Embedding(num_business_lines, 16, padding_idx=0)
 
         self.habit_proj = nn.Linear(seq_feature_dim, 32)
@@ -189,6 +215,8 @@ class UPSCANRRanker(nn.Module):
 
         # 64 (prod) + 32 (cat) + 16 (subcat) + 16 (line) + 32 (habit) + 32 (text) = 192
         history_token_dim = 64 + 32 + 16 + 16 + 32 + 32
+        if history_gap_reference_days is not None:
+            history_token_dim = dim + 32 + 16 + 16 + 32 + 1
         self.token_proj = nn.Sequential(
             nn.Linear(history_token_dim, dim),
             nn.LayerNorm(dim),
@@ -232,11 +260,22 @@ class UPSCANRRanker(nn.Module):
             dropout=dropout,
             batch_first=True,
         )
+        self.history_age_weight = nn.Parameter(torch.zeros(num_heads)) if history_age_attention else None
+        self.statistics_attention_weights = (
+            nn.Parameter(torch.zeros(num_heads, num_pairwise_features + 1, seq_feature_dim + num_tabular_features))
+            if statistics_attention else None
+        )
+        self.candidate_query_adjustment = (
+            nn.Linear(dim + num_pairwise_features, dim) if adapt_candidate_query else None
+        )
+        if self.candidate_query_adjustment is not None:
+            nn.init.zeros_(self.candidate_query_adjustment.weight)
+            nn.init.zeros_(self.candidate_query_adjustment.bias)
 
         # -------------------------------------------------------------
-        # 6. Scoring & Residual Fusion Head
+        # 6. Scoring Head
         # -------------------------------------------------------------
-        # Inputs: z_candidate (128) + h_attended (128) + interaction (128) + pairwise_features (12) = 396
+        # Inputs: z_candidate (128) + h_attended (128) + interaction (128) + pairwise_features (13) = 397
         total_mlp_input_dim = dim * 3 + num_pairwise_features
         self.mlp = nn.Sequential(
             nn.Linear(total_mlp_input_dim, 256),
@@ -253,14 +292,6 @@ class UPSCANRRanker(nn.Module):
             nn.Dropout(0.1),
             nn.Linear(64, 1),
         )
-
-        # Learnable residual skip weight for Stage 1 score
-        self.skip_weight = nn.Parameter(torch.tensor(float(residual_weight_init), dtype=torch.float32))
-
-    @property
-    def residual_weight(self) -> nn.Parameter:
-        """Alias for skip_weight."""
-        return self.skip_weight
 
     def build_key_padding_mask(self, attention_mask: torch.Tensor) -> torch.Tensor:
         """Construct key_padding_mask of shape (B, 33) where True indicates masked positions.
@@ -286,19 +317,15 @@ class UPSCANRRanker(nn.Module):
         seq_product_ids: Optional[torch.Tensor] = None,
         seq_category_ids: Optional[torch.Tensor] = None,
         seq_subcategory_ids: Optional[torch.Tensor] = None,
+        seq_brand_ids: Optional[torch.Tensor] = None,
         seq_business_line_ids: Optional[torch.Tensor] = None,
         seq_product_text: Optional[torch.Tensor] = None,
+        seq_purchase_dates: Optional[torch.Tensor] = None,
+        catalog_product_vectors: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Construct and contextualize the Unified 33-Token Customer Memory."""
         b_size = text_embedding.size(0)
         seq_len = sequence.size(1)
-
-        # Pad / slice tabular features to expected dimension
-        if tabular_features.size(-1) < self.num_tabular_features:
-            pad_tab = self.num_tabular_features - tabular_features.size(-1)
-            tabular_features = F.pad(tabular_features, (0, pad_tab))
-        elif tabular_features.size(-1) > self.num_tabular_features:
-            tabular_features = tabular_features[..., : self.num_tabular_features]
 
         # 1. Profile Token 0
         z_text = self.text_proj(text_embedding)  # (B, 128)
@@ -317,34 +344,43 @@ class UPSCANRRanker(nn.Module):
             seq_product_ids = torch.zeros((b_size, seq_len), dtype=torch.long, device=sequence.device)
         if seq_category_ids is None:
             seq_category_ids = torch.zeros((b_size, seq_len), dtype=torch.long, device=sequence.device)
-        if seq_subcategory_ids is None:
-            seq_subcategory_ids = torch.zeros((b_size, seq_len), dtype=torch.long, device=sequence.device)
         if seq_business_line_ids is None:
             seq_business_line_ids = torch.zeros((b_size, seq_len), dtype=torch.long, device=sequence.device)
 
-        # Ensure sequence continuous features match seq_feature_dim
-        if sequence.size(-1) < self.seq_feature_dim:
-            pad_seq = self.seq_feature_dim - sequence.size(-1)
-            sequence = F.pad(sequence, (0, pad_seq))
-        elif sequence.size(-1) > self.seq_feature_dim:
-            sequence = sequence[..., : self.seq_feature_dim]
-
-        # Product text representation for historical purchases
-        if seq_product_text is not None:
-            txt_emb = seq_product_text
-        elif self.catalog_text_embeddings is not None:
-            txt_emb = self.catalog_text_embeddings[seq_product_ids]
-        else:
-            txt_emb = torch.zeros((b_size, seq_len, self.text_dim), dtype=sequence.dtype, device=sequence.device)
-
-        p_emb = self.product_embedding(seq_product_ids)       # (B, 32, 64)
         cat_emb = self.cat_embedding(seq_category_ids)        # (B, 32, 32)
-        sub_emb = self.subcat_embedding(seq_subcategory_ids)  # (B, 32, 16)
+        if self.history_brand_embedding is not None:
+            if seq_brand_ids is None:
+                raise ValueError("Brand history requires purchase brand IDs.")
+            attribute_emb = self.history_brand_embedding(seq_brand_ids)
+        else:
+            if seq_subcategory_ids is None:
+                seq_subcategory_ids = torch.zeros_like(seq_product_ids)
+            attribute_emb = self.subcat_embedding(seq_subcategory_ids)
         line_emb = self.line_embedding(seq_business_line_ids) # (B, 32, 16)
+        if self.history_age_weight is not None:
+            # Age enters only the attention scores in this mode.
+            sequence = sequence.clone()
+            sequence[..., HISTORY_AGE_INDEX] = 0
         h_proj = self.habit_proj(sequence)                    # (B, 32, 32)
-        t_proj = self.product_text_proj(txt_emb)              # (B, 32, 32)
-
-        hist_raw = torch.cat([p_emb, cat_emb, sub_emb, line_emb, h_proj, t_proj], dim=-1)  # (B, 32, 192)
+        if self.history_gap_reference_days is not None:
+            if seq_purchase_dates is None or catalog_product_vectors is None:
+                raise ValueError("Stored-vector history requires purchase dates and catalogue product vectors.")
+            # The one-based history IDs index the retriever catalogue; zero is padding or unknown.
+            p_emb = F.embedding(seq_product_ids, F.pad(catalog_product_vectors.detach(), (0, 0, 1, 0)))
+            gaps = normalize_purchase_history_gaps(
+                seq_purchase_dates, attention_mask, self.history_gap_reference_days,
+            )
+            extra = gaps.unsqueeze(-1)
+        else:
+            p_emb = self.product_embedding(seq_product_ids)
+            if seq_product_text is not None:
+                txt_emb = seq_product_text
+            elif self.catalog_text_embeddings is not None:
+                txt_emb = self.catalog_text_embeddings[seq_product_ids]
+            else:
+                txt_emb = sequence.new_zeros((b_size, seq_len, self.text_dim))
+            extra = self.product_text_proj(txt_emb)
+        hist_raw = torch.cat([p_emb, cat_emb, attribute_emb, line_emb, h_proj, extra], dim=-1)
         t_hist = self.token_proj(hist_raw)  # (B, 32, 128)
 
         # Positional and token-type embeddings
@@ -432,7 +468,6 @@ class UPSCANRRanker(nn.Module):
         seq_product_text: Optional[torch.Tensor] = None,
         # Candidate Slate Inputs
         candidate_indices: Optional[torch.Tensor] = None,
-        candidate_scores: Optional[torch.Tensor] = None,
         pairwise_features: Optional[torch.Tensor] = None,
         candidate_vectors: Optional[torch.Tensor] = None,
         catalog_product_vectors: Optional[torch.Tensor] = None,
@@ -443,9 +478,21 @@ class UPSCANRRanker(nn.Module):
         candidate_line_ids: Optional[torch.Tensor] = None,
         candidate_demand_feats: Optional[torch.Tensor] = None,
         candidate_container_ids: Optional[torch.Tensor] = None,
+        seq_purchase_dates: Optional[torch.Tensor] = None,
+        prediction_day: Optional[torch.Tensor] = None,
+        seq_brand_ids: Optional[torch.Tensor] = None,
     ) -> RankerOutput:
         """Forward pass of Stage 2 UPS-CANR ranker."""
         b_size = text_embedding.size(0)
+        sequence = _fit_feature_width(sequence, self.seq_feature_dim)
+        if {"history_month", "history_repeat"}.intersection(self.excluded_statistics):
+            sequence = sequence.clone()
+            if "history_month" in self.excluded_statistics:
+                sequence[..., 3:5] = 0
+            if "history_repeat" in self.excluded_statistics:
+                sequence[..., 7] = 0
+        tabular_features = _fit_feature_width(tabular_features, self.num_tabular_features)
+        statistics_in_scores = self.statistics_attention_weights is not None
 
         # 1. Customer Memory Contextualization (B, 33, 128)
         memory, key_padding_mask = self._compute_customer_memory(
@@ -453,14 +500,17 @@ class UPSCANRRanker(nn.Module):
             city_id=city_id,
             region_id=region_id,
             industry_id=industry_id,
-            tabular_features=tabular_features,
-            sequence=sequence,
+            tabular_features=torch.zeros_like(tabular_features) if statistics_in_scores else tabular_features,
+            sequence=torch.zeros_like(sequence) if statistics_in_scores else sequence,
             attention_mask=attention_mask,
             seq_product_ids=seq_product_ids,
             seq_category_ids=seq_category_ids,
             seq_subcategory_ids=seq_subcategory_ids,
+            seq_brand_ids=seq_brand_ids,
             seq_business_line_ids=seq_business_line_ids,
             seq_product_text=seq_product_text,
+            seq_purchase_dates=seq_purchase_dates,
+            catalog_product_vectors=catalog_product_vectors,
         )
 
         # 2. Resolve Candidate Queries Q (B, C, 128)
@@ -478,14 +528,56 @@ class UPSCANRRanker(nn.Module):
             candidate_container_ids=candidate_container_ids,
         )
         c_slate = z_cand.size(1)
+        if pairwise_features is None:
+            pairwise_features = z_cand.new_zeros((b_size, c_slate, self.num_pairwise_features))
+        else:
+            pairwise_features = _fit_feature_width(pairwise_features, self.num_pairwise_features)
+        if "candidate_repeat" in self.excluded_statistics:
+            pairwise_features = pairwise_features.clone()
+            pairwise_features[..., 0] = 0
+        query = z_cand
+        if self.candidate_query_adjustment is not None:
+            query = query + self.candidate_query_adjustment(torch.cat([z_cand, pairwise_features], dim=-1))
 
         # 3. Candidate-Aware Multi-Head Cross-Attention
         # Query Q: (B, C, 128), Key K: (B, 33, 128), Value V: (B, 33, 128)
+        attention_bias = None
+        attention_padding = key_padding_mask
+        if statistics_in_scores or self.history_age_weight is not None:
+            purchase_statistics = sequence
+            if not self.precomputed_purchase_age:
+                if prediction_day is None or seq_purchase_dates is None:
+                    raise ValueError("Date-aware attention requires prediction and purchase dates.")
+                purchase_days = (seq_purchase_dates * DAYS_PER_YEAR).round()
+                age_days = (prediction_day[:, None] - purchase_days).clamp_min(0)
+                age = age_days / (age_days + 90.0)
+                purchase_statistics = sequence.clone()
+                purchase_statistics[..., HISTORY_AGE_INDEX] = age
+            if statistics_in_scores:
+                key_statistics = torch.cat((
+                    F.pad(tabular_features[:, None, :], (self.seq_feature_dim, 0)),
+                    F.pad(purchase_statistics, (0, self.num_tabular_features)),
+                ), dim=1)
+                # A constant term lets a key statistic matter on its own. Each
+                # candidate's features also change the weights for that key.
+                candidate_statistics = F.pad(pairwise_features, (1, 0), value=1)
+                coefficients = candidate_statistics[:, None] @ self.statistics_attention_weights
+                bias = coefficients @ key_statistics.transpose(-1, -2)[:, None]
+            else:
+                # The age-only variant leaves the profile token neutral.
+                bias = F.pad(purchase_statistics[..., HISTORY_AGE_INDEX].to(query.dtype), (1, 0))[:, None, None, :]
+                bias = bias * self.history_age_weight[None, :, None, None]
+            bias = bias.masked_fill(key_padding_mask[:, None, None, :], -torch.inf)
+            attention_bias = bias.expand(-1, -1, c_slate, -1).reshape(
+                b_size * self.num_heads, c_slate, memory.size(1),
+            ).to(query.dtype)
+            attention_padding = None
         h_att, attn_w = self.cross_attention(
-            query=z_cand,
+            query=query,
             key=memory,
             value=memory,
-            key_padding_mask=key_padding_mask,
+            key_padding_mask=attention_padding,
+            attn_mask=attention_bias,
             need_weights=True,
             average_attn_weights=True,
         )
@@ -505,33 +597,13 @@ class UPSCANRRanker(nn.Module):
         # 4. Feature Fusion
         interaction = z_cand * h_att
 
-        if pairwise_features is None:
-            pairwise_features = torch.zeros(
-                (b_size, c_slate, self.num_pairwise_features),
-                dtype=z_cand.dtype,
-                device=z_cand.device,
-            )
-        elif pairwise_features.size(-1) < self.num_pairwise_features:
-            pad_pw = self.num_pairwise_features - pairwise_features.size(-1)
-            pairwise_features = F.pad(pairwise_features, (0, pad_pw))
-        elif pairwise_features.size(-1) > self.num_pairwise_features:
-            pairwise_features = pairwise_features[..., : self.num_pairwise_features]
-
-        fused = torch.cat([z_cand, h_att, interaction, pairwise_features], dim=-1)  # (B, C, 396)
+        fused = torch.cat([z_cand, h_att, interaction, pairwise_features], dim=-1)  # (B, C, 397)
 
         # 5. Deep Ranking MLP
         mlp_raw = self.mlp(fused).squeeze(-1)  # (B, C)
 
-        # 6. Residual Skip Connection
-        if candidate_scores is not None:
-            stage1_score = candidate_scores
-        else:
-            stage1_score = pairwise_features[..., 0]
-
-        logits = mlp_raw + self.skip_weight * stage1_score
-
         return RankerOutput(
-            scores=logits,
+            scores=mlp_raw,
             raw_scores=mlp_raw,
             attn_weights=attn_w,
             h_attended=h_att,
@@ -597,9 +669,9 @@ class UPSCANRRanker(nn.Module):
             num_industries=ind_size,
             num_products=num_products + 1,
             num_brands=product_sizes["brand"],
-            num_categories=product_sizes["category"],
+            num_categories=max(product_sizes["category"], len(ckpt.get("vocabs", {}).get("category_vocab", {})) + 1),
             num_subcategories=subcat_size,
-            num_business_lines=product_sizes["business_line"],
+            num_business_lines=max(product_sizes["business_line"], len(ckpt.get("vocabs", {}).get("business_line_vocab", {})) + 1),
             product_tower=product_tower,
         )
         ranker_kwargs.update(kwargs)
@@ -663,15 +735,22 @@ class UPSCANRRanker(nn.Module):
 class RankerLoss(nn.Module):
     """Combined Multi-Label BCE and Listwise Softmax Cross-Entropy Loss."""
 
-    def __init__(self, pos_weight: float = 10.0, listwise_weight: float = 1.0):
+    def __init__(
+        self, pos_weight: float = 10.0, listwise_weight: float = 1.0,
+        new_positive_weight: float = 1.0,
+    ):
         super().__init__()
         self.pos_weight = float(pos_weight)
         self.listwise_weight = float(listwise_weight)
+        if not math.isfinite(new_positive_weight) or new_positive_weight <= 0:
+            raise ValueError("new_positive_weight must be a finite positive number.")
+        self.new_positive_weight = float(new_positive_weight)
 
     def forward(
         self,
         logits: torch.Tensor,
         targets: torch.Tensor,
+        unseen_mask: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         """Compute BCE loss, Listwise loss, and combined total loss.
 
@@ -683,12 +762,35 @@ class RankerLoss(nn.Module):
             Dict containing 'loss', 'bce_loss', and 'list_loss'.
         """
         pw = torch.tensor([self.pos_weight], dtype=logits.dtype, device=logits.device)
-        loss_bce = F.binary_cross_entropy_with_logits(logits, targets, pos_weight=pw)
+        if self.new_positive_weight != 1.0 and unseen_mask is None:
+            raise ValueError("unseen_mask is required when new_positive_weight is not 1.0.")
+        bce_terms = F.binary_cross_entropy_with_logits(
+            logits, targets, pos_weight=pw, reduction="none",
+        )
+        if unseen_mask is not None and self.new_positive_weight != 1.0:
+            unseen_positive = unseen_mask.to(device=logits.device, dtype=torch.bool) & (targets > 0.5)
+            positive_scale = torch.where(
+                unseen_positive,
+                torch.full_like(targets, self.new_positive_weight),
+                torch.ones_like(targets),
+            )
+            bce_terms = torch.where(targets > 0.5, bce_terms * positive_scale, bce_terms)
+        loss_bce = bce_terms.mean()
 
         # Listwise Softmax Cross-Entropy
         pos_mask = (targets > 0.5)
         pos_counts = pos_mask.sum(dim=-1, keepdim=True).clamp(min=1.0)
-        target_probs = targets / pos_counts
+        target_weights = targets
+        if unseen_mask is not None and self.new_positive_weight != 1.0:
+            unseen_positive = unseen_mask.to(device=logits.device, dtype=torch.bool) & pos_mask
+            target_weights = targets * torch.where(
+                unseen_positive,
+                torch.full_like(targets, self.new_positive_weight),
+                torch.ones_like(targets),
+            )
+        # Keep the original positive count as denominator: one unseen target gets
+        # the full configured weight, even when it is the basket's only positive.
+        target_probs = target_weights / pos_counts
 
         log_probs = F.log_softmax(logits, dim=-1)
         slate_has_pos = (pos_mask.sum(dim=-1) > 0)

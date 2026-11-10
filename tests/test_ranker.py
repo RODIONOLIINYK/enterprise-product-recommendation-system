@@ -50,7 +50,7 @@ class TestRankerArchitectureShapes(unittest.TestCase):
             num_business_lines=10,
             seq_feature_dim=9,
             num_tabular_features=8,
-            num_pairwise_features=12,
+            num_pairwise_features=NUM_PAIRWISE_FEATURES,
             num_heads=4,
             dropout=0.1,
         )
@@ -67,7 +67,7 @@ class TestRankerArchitectureShapes(unittest.TestCase):
         seq_cids = torch.randint(1, 20, (B, self.seq_len))
         candidate_vecs = torch.randn(B, C, OUTPUT_DIM)
         candidate_vecs = F.normalize(candidate_vecs, p=2, dim=-1)
-        pairwise_feats = torch.rand(B, C, 12)
+        pairwise_feats = torch.rand(B, C, NUM_PAIRWISE_FEATURES)
         return {
             "text_embedding": text_emb,
             "city_id": city_id,
@@ -91,6 +91,7 @@ class TestRankerArchitectureShapes(unittest.TestCase):
         self.assertEqual(out.logits.shape, (self.B, self.C))
         self.assertEqual(out.scores.shape, (self.B, self.C))
         self.assertEqual(out.raw_scores.shape, (self.B, self.C))
+        torch.testing.assert_close(out.logits, out.mlp_score)
         self.assertEqual(out.attention_weights.shape, (self.B, self.C, 33))
         self.assertEqual(out.attended_context.shape, (self.B, self.C, OUTPUT_DIM))
         self.assertEqual(out.memory.shape, (self.B, 33, OUTPUT_DIM))
@@ -104,6 +105,24 @@ class TestRankerArchitectureShapes(unittest.TestCase):
             out = self.model(**inputs)
             self.assertEqual(out.logits.shape, (self.B, c))
             self.assertEqual(out.attention_weights.shape, (self.B, c, 33))
+
+    def test_stored_vectors_are_frozen_and_candidate_stats_reach_attention(self):
+        model = UPSCANRRanker(history_gap_reference_days=30, adapt_candidate_query=True).eval()
+        inputs = self._generate_synthetic_inputs(1, 2)
+        catalogue = torch.randn(100, OUTPUT_DIM, requires_grad=True)
+        inputs["catalog_product_vectors"] = catalogue
+        inputs["seq_purchase_dates"] = torch.arange(32).float().unsqueeze(0) / 365.25
+        with torch.no_grad():
+            model.candidate_query_adjustment.weight[:, OUTPUT_DIM].copy_(torch.arange(OUTPUT_DIM) / OUTPUT_DIM)
+        first = model(**inputs)
+        inputs["pairwise_features"] = inputs["pairwise_features"].clone()
+        inputs["pairwise_features"][0, 0, 0] += 1
+        second = model(**inputs)
+        torch.testing.assert_close(first.memory, second.memory)
+        self.assertFalse(torch.allclose(first.attention_weights[0, 0], second.attention_weights[0, 0]))
+        torch.testing.assert_close(first.attention_weights[0, 1], second.attention_weights[0, 1])
+        second.logits.sum().backward()
+        self.assertIsNone(catalogue.grad)
 
     def test_variable_batch_sizes(self):
         """Batch sizes B=1, 4, 32 execute cleanly and preserve tensor dimensions."""
@@ -153,7 +172,7 @@ class TestAttentionMaskingAndContextualization(unittest.TestCase):
             num_categories=20,
             seq_feature_dim=9,
             num_tabular_features=8,
-            num_pairwise_features=12,
+            num_pairwise_features=NUM_PAIRWISE_FEATURES,
         )
 
     def test_token0_never_masked_invariant(self):
@@ -194,7 +213,7 @@ class TestAttentionMaskingAndContextualization(unittest.TestCase):
             sequence=seq,
             attention_mask=mask,
             candidate_vectors=torch.randn(self.B, self.C, OUTPUT_DIM),
-            pairwise_features=torch.rand(self.B, self.C, 12),
+            pairwise_features=torch.rand(self.B, self.C, NUM_PAIRWISE_FEATURES),
         )
 
         attn = out.attention_weights  # (B, C, 33)
@@ -220,7 +239,7 @@ class TestAttentionMaskingAndContextualization(unittest.TestCase):
             sequence=seq,
             attention_mask=mask,
             candidate_vectors=torch.randn(self.B, self.C, OUTPUT_DIM),
-            pairwise_features=torch.rand(self.B, self.C, 12),
+            pairwise_features=torch.rand(self.B, self.C, NUM_PAIRWISE_FEATURES),
         )
 
         self.assertFalse(torch.isnan(out.logits).any())
@@ -248,7 +267,7 @@ class TestAttentionMaskingAndContextualization(unittest.TestCase):
             sequence=torch.randn(self.B, self.seq_len, 9),
             attention_mask=mask,
             candidate_vectors=torch.randn(self.B, self.C, OUTPUT_DIM),
-            pairwise_features=torch.rand(self.B, self.C, 12),
+            pairwise_features=torch.rand(self.B, self.C, NUM_PAIRWISE_FEATURES),
         )
 
         weight_sums = out.attention_weights.sum(dim=-1)  # (B, C)
@@ -264,7 +283,7 @@ class TestAttentionMaskingAndContextualization(unittest.TestCase):
         seq = torch.randn(1, self.seq_len, 9)
         mask = torch.ones(1, self.seq_len, dtype=torch.long)
         cand_vecs = torch.randn(1, 2, OUTPUT_DIM)
-        p_feats = torch.rand(1, 2, 12)
+        p_feats = torch.rand(1, 2, NUM_PAIRWISE_FEATURES)
 
         # Baseline forward pass
         out_base = self.model(
@@ -310,7 +329,7 @@ class TestGradientFlowAndTrainability(unittest.TestCase):
             num_categories=20,
             seq_feature_dim=9,
             num_tabular_features=8,
-            num_pairwise_features=12,
+            num_pairwise_features=NUM_PAIRWISE_FEATURES,
         )
 
     def test_all_parameters_receive_nonzero_gradients(self):
@@ -330,7 +349,7 @@ class TestGradientFlowAndTrainability(unittest.TestCase):
             seq_business_line_ids=torch.randint(1, 10, (B, 32)),
             seq_product_text=torch.randn(B, 32, TEXT_DIM),
             candidate_vectors=torch.randn(B, C, OUTPUT_DIM),
-            pairwise_features=torch.rand(B, C, 12),
+            pairwise_features=torch.rand(B, C, NUM_PAIRWISE_FEATURES),
         )
 
         loss = out.logits.sum()
@@ -354,7 +373,7 @@ class TestGradientFlowAndTrainability(unittest.TestCase):
             sequence=torch.randn(B, 32, 9),
             attention_mask=torch.ones(B, 32, dtype=torch.long),
             candidate_vectors=torch.randn(B, C, OUTPUT_DIM),
-            pairwise_features=torch.rand(B, C, 12),
+            pairwise_features=torch.rand(B, C, NUM_PAIRWISE_FEATURES),
         )
 
         targets = torch.zeros(B, C)
@@ -368,8 +387,6 @@ class TestGradientFlowAndTrainability(unittest.TestCase):
         self.assertGreater(float(loss.item()), 0.0)
 
         loss.backward()
-        self.assertIsNotNone(self.model.skip_weight.grad)
-        self.assertFalse(torch.isnan(self.model.skip_weight.grad).any())
 
     def test_listwise_cross_entropy_backward(self):
         """Listwise softmax cross-entropy loss propagates gradients cleanly to cross-attention."""
@@ -383,7 +400,7 @@ class TestGradientFlowAndTrainability(unittest.TestCase):
             sequence=torch.randn(B, 32, 9),
             attention_mask=torch.ones(B, 32, dtype=torch.long),
             candidate_vectors=torch.randn(B, C, OUTPUT_DIM),
-            pairwise_features=torch.rand(B, C, 12),
+            pairwise_features=torch.rand(B, C, NUM_PAIRWISE_FEATURES),
         )
 
         # Single target item per transition (slate position 0)
@@ -415,115 +432,6 @@ class TestGradientFlowAndTrainability(unittest.TestCase):
         self.assertFalse(torch.isnan(logits.grad).any())
 
 
-class TestResidualSkipConnection(unittest.TestCase):
-    def setUp(self):
-        torch.manual_seed(42)
-        self.model = UPSCANRRanker(
-            text_dim=TEXT_DIM,
-            memory_dim=OUTPUT_DIM,
-            num_cities=50,
-            num_regions=20,
-            num_industries=30,
-            num_products=100,
-            num_categories=20,
-            seq_feature_dim=9,
-            num_tabular_features=8,
-            num_pairwise_features=12,
-        )
-
-    def test_additive_influence_of_stage1_score(self):
-        """Altering stage1_score produces linear additive shift via skip_weight."""
-        with torch.no_grad():
-            self.model.skip_weight.fill_(0.5)
-
-        B, C = 1, 2
-        p_feats_base = torch.zeros(B, C, 12)
-        p_feats_base[0, 0, 0] = 0.2  # stage1_score candidate 0
-        p_feats_base[0, 1, 0] = 0.8  # stage1_score candidate 1
-
-        common_args = {
-            "text_embedding": torch.randn(B, TEXT_DIM),
-            "city_id": torch.zeros(B, dtype=torch.long),
-            "region_id": torch.zeros(B, dtype=torch.long),
-            "industry_id": torch.zeros(B, dtype=torch.long),
-            "tabular_features": torch.zeros(B, 8),
-            "sequence": torch.zeros(B, 32, 9),
-            "attention_mask": torch.ones(B, 32, dtype=torch.long),
-            "candidate_vectors": torch.randn(B, C, OUTPUT_DIM),
-        }
-
-        out_base = self.model(**common_args, pairwise_features=p_feats_base)
-
-        # Perturb stage1_score by delta = +0.4 on candidate 0
-        p_feats_shift = p_feats_base.clone()
-        p_feats_shift[0, 0, 0] += 0.4
-        out_shift = self.model(**common_args, pairwise_features=p_feats_shift)
-
-        # Expected shift in logit is exactly skip_weight * stage1_score plus mlp contribution
-        mlp_base_0 = out_base.mlp_score[0, 0]
-        mlp_shift_0 = out_shift.mlp_score[0, 0]
-        skip_contribution_base = 0.5 * 0.2
-        skip_contribution_shift = 0.5 * 0.6
-
-        self.assertAlmostEqual(
-            float((out_base.logits[0, 0] - mlp_base_0).detach().item()),
-            skip_contribution_base,
-            places=5,
-        )
-        self.assertAlmostEqual(
-            float((out_shift.logits[0, 0] - mlp_shift_0).detach().item()),
-            skip_contribution_shift,
-            places=5,
-        )
-
-    def test_skip_weight_learnability(self):
-        """Skip weight is trainable and receives finite gradients."""
-        self.assertTrue(self.model.skip_weight.requires_grad)
-        out = self.model(
-            text_embedding=torch.randn(2, TEXT_DIM),
-            city_id=torch.randint(0, 50, (2,)),
-            region_id=torch.randint(0, 20, (2,)),
-            industry_id=torch.randint(0, 30, (2,)),
-            tabular_features=torch.randn(2, 8),
-            sequence=torch.randn(2, 32, 9),
-            attention_mask=torch.ones(2, 32, dtype=torch.long),
-            candidate_vectors=torch.randn(2, 4, OUTPUT_DIM),
-            pairwise_features=torch.rand(2, 4, 12),
-        )
-        loss = out.logits.sum()
-        loss.backward()
-        self.assertIsNotNone(self.model.skip_weight.grad)
-        self.assertTrue(self.model.skip_weight.grad.item() != 0.0)
-
-    def test_cold_start_retrieval_preservation(self):
-        """High skip weight preserves Stage 1 relative ranking under uninformative attended contexts."""
-        with torch.no_grad():
-            self.model.skip_weight.fill_(100.0)
-            # Neutralize MLP weights
-            for p in self.model.mlp.parameters():
-                p.zero_()
-
-        B, C = 1, 5
-        cand_scores = torch.tensor([[1.0, 5.0, 3.0, 2.0, 4.0]])
-
-        out = self.model(
-            text_embedding=torch.randn(B, TEXT_DIM),
-            city_id=torch.zeros(B, dtype=torch.long),
-            region_id=torch.zeros(B, dtype=torch.long),
-            industry_id=torch.zeros(B, dtype=torch.long),
-            tabular_features=torch.zeros(B, 8),
-            sequence=torch.zeros(B, 32, 9),
-            attention_mask=torch.ones(B, 32, dtype=torch.long),
-            candidate_vectors=torch.randn(B, C, OUTPUT_DIM),
-            candidate_scores=cand_scores,
-        )
-
-        # Relative ranking of logits must exactly match cand_scores
-        rank_scores = torch.argsort(cand_scores, descending=True)
-        rank_logits = torch.argsort(out.logits, descending=True)
-        self.assertTrue(torch.equal(rank_scores, rank_logits))
-
-
 class TestDevicePortabilityAndPrecision(unittest.TestCase):
     def setUp(self):
         torch.manual_seed(42)
@@ -537,7 +445,7 @@ class TestDevicePortabilityAndPrecision(unittest.TestCase):
             num_categories=20,
             seq_feature_dim=9,
             num_tabular_features=8,
-            num_pairwise_features=12,
+            num_pairwise_features=NUM_PAIRWISE_FEATURES,
         )
 
     def test_cpu_forward_backward_float32(self):
@@ -552,7 +460,7 @@ class TestDevicePortabilityAndPrecision(unittest.TestCase):
             sequence=torch.randn(2, 32, 9),
             attention_mask=torch.ones(2, 32, dtype=torch.long),
             candidate_vectors=torch.randn(2, 5, OUTPUT_DIM),
-            pairwise_features=torch.rand(2, 5, 12),
+            pairwise_features=torch.rand(2, 5, NUM_PAIRWISE_FEATURES),
         )
         self.assertEqual(out.logits.dtype, torch.float32)
         out.logits.sum().backward()
@@ -572,7 +480,7 @@ class TestDevicePortabilityAndPrecision(unittest.TestCase):
             "sequence": torch.randn(2, 32, 9),
             "attention_mask": torch.ones(2, 32, dtype=torch.long),
             "candidate_vectors": torch.randn(2, 5, OUTPUT_DIM),
-            "pairwise_features": torch.rand(2, 5, 12),
+            "pairwise_features": torch.rand(2, 5, NUM_PAIRWISE_FEATURES),
         }
         inputs_mps = {k: v.to(device) for k, v in inputs_cpu.items()}
 
@@ -581,7 +489,115 @@ class TestDevicePortabilityAndPrecision(unittest.TestCase):
         self.assertFalse(torch.isnan(out_mps.logits).any())
 
         out_mps.logits.sum().backward()
-        self.assertIsNotNone(model_mps.skip_weight.grad)
+
+
+def test_prediction_age_bias_changes_attention_without_changing_history_tokens():
+    ranker = UPSCANRRanker(history_age_attention=True, dropout=0).eval()
+    with torch.no_grad():
+        # Isolate the age effect from the learned query/key dot product.
+        ranker.cross_attention.in_proj_weight[:2 * OUTPUT_DIM].zero_()
+        ranker.cross_attention.in_proj_bias[:2 * OUTPUT_DIM].zero_()
+        ranker.history_age_weight.fill_(-2)
+
+    mask = torch.zeros(1, 32, dtype=torch.long)
+    mask[:, :2] = 1
+    dates = torch.zeros(1, 32)
+    dates[0, :2] = torch.tensor([-400.0, -800.0]) / 365.25
+    sequence = torch.zeros(1, 32, 9)
+    inputs = dict(
+        text_embedding=torch.zeros(1, TEXT_DIM),
+        city_id=torch.zeros(1, dtype=torch.long),
+        region_id=torch.zeros(1, dtype=torch.long),
+        industry_id=torch.zeros(1, dtype=torch.long),
+        tabular_features=torch.zeros(1, 8),
+        attention_mask=mask,
+        seq_purchase_dates=dates,
+        candidate_vectors=torch.zeros(1, 2, OUTPUT_DIM),
+    )
+    first = ranker(**inputs, sequence=sequence, prediction_day=torch.tensor([0.0]))
+    sequence[..., 1] = 1
+    later = ranker(**inputs, sequence=sequence, prediction_day=torch.tensor([90.0]))
+    torch.testing.assert_close(first.memory, later.memory)
+    for output, ages in [(first, (400, 800)), (later, (490, 890))]:
+        expected = torch.softmax(torch.tensor([0.0, *(-2 * a / (a + 90) for a in ages)]), dim=0)
+        torch.testing.assert_close(output.attention_weights[0, :, :3], expected.expand(2, -1))
+        assert torch.count_nonzero(output.attention_weights[..., 3:]) == 0
+    later.attention_weights[..., 1].sum().backward()
+    assert torch.count_nonzero(ranker.history_age_weight.grad) == ranker.num_heads
+
+
+def test_statistics_bias_combines_candidate_and_token_inputs():
+    ranker = UPSCANRRanker(statistics_attention=True, dropout=0).eval()
+    with torch.no_grad():
+        ranker.cross_attention.in_proj_weight[:2 * OUTPUT_DIM].zero_()
+        ranker.cross_attention.in_proj_bias[:2 * OUTPUT_DIM].zero_()
+        weights = ranker.statistics_attention_weights
+        weights[:, 0, 0] = 1   # Quantity on its own
+        weights[:, 0, 1] = 1   # Exact age on its own
+        weights[:, 1, 0] = 2   # First candidate feature × quantity
+        weights[:, 0, 9] = 3   # First profile statistic
+        weights[:, 2, 9] = -4  # Second candidate feature × profile statistic
+
+    mask = torch.zeros(1, 32, dtype=torch.long)
+    mask[:, :2] = 1
+    dates = torch.zeros(1, 32)
+    dates[0, :2] = torch.tensor([-30.0, -90.0]) / 365.25
+    sequence = torch.zeros(1, 32, 9)
+    sequence[0, :2, 0] = torch.tensor([0.25, 0.5])
+    profile = torch.zeros(1, 8)
+    profile[0, 0] = 0.5
+    pairwise = torch.zeros(1, 2, NUM_PAIRWISE_FEATURES)
+    pairwise[0, 1, :2] = torch.tensor([1.0, 0.5])
+    inputs = dict(
+        text_embedding=torch.zeros(1, TEXT_DIM),
+        city_id=torch.zeros(1, dtype=torch.long),
+        region_id=torch.zeros(1, dtype=torch.long),
+        industry_id=torch.zeros(1, dtype=torch.long),
+        attention_mask=mask,
+        seq_purchase_dates=dates,
+        prediction_day=torch.zeros(1),
+        candidate_vectors=torch.zeros(1, 2, OUTPUT_DIM),
+        pairwise_features=pairwise,
+    )
+    output = ranker(**inputs, tabular_features=profile, sequence=sequence)
+    expected = torch.softmax(torch.tensor([[1.5, 0.5, 1.0], [0.5, 1.0, 2.0]]), dim=-1)
+    torch.testing.assert_close(output.attention_weights[0, :, :3], expected)
+    assert torch.count_nonzero(output.attention_weights[..., 3:]) == 0
+
+    no_statistics = ranker(
+        **inputs, tabular_features=torch.zeros_like(profile), sequence=torch.zeros_like(sequence),
+    )
+    torch.testing.assert_close(output.memory, no_statistics.memory)
+    output.attention_weights[0, 1, 0].backward()
+    assert torch.count_nonzero(weights.grad[:, 2, 9]) == ranker.num_heads
+
+
+def test_excluded_statistics_are_hidden_from_attention_and_the_scorer():
+    ranker = UPSCANRRanker(
+        statistics_attention=True, dropout=0,
+        excluded_statistics=("history_month", "history_repeat", "candidate_repeat"),
+    ).eval()
+    with torch.no_grad():
+        ranker.statistics_attention_weights.normal_()
+    sequence = torch.rand(1, 32, 9)
+    pairwise = torch.rand(1, 2, NUM_PAIRWISE_FEATURES)
+    inputs = dict(
+        text_embedding=torch.zeros(1, TEXT_DIM),
+        city_id=torch.zeros(1, dtype=torch.long),
+        region_id=torch.zeros(1, dtype=torch.long),
+        industry_id=torch.zeros(1, dtype=torch.long),
+        tabular_features=torch.zeros(1, 8),
+        attention_mask=torch.ones(1, 32, dtype=torch.long),
+        seq_purchase_dates=torch.zeros(1, 32),
+        prediction_day=torch.ones(1),
+        candidate_vectors=torch.randn(1, 2, OUTPUT_DIM),
+    )
+    first = ranker(**inputs, sequence=sequence, pairwise_features=pairwise)
+    sequence[..., [3, 4, 7]] = 1
+    pairwise[..., 0] = 1
+    second = ranker(**inputs, sequence=sequence, pairwise_features=pairwise)
+    torch.testing.assert_close(first.attention_weights, second.attention_weights)
+    torch.testing.assert_close(first.logits, second.logits)
 
 
 class TestDownstreamEvaluationIntegration(unittest.TestCase):
@@ -597,7 +613,7 @@ class TestDownstreamEvaluationIntegration(unittest.TestCase):
             num_categories=20,
             seq_feature_dim=9,
             num_tabular_features=8,
-            num_pairwise_features=12,
+            num_pairwise_features=NUM_PAIRWISE_FEATURES,
         )
 
     def test_candidate_reranking_and_slate_stitching(self):
@@ -611,7 +627,7 @@ class TestDownstreamEvaluationIntegration(unittest.TestCase):
             candidate_pids=candidate_pids,
             candidate_indices=torch.arange(C).unsqueeze(0).repeat(B, 1),
             candidate_scores=torch.randn(B, C),
-            pairwise_features=torch.rand(B, C, 12),
+            pairwise_features=torch.rand(B, C, NUM_PAIRWISE_FEATURES),
             top100_pids=top100_pids,
             top100_indices=torch.arange(100).unsqueeze(0).repeat(B, 1),
             top100_scores=torch.randn(B, 100),

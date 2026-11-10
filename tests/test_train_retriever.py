@@ -43,7 +43,7 @@ class MockSentenceTransformer:
 
 
 class TestTrainRetriever(unittest.TestCase):
-    def test_unseen_candidates_use_the_full_history_before_the_target_basket(self):
+    def test_novel_targets_use_only_purchases_before_the_target_basket(self):
         purchases = pd.DataFrame(
             {
                 "customer_id": ["C1"] * 5,
@@ -62,11 +62,13 @@ class TestTrainRetriever(unittest.TestCase):
         dataset = RetrieverDataset(
             [transition], purchases, {"A": 0, "B": 1, "C": 2, "D": 3}, {}, {},
             vocabularies={"product_vocab": {"A": 1, "B": 2, "C": 3, "D": 4}},
+            include_novel_target_mask=True,
             include_unseen_candidates=True,
             max_seq_len=1,
         )
         example = dataset[0]
         self.assertEqual(example["target"].tolist(), [1.0, 1.0, 0.0, 0.0])
+        self.assertEqual(example["novel_target_mask"].tolist(), [False, True, False, False])
         self.assertEqual(example["unseen_candidates"].tolist(), [False, True, True, False])
         self.assertEqual(example["seq_product_ids"][example["attention_mask"].bool()].tolist(), [1])
 

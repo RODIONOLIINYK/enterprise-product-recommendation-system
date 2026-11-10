@@ -24,9 +24,12 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from recommender.candidates import DEFAULT_HEURISTIC_FRACTION, NUM_PAIRWISE_FEATURES, CandidateRetriever
+from recommender.candidates import (
+    DEFAULT_HEURISTIC_FRACTION, NUM_PAIRWISE_FEATURES, CandidateRetriever,
+)
 from recommender.catalogue import load_product_catalogue, order_retriever_catalogue
 from recommender.company import load_companies
+from recommender.complementarity import ProductComplementarity, group_snapshot_rows, product_snapshot_date
 from recommender.features import (
     LEGACY_PROFILE_FEATURES,
     MEDIAN_BASKET_QUANTITY,
@@ -35,14 +38,25 @@ from recommender.features import (
     compute_point_in_time_features,
 )
 from recommender.models import TEXT_DIM
+from recommender.purchase_timing import TIMING_FEATURE_VERSION, PurchaseTiming, add_candidate_timing
 from recommender.ranker import RankerLoss, UPSCANRRanker
+from recommender.ranker_statistics import (
+    SHARED_SKU_STATISTICS_VERSION,
+    FavoriteCategoryAffinity,
+    ranker_history_options,
+    with_candidate_peer_affinity,
+    with_history_variant,
+    with_shared_sku_statistics,
+)
 from recommender.scope import get_datasets_locs
 from recommender.sequences import (
     DEFAULT_SEQUENCE_LENGTH,
     ENRICHED_FEATURE_DIM,
+    PURCHASE_DATE_ORIGIN,
     build_customer_sequence,
 )
-from recommender.split import TEST_START
+from recommender.split import TEST_START, TRAIN_CUTOFF
+from recommender.stage1_catalogue import load_stage1_discovery
 from recommender.text import (
     CATALOGUE_CACHE_WITHOUT_SUBCATEGORY,
     DEFAULT_CACHE_DIR,
@@ -56,7 +70,8 @@ from recommender.train_retriever import (
 )
 
 
-SLATE_SCHEMA_VERSION = 2
+SLATE_SCHEMA_VERSION = 3
+DEFAULT_EXCLUDED_STATISTICS: Tuple[str, ...] = ("history_repeat",)
 
 
 class RankerDataset(Dataset):
@@ -70,9 +85,12 @@ class RankerDataset(Dataset):
         self.tabular_features = data["tabular_features"]      # (N, 8)
         self.retriever_tabular_features = data.get("retriever_tabular_features", self.tabular_features)
         self.sequence = data["sequence"]                      # (N, 32, 9)
+        self.ranker_sequence = data.get("ranker_sequence")
+        self.seq_brand_ids = data.get("seq_brand_ids")
         self.attention_mask = data["attention_mask"]          # (N, 32)
         self.seq_product_ids = data["seq_product_ids"]        # (N, 32)
         self.seq_purchase_dates = data.get("seq_purchase_dates")
+        self.prediction_days = data.get("prediction_days")
         self.seq_category_ids = data["seq_category_ids"]      # (N, 32)
         self.seq_subcategory_ids = data.get(
             "seq_subcategory_ids",
@@ -83,11 +101,12 @@ class RankerDataset(Dataset):
             torch.zeros_like(self.seq_product_ids),
         )
         self.candidate_indices = data["candidate_indices"]    # (N, 50)
-        self.candidate_scores = data["candidate_scores"]      # (N, 50)
-        self.pairwise_features = data["pairwise_features"]    # (N, 50, 12)
+        self.candidate_vectors = data.get("candidate_vectors")
+        self.pairwise_features = data["pairwise_features"]    # (N, 50, F)
         self.labels = data["labels"]                          # (N, 50)
         self.candidate_pids = data["candidate_pids"]          # List of length N (list of 50 strings)
         self.positive_pids = data["positive_pids"]            # List of length N (list of strings)
+        self.new_positive_pids = data.get("new_positive_pids")
         self.customer_ids = data["customer_ids"]              # List of length N (strings)
 
     def __len__(self) -> int:
@@ -102,20 +121,24 @@ class RankerDataset(Dataset):
             "tabular_features": self.tabular_features[idx],
             "retriever_tabular_features": self.retriever_tabular_features[idx],
             "sequence": self.sequence[idx],
+            "ranker_sequence": self.ranker_sequence[idx] if self.ranker_sequence is not None else None,
+            "seq_brand_ids": self.seq_brand_ids[idx] if self.seq_brand_ids is not None else None,
             "attention_mask": self.attention_mask[idx],
             "seq_product_ids": self.seq_product_ids[idx],
             "seq_purchase_dates": (
                 self.seq_purchase_dates[idx] if self.seq_purchase_dates is not None else None
             ),
+            "prediction_day": self.prediction_days[idx] if self.prediction_days is not None else None,
             "seq_category_ids": self.seq_category_ids[idx],
             "seq_subcategory_ids": self.seq_subcategory_ids[idx],
             "seq_business_line_ids": self.seq_business_line_ids[idx],
             "candidate_indices": self.candidate_indices[idx],
-            "candidate_scores": self.candidate_scores[idx],
+            "candidate_vectors": self.candidate_vectors[idx] if self.candidate_vectors is not None else None,
             "pairwise_features": self.pairwise_features[idx],
             "labels": self.labels[idx],
             "candidate_pids": self.candidate_pids[idx],
             "positive_pids": self.positive_pids[idx],
+            "new_positive_pids": self.new_positive_pids[idx] if self.new_positive_pids is not None else None,
             "customer_id": self.customer_ids[idx],
         }
 
@@ -132,21 +155,39 @@ def collate_ranker_batch(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
             [x.get("retriever_tabular_features", x["tabular_features"]) for x in batch], dim=0,
         ),
         "sequence": torch.stack([x["sequence"] for x in batch], dim=0),
+        "ranker_sequence": (
+            torch.stack([x["ranker_sequence"] for x in batch])
+            if batch[0].get("ranker_sequence") is not None else None
+        ),
+        "seq_brand_ids": (
+            torch.stack([x["seq_brand_ids"] for x in batch])
+            if batch[0].get("seq_brand_ids") is not None else None
+        ),
         "attention_mask": torch.stack([x["attention_mask"] for x in batch], dim=0),
         "seq_product_ids": torch.stack([x["seq_product_ids"] for x in batch], dim=0),
         "seq_purchase_dates": (
             torch.stack([x["seq_purchase_dates"] for x in batch], dim=0)
             if batch[0].get("seq_purchase_dates") is not None else None
         ),
+        "prediction_day": (
+            torch.stack([x["prediction_day"] for x in batch])
+            if batch[0].get("prediction_day") is not None else None
+        ),
         "seq_category_ids": torch.stack([x["seq_category_ids"] for x in batch], dim=0),
         "seq_subcategory_ids": torch.stack([x["seq_subcategory_ids"] for x in batch], dim=0),
         "seq_business_line_ids": torch.stack([x["seq_business_line_ids"] for x in batch], dim=0),
         "candidate_indices": torch.stack([x["candidate_indices"] for x in batch], dim=0),
-        "candidate_scores": torch.stack([x["candidate_scores"] for x in batch], dim=0),
+        "candidate_vectors": (
+            torch.stack([x["candidate_vectors"] for x in batch]) if batch[0].get("candidate_vectors") is not None else None
+        ),
         "pairwise_features": torch.stack([x["pairwise_features"] for x in batch], dim=0),
         "labels": torch.stack([x["labels"] for x in batch], dim=0),
         "candidate_pids": [x["candidate_pids"] for x in batch],
         "positive_pids": [x["positive_pids"] for x in batch],
+        "new_positive_pids": (
+            [x["new_positive_pids"] for x in batch]
+            if batch[0].get("new_positive_pids") is not None else None
+        ),
         "customer_ids": [x["customer_id"] for x in batch],
     }
 
@@ -166,6 +207,7 @@ def precompute_candidate_slates_for_transitions(
     *,
     heuristic_fraction: float = 0.0,
     category_overdue: bool = False,
+    complementarity: Optional[ProductComplementarity] = None,
 ) -> Dict[str, Any]:
     """Precompute full customer memory tensors and CandidateRetriever slates for a transition list."""
     n_transitions = len(transitions)
@@ -272,61 +314,76 @@ def precompute_candidate_slates_for_transitions(
 
     # 2. Batched Stage 1 retrieval and CandidateBatch generation
     all_cand_indices: List[torch.Tensor] = []
-    all_cand_scores: List[torch.Tensor] = []
+    all_candidate_vectors: List[torch.Tensor] = []
     all_pairwise_feats: List[torch.Tensor] = []
     all_labels: List[torch.Tensor] = []
     all_cand_pids: List[List[str]] = []
     all_pos_pids: List[List[str]] = []
     all_cust_ids: List[str] = []
+    dates = [product_snapshot_date(t["as_of_date"]) for t in transitions]
+    dated_vectors = retriever.product_complementarity is not None and any(date < TRAIN_CUTOFF for date in dates)
+    row_groups = group_snapshot_rows(dates) if dated_vectors else [list(range(n_transitions))]
+    batches = [rows[i:i + batch_size] for rows in row_groups for i in range(0, len(rows), batch_size)]
 
     retriever.model.eval()
     with torch.no_grad():
-        for start_idx in range(0, n_transitions, batch_size):
-            end_idx = min(start_idx + batch_size, n_transitions)
-            batch_slice = transitions[start_idx:end_idx]
-            b_text = t_text[start_idx:end_idx].to(device)
-            b_city = t_city[start_idx:end_idx].to(device)
-            b_reg = t_region[start_idx:end_idx].to(device)
-            b_ind = t_industry[start_idx:end_idx].to(device)
-            b_tab = t_retriever_tab[start_idx:end_idx].to(device)
+        for rows in batches:
+            batch_slice = [transitions[i] for i in rows]
+            b_text = t_text[rows].to(device)
+            b_city = t_city[rows].to(device)
+            b_reg = t_region[rows].to(device)
+            b_ind = t_industry[rows].to(device)
+            b_tab = t_retriever_tab[rows].to(device)
+            vectors = retriever.get_product_vectors(dates[rows[0]]) if dated_vectors else product_vectors
             u_c = retriever.model.customer_tower(
                 text_embedding=b_text,
                 city_id=b_city,
                 region_id=b_reg,
                 industry_id=b_ind,
                 tabular_features=b_tab,
-                catalog_product_vectors=product_vectors,
-                **{name: tensor[start_idx:end_idx].to(device) for name, tensor in tower_inputs.items()},
+                catalog_product_vectors=vectors,
+                **{name: tensor[rows].to(device) for name, tensor in tower_inputs.items()},
             )
 
             b_cids_list = [str(t["customer_id"]) for t in batch_slice]
             b_dates = [t["as_of_date"] for t in batch_slice]
             b_pos_pids = [t["positive_product_ids"] for t in batch_slice]
 
-            logits = retriever.compute_logits(u_c, product_vectors)
+            logits = retriever.compute_logits(
+                u_c, vectors, customer_ids=b_cids_list, as_of_dates=b_dates,
+            )
 
             batch_candidates = retriever.generate_candidate_batch(
                 logits=logits,
                 customer_ids=b_cids_list,
                 as_of_dates=b_dates,
                 positive_product_ids=b_pos_pids,
+                top_k=top_c if retriever.rolling_pool is not None else 100,
                 top_c=top_c,
                 heuristic_fraction=heuristic_fraction,
                 category_overdue=category_overdue,
             )
+            if batch_candidates.candidate_indices.size(1) != top_c and retriever.rolling_pool is not None:
+                raise ValueError("Rolling ranker slates require enough eligible candidates for every basket.")
 
             all_cand_indices.append(batch_candidates.candidate_indices.cpu())
-            all_cand_scores.append(batch_candidates.candidate_scores.cpu())
-            all_pairwise_feats.append(batch_candidates.pairwise_features.cpu())
+            if dated_vectors:
+                all_candidate_vectors.append(vectors[batch_candidates.candidate_indices.to(device)].cpu())
+            features = batch_candidates.pairwise_features.cpu()
+            if complementarity is not None:
+                shares = np.stack([complementarity.shares(pids, date)
+                                   for pids, date in zip(batch_candidates.candidate_pids, b_dates)])
+                features = torch.cat((features, torch.from_numpy(shares[..., None])), dim=-1)
+            all_pairwise_feats.append(features)
             all_labels.append(batch_candidates.labels.cpu())
             all_cand_pids.extend(batch_candidates.candidate_pids)
             all_pos_pids.extend(b_pos_pids)
             all_cust_ids.extend(b_cids_list)
 
-    stacked_cand_idx = torch.cat(all_cand_indices, dim=0)
-    stacked_cand_scores = torch.cat(all_cand_scores, dim=0)
-    stacked_pw_feats = torch.cat(all_pairwise_feats, dim=0)
-    stacked_labels = torch.cat(all_labels, dim=0)
+    order = torch.argsort(torch.tensor([i for rows in batches for i in rows]))
+    stacked_cand_idx = torch.cat(all_cand_indices, dim=0)[order]
+    stacked_pw_feats = torch.cat(all_pairwise_feats, dim=0)[order]
+    stacked_labels = torch.cat(all_labels, dim=0)[order]
 
     result = {
         "text_embedding": t_text,
@@ -343,22 +400,29 @@ def precompute_candidate_slates_for_transitions(
         "seq_subcategory_ids": t_sub_ids,
         "seq_business_line_ids": t_line_ids,
         "candidate_indices": stacked_cand_idx,
-        "candidate_scores": stacked_cand_scores,
         "pairwise_features": stacked_pw_feats,
         "labels": stacked_labels,
-        "candidate_pids": all_cand_pids,
-        "positive_pids": all_pos_pids,
-        "customer_ids": all_cust_ids,
+        "candidate_pids": [all_cand_pids[i] for i in order.tolist()],
+        "positive_pids": [all_pos_pids[i] for i in order.tolist()],
+        "customer_ids": [all_cust_ids[i] for i in order.tolist()],
     }
     if retriever_sequence:
         result["retriever_sequence"] = retriever_sequence
+    if dated_vectors:
+        result["candidate_vectors"] = torch.cat(all_candidate_vectors, dim=0)[order]
     return result
 
 
-def slate_cache_path(split: str, heuristic_fraction: float = 0.0, *, category_overdue: bool = False) -> Path:
+def slate_cache_path(
+    split: str, heuristic_fraction: float = 0.0, *, category_overdue: bool = False, rolling: bool = False,
+    include_complementarity: bool = False, dated_vectors: bool = False,
+) -> Path:
     mix = f"_repeat_{heuristic_fraction}" if heuristic_fraction else ""
     cadence = "_category_overdue" if category_overdue else ""
-    return Path("data/interim") / f"ranker_{split}_slates_v{SLATE_SCHEMA_VERSION}{mix}{cadence}.pt"
+    pool = "_rolling_v1" if rolling else ""
+    share = "_complementarity_v1" if include_complementarity else ""
+    dated = "_monthly_vectors" if dated_vectors else ""
+    return Path("data/interim") / f"ranker_{split}_slates_v{SLATE_SCHEMA_VERSION}{mix}{cadence}{pool}{share}{dated}.pt"
 
 
 def checkpoint_digest(path: Path) -> str:
@@ -387,6 +451,8 @@ def slate_cache_identity(
     heuristic_fraction: float = 0.0,
     company_cache_name: str = "bge_m3_company.parquet",
     category_overdue: bool = False,
+    rolling: bool = False,
+    include_complementarity: bool = False,
 ) -> str:
     """Bind cached model inputs and labels to their retriever and source data."""
     digest = hashlib.sha256(f"{SLATE_SCHEMA_VERSION}:{retriever_digest}".encode())
@@ -394,6 +460,10 @@ def slate_cache_identity(
         digest.update(f":repeat_plus_popularity:{heuristic_fraction}".encode())
     if category_overdue:
         digest.update(b":category_overdue")
+    if rolling:
+        digest.update(b":rolling_v1")
+    if include_complementarity:
+        digest.update(b":complementarity_v1")
     for path in (catalogue_embeddings_path(include_subcategory), company_embeddings_path(checkpoint_path, company_cache_name)):
         digest.update(checkpoint_digest(path).encode())
     for frame in (purchases, catalogue, companies):
@@ -411,11 +481,18 @@ def load_ranker_retriever(
 ) -> Tuple[CandidateRetriever, Dict[str, Dict[str, int]]]:
     """Use the same ordered catalogue and demand inputs as retriever training."""
     ckpt = torch.load(checkpoint_path, map_location="cpu")
+    if ckpt.get("config", {}).get("discovery_only"):
+        retriever, ckpt = load_stage1_discovery(
+            checkpoint_path, purchases, catalogue, companies,
+            Path("checkpoints/stage1-full-catalogue/text_embeddings"), device,
+        )
+        return retriever, ckpt["vocabs"]
     product_ids = ckpt["product_ids"]
     vocabs = ckpt["vocabs"]
     catalogue = order_retriever_catalogue(catalogue, product_ids)
     include_subcategory = "product_tower.subcat_embedding.weight" in ckpt["model_state_dict"]
     config = ckpt.get("config", {})
+    complementarity = ProductComplementarity(purchases) if config.get("include_complementarity") else None
     cat_embs = load_cached_embeddings(
         catalogue_embeddings_path(include_subcategory), id_column="product_id",
     )
@@ -424,6 +501,7 @@ def load_ranker_retriever(
         include_sku_median_quantity=config.get("include_sku_median_quantity", False),
         container_encoding=config.get("container_encoding", "one_hot"),
         sku_prices_uah=config.get("sku_prices_uah"),
+        complementarity=complementarity,
     )
     retriever = CandidateRetriever.from_checkpoint(
         checkpoint_path,
@@ -432,6 +510,7 @@ def load_ranker_retriever(
         companies_df=companies,
         product_inputs=product_inputs,
         device=device,
+        product_complementarity=complementarity,
     )
     return retriever, vocabs
 
@@ -444,6 +523,8 @@ def prepare_slate_inputs(
     companies: pd.DataFrame,
     train_transitions: List[Dict[str, Any]],
     vocabs: Dict[str, Dict[str, int]],
+    *,
+    include_complementarity: bool = False,
 ) -> Dict[str, Any]:
     """Prepare the customer features used identically by ranker training and evaluation."""
     customer_vocabs = retriever.customer_vocabs
@@ -484,6 +565,9 @@ def prepare_slate_inputs(
         "normalizer": normalizer,
         "vocabs": vocabs,
         "item_metadata": item_metadata,
+        "complementarity": (
+            retriever.product_complementarity or ProductComplementarity(purchases)
+        ) if include_complementarity else None,
     }
 
 
@@ -530,6 +614,12 @@ def load_or_precompute_slates(
     *,
     heuristic_fraction: float = 0.0,
     category_overdue: bool = False,
+    include_complementarity: bool = False,
+    candidate_timing: bool = False,
+    category_gap_fallback: bool = True,
+    shared_sku_statistics: bool = False,
+    candidate_peer_affinity: bool = False,
+    history_variant: str | None = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], torch.Tensor, List[str], Dict[str, Dict[str, int]]]:
     """Load or generate slates for both splits using the configured mix."""
     retriever, vocabs = load_ranker_retriever(
@@ -542,16 +632,26 @@ def load_or_precompute_slates(
         heuristic_fraction=heuristic_fraction,
         company_cache_name=retriever.company_cache_name,
         category_overdue=category_overdue,
+        rolling=retriever.rolling_pool is not None,
+        include_complementarity=include_complementarity,
     )
     train_data = load_slate_cache(train_cache_path, f"{identity}:train")
     val_data = load_slate_cache(val_cache_path, f"{identity}:val")
-    if train_data is None or val_data is None:
-        train_transitions, val_transitions, _ = build_retriever_transitions(purchases_df)
-        slate_inputs = prepare_slate_inputs(
-            retriever, checkpoint_path, purchases_df, catalogue_df, companies_df, train_transitions, vocabs,
-        )
-        slate_inputs["heuristic_fraction"] = heuristic_fraction
-        slate_inputs["category_overdue"] = category_overdue
+    train_transitions, val_transitions, _ = build_retriever_transitions(purchases_df)
+    if retriever.rolling_pool is not None:
+        dates = {t["as_of_date"] for t in train_transitions}
+        full_slate_dates = {date for date in dates if len(retriever.rolling_pool.eligible_on(date)) >= 50}
+        before = len(train_transitions)
+        train_transitions = [t for t in train_transitions if t["as_of_date"] in full_slate_dates]
+        print(f"Excluded {before - len(train_transitions)} training baskets with fewer than 50 eligible SKUs.")
+    if train_data is None or val_data is None or candidate_timing:
+        if train_data is None or val_data is None:
+            slate_inputs = prepare_slate_inputs(
+                retriever, checkpoint_path, purchases_df, catalogue_df, companies_df, train_transitions, vocabs,
+                include_complementarity=include_complementarity,
+            )
+            slate_inputs["heuristic_fraction"] = heuristic_fraction
+            slate_inputs["category_overdue"] = category_overdue
         if train_data is None:
             print(f"Precomputing {len(train_transitions)} training slates from retrieved candidates")
             train_data = build_slate_cache(
@@ -562,7 +662,72 @@ def load_or_precompute_slates(
             val_data = build_slate_cache(
                 val_cache_path, f"{identity}:val", val_transitions, slate_inputs,
             )
+        if candidate_timing:
+            timing = PurchaseTiming(purchases_df, catalogue_df, category_gap_fallback=category_gap_fallback)
+            train_data = add_candidate_timing(train_data, train_transitions, timing)
+            val_data = add_candidate_timing(val_data, val_transitions, timing)
+    # Discovery labels are deliberately attached outside the slate cache so existing
+    # expensive candidate caches remain reusable when this metric is introduced.
+    attach_new_positive_metadata(train_data, train_transitions, purchases_df)
+    attach_new_positive_metadata(val_data, val_transitions, purchases_df)
+    if shared_sku_statistics:
+        store = retriever.feature_store
+        affinity = FavoriteCategoryAffinity(store)
+        brand_vocab = vocabs.get("brand_vocab", {})
+        print("Building shared Stage 2 SKU statistics")
+        train_data = with_shared_sku_statistics(train_data, train_transitions, store, affinity, brand_vocab)
+        val_data = with_shared_sku_statistics(val_data, val_transitions, store, affinity, brand_vocab)
+    elif candidate_peer_affinity:
+        store = retriever.feature_store
+        affinity = FavoriteCategoryAffinity(store)
+        print("Building Stage 2 candidate category peer affinity")
+        train_data = with_candidate_peer_affinity(train_data, train_transitions, store, affinity)
+        val_data = with_candidate_peer_affinity(val_data, val_transitions, store, affinity)
+    if history_variant is not None:
+        store = retriever.feature_store
+        brand_vocab = vocabs.get("brand_vocab", {})
+        train_data = with_history_variant(train_data, train_transitions, store, brand_vocab, history_variant)
+        val_data = with_history_variant(val_data, val_transitions, store, brand_vocab, history_variant)
     return train_data, val_data, retriever.get_product_vectors(), retriever.eligible_product_ids, vocabs
+
+
+def prediction_day_offsets(transitions: Sequence[Dict[str, Any]]) -> torch.Tensor:
+    """Calendar days from the same origin used by the stored purchase dates."""
+    return torch.tensor([
+        (pd.Timestamp(row["as_of_date"]).tz_localize(None).normalize() - PURCHASE_DATE_ORIGIN).days
+        for row in transitions
+    ], dtype=torch.float32)
+
+
+def attach_new_positive_metadata(
+    data: Dict[str, Any], transitions: Sequence[Dict[str, Any]], purchases_df: pd.DataFrame,
+) -> None:
+    """Attach full-history unseen target IDs without changing slate cache schemas."""
+    if len(data["customer_ids"]) != len(transitions):
+        raise ValueError("Cached slates and chronological transitions have different lengths.")
+
+    history_by_customer = {
+        str(cid): group[["purchase_date", "product_id"]].copy()
+        for cid, group in purchases_df.groupby("customer_id", sort=False)
+    }
+    new_positive_pids: List[List[str]] = []
+    for cid, positives, transition in zip(
+        data["customer_ids"], data["positive_pids"], transitions, strict=True,
+    ):
+        expected_positives = sorted(str(pid) for pid in positives)
+        transition_positives = sorted(str(pid) for pid in transition["positive_product_ids"])
+        if str(cid) != str(transition["customer_id"]) or expected_positives != transition_positives:
+            raise ValueError("Cached slate row order does not match chronological transition order.")
+        as_of = pd.Timestamp(transition["as_of_date"])
+        history = history_by_customer.get(str(cid))
+        if history is None:
+            prior_products: set[str] = set()
+        else:
+            prior = history.loc[history["purchase_date"] < as_of, "product_id"]
+            prior_products = set(prior.astype(str))
+        new_positive_pids.append([str(pid) for pid in positives if str(pid) not in prior_products])
+    data["new_positive_pids"] = new_positive_pids
+    data["prediction_days"] = prediction_day_offsets(transitions)
 
 
 def evaluate_ranker(
@@ -576,6 +741,7 @@ def evaluate_ranker(
     """Evaluate Stage 2 ranker on validation loader, computing Recall@K, NDCG@10, MRR, and attention allocation."""
     model.eval()
     total_val_loss = 0.0
+    total_unweighted_val_loss = 0.0
     val_batches = 0
 
     recalls: Dict[int, List[float]] = {k: [] for k in k_list}
@@ -583,8 +749,14 @@ def evaluate_ranker(
     mrr_list: List[float] = []
     token0_attns: List[float] = []
     history_attns: List[float] = []
+    new_target_count = 0
+    new_hits: Dict[int, int] = {k: 0 for k in k_list}
+    discovery_available = True
 
     cat_vectors_dev = catalog_product_vectors.to(device)
+    unweighted_loss_module = RankerLoss(
+        pos_weight=loss_module.pos_weight, listwise_weight=loss_module.listwise_weight,
+    ).to(device)
 
     with torch.no_grad():
         for batch in val_loader:
@@ -595,19 +767,24 @@ def evaluate_ranker(
             reg_id = batch["region_id"].to(device)
             ind_id = batch["industry_id"].to(device)
             tab_f = batch["tabular_features"].to(device)
-            seq = batch["sequence"].to(device)
+            shared_sequence = batch.get("ranker_sequence")
+            seq = (batch["sequence"] if shared_sequence is None else shared_sequence).to(device)
             mask = batch["attention_mask"].to(device)
             seq_pids = batch["seq_product_ids"].to(device)
             seq_cids = batch["seq_category_ids"].to(device)
-            seq_sub_ids = batch["seq_subcategory_ids"].to(device)
+            brand_ids = batch.get("seq_brand_ids")
+            seq_sub_ids = batch["seq_subcategory_ids"].to(device) if brand_ids is None else None
+            precomputed_age = getattr(model, "precomputed_purchase_age", False)
             seq_line_ids = batch["seq_business_line_ids"].to(device)
 
             cand_idx = batch["candidate_indices"].to(device)
-            cand_scores = batch["candidate_scores"].to(device)
             pw_f = batch["pairwise_features"].to(device)
             labels = batch["labels"].to(device)
+            # The first column is the repeat flag or, in shared mode, the normalized SKU count.
+            unseen_mask = pw_f[..., 0] == 0
 
-            cand_vectors = cat_vectors_dev[cand_idx]
+            cand_vectors = batch["candidate_vectors"]
+            cand_vectors = cat_vectors_dev[cand_idx] if cand_vectors is None else cand_vectors.to(device)
 
             out = model(
                 text_embedding=t_emb,
@@ -620,14 +797,18 @@ def evaluate_ranker(
                 seq_product_ids=seq_pids,
                 seq_category_ids=seq_cids,
                 seq_subcategory_ids=seq_sub_ids,
+                seq_brand_ids=brand_ids.to(device) if brand_ids is not None else None,
                 seq_business_line_ids=seq_line_ids,
                 candidate_vectors=cand_vectors,
-                candidate_scores=cand_scores,
                 pairwise_features=pw_f,
+                catalog_product_vectors=cat_vectors_dev,
+                seq_purchase_dates=batch["seq_purchase_dates"].to(device) if not precomputed_age and batch["seq_purchase_dates"] is not None else None,
+                prediction_day=batch["prediction_day"].to(device) if not precomputed_age and batch.get("prediction_day") is not None else None,
             )
 
-            loss_dict = loss_module(out.logits, labels)
+            loss_dict = loss_module(out.logits, labels, unseen_mask=unseen_mask)
             total_val_loss += float(loss_dict["loss"].item())
+            total_unweighted_val_loss += float(unweighted_loss_module(out.logits, labels)["loss"].item())
             val_batches += 1
 
             # Track attention distribution (Token 0 vs Tokens 1..32)
@@ -643,6 +824,13 @@ def evaluate_ranker(
                 if not targets:
                     continue
                 c_pids = batch["candidate_pids"][b]
+                row_new_targets = batch.get("new_positive_pids")
+                if row_new_targets is None:
+                    discovery_available = False
+                    new_targets: set[str] = set()
+                else:
+                    new_targets = set(row_new_targets[b])
+                    new_target_count += len(new_targets)
                 ranks = np.argsort(-logits_np[b])
                 reranked = [c_pids[i] for i in ranks]
 
@@ -650,6 +838,7 @@ def evaluate_ranker(
                 for k in k_list:
                     hits = sum(1 for p in reranked[:k] if p in targets)
                     recalls[k].append(hits / len(targets))
+                    new_hits[k] += sum(1 for p in reranked[:k] if p in new_targets)
 
                 # NDCG@10
                 dcg = sum(1.0 / math.log2(r + 2) for r, p in enumerate(reranked[:10]) if p in targets)
@@ -667,6 +856,8 @@ def evaluate_ranker(
     res = {
         "val_loss": total_val_loss / max(val_batches, 1),
         "Val Loss": total_val_loss / max(val_batches, 1),
+        "val_loss_unweighted": total_unweighted_val_loss / max(val_batches, 1),
+        "Val Loss Unweighted": total_unweighted_val_loss / max(val_batches, 1),
         "avg_token0_weight": float(np.mean(token0_attns)) if token0_attns else 0.0,
         "avg_history_weight": float(np.mean(history_attns)) if history_attns else 0.0,
     }
@@ -682,6 +873,14 @@ def evaluate_ranker(
     v_mrr = float(np.mean(mrr_list)) if mrr_list else 0.0
     res["val_mrr"] = v_mrr
     res["Val MRR"] = v_mrr
+    if discovery_available:
+        res["new_target_count"] = int(new_target_count)
+        for k in k_list:
+            hits = int(new_hits[k])
+            new_recall = float(hits / new_target_count) if new_target_count else 0.0
+            res[f"new_hits@{k}"] = hits
+            res[f"new_recall@{k}"] = new_recall
+            res[f"Val New Recall@{k}"] = new_recall
 
     return res
 
@@ -699,12 +898,38 @@ def train_ranker(
     *,
     heuristic_fraction: float = DEFAULT_HEURISTIC_FRACTION,
     category_overdue: bool = False,
+    include_complementarity: bool = False,
+    stored_vector_attention: bool = False,
+    candidate_timing: bool = False,
+    category_gap_fallback: bool = True,
+    adapt_candidate_query: Optional[bool] = None,
+    history_age_attention: bool = False,
+    statistics_attention: bool = True,
+    shared_sku_statistics: bool = False,
+    candidate_peer_affinity: bool = False,
+    excluded_statistics: tuple[str, ...] = DEFAULT_EXCLUDED_STATISTICS,
+    history_variant: str | None = None,
+    new_positive_weight: float = 1.0,
+    selection_metric: str = "ndcg",
+    discovery_min_overall_recall: Optional[float] = None,
+    seed: int = 42,
 ) -> Dict[str, Any]:
     """Train Stage 2 UPS-CANR Ranker for 10 epochs and save checkpoints and history."""
     if not 0.0 <= heuristic_fraction <= 1.0:
         raise ValueError("heuristic_fraction must be between 0 and 1.")
-    torch.manual_seed(42)
-    np.random.seed(42)
+    if shared_sku_statistics and (candidate_timing or category_overdue or include_complementarity or candidate_peer_affinity):
+        raise ValueError("Shared SKU statistics replace the legacy candidate feature set.")
+    if history_variant is not None and (history_variant not in {"brand", "population"} or shared_sku_statistics):
+        raise ValueError("Invalid history variant or incompatible shared statistics mode.")
+    if selection_metric not in {"ndcg", "discovery"}:
+        raise ValueError("selection_metric must be 'ndcg' or 'discovery'.")
+    if discovery_min_overall_recall is not None and not 0.0 <= discovery_min_overall_recall <= 1.0:
+        raise ValueError("discovery_min_overall_recall must be between 0 and 1.")
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    resolved_adapt_candidate_query = (
+        stored_vector_attention if adapt_candidate_query is None else bool(adapt_candidate_query)
+    )
 
     dev = get_device(device)
     print(f"Using compute device: {dev}")
@@ -712,6 +937,8 @@ def train_ranker(
     ckpt_dir = Path(checkpoint_dir)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     best_checkpoint_path = ckpt_dir / "best_ranker.pt"
+    best_ndcg_checkpoint_path = ckpt_dir / "best_ndcg_ranker.pt"
+    best_discovery_checkpoint_path = ckpt_dir / "best_discovery_ranker.pt"
     history_path = ckpt_dir / "training_history.json"
 
     # 1. Load dataframes
@@ -725,6 +952,15 @@ def train_ranker(
     companies_df = load_companies(purchases=purchases_df, minimum_purchases=1)
     retriever_checkpoint_path = Path(retriever_checkpoint_path)
     retriever_digest = checkpoint_digest(retriever_checkpoint_path)
+    retriever_config = torch.load(retriever_checkpoint_path, map_location="cpu").get("config", {})
+    history_gap_reference_days = retriever_config.get("history_gap_reference_days") if stored_vector_attention else None
+    if stored_vector_attention and history_gap_reference_days is None:
+        raise ValueError("Stored-vector attention requires a retriever with a fitted history gap scale.")
+    rolling = bool(retriever_config.get("discovery_only"))
+    slate_options = dict(
+        category_overdue=category_overdue, rolling=rolling, include_complementarity=include_complementarity,
+        dated_vectors=bool(retriever_config.get("include_complementarity")),
+    )
 
     # 2. Load or precompute candidate slates
     train_data, val_data, catalog_product_vectors, eligible_pids, vocabs = load_or_precompute_slates(
@@ -732,11 +968,17 @@ def train_ranker(
         catalogue_df=catalogue_df,
         companies_df=companies_df,
         checkpoint_path=retriever_checkpoint_path,
-        train_cache_path=slate_cache_path("train", heuristic_fraction, category_overdue=category_overdue),
-        val_cache_path=slate_cache_path("val", heuristic_fraction, category_overdue=category_overdue),
+        train_cache_path=slate_cache_path("train", heuristic_fraction, **slate_options),
+        val_cache_path=slate_cache_path("val", heuristic_fraction, **slate_options),
         device=dev,
         heuristic_fraction=heuristic_fraction,
         category_overdue=category_overdue,
+        include_complementarity=include_complementarity,
+        candidate_timing=candidate_timing,
+        category_gap_fallback=category_gap_fallback,
+        shared_sku_statistics=shared_sku_statistics,
+        candidate_peer_affinity=candidate_peer_affinity,
+        history_variant=history_variant,
     )
 
     train_dataset = RankerDataset(train_data)
@@ -762,13 +1004,22 @@ def train_ranker(
     model = UPSCANRRanker.from_retriever_checkpoint(
         checkpoint_path=retriever_checkpoint_path,
         device=dev,
-        num_pairwise_features=NUM_PAIRWISE_FEATURES + int(category_overdue),
+        num_pairwise_features=train_data["pairwise_features"].shape[-1],
+        history_gap_reference_days=history_gap_reference_days,
+        adapt_candidate_query=resolved_adapt_candidate_query,
+        history_age_attention=history_age_attention,
+        statistics_attention=statistics_attention or shared_sku_statistics,
+        excluded_statistics=excluded_statistics,
+        **ranker_history_options(vocabs, shared_sku_statistics, history_variant),
     )
     if checkpoint_digest(retriever_checkpoint_path) != retriever_digest:
         raise RuntimeError("The retriever checkpoint changed during ranker setup. Restart ranker training.")
     model.to(dev)
 
-    loss_fn = RankerLoss(pos_weight=pos_weight, listwise_weight=listwise_weight).to(dev)
+    loss_fn = RankerLoss(
+        pos_weight=pos_weight, listwise_weight=listwise_weight,
+        new_positive_weight=new_positive_weight,
+    ).to(dev)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
 
@@ -776,8 +1027,10 @@ def train_ranker(
 
     training_history: List[Dict[str, Any]] = []
     best_val_ndcg: float = -1.0
+    best_new_recall: float = -1.0
+    best_discovery_epoch: Optional[int] = None
 
-    print("Beginning Stage 2 UPS-CANR ranker training loop for 10 epochs...")
+    print(f"Beginning Stage 2 UPS-CANR ranker training for {epochs} epochs...")
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -790,19 +1043,22 @@ def train_ranker(
             reg_id = batch["region_id"].to(dev)
             ind_id = batch["industry_id"].to(dev)
             tab_f = batch["tabular_features"].to(dev)
-            seq = batch["sequence"].to(dev)
+            shared_sequence = batch["ranker_sequence"]
+            seq = (batch["sequence"] if shared_sequence is None else shared_sequence).to(dev)
             mask = batch["attention_mask"].to(dev)
             seq_pids = batch["seq_product_ids"].to(dev)
             seq_cids = batch["seq_category_ids"].to(dev)
-            seq_sub_ids = batch["seq_subcategory_ids"].to(dev)
+            brand_ids = batch["seq_brand_ids"]
+            seq_sub_ids = batch["seq_subcategory_ids"].to(dev) if brand_ids is None else None
             seq_line_ids = batch["seq_business_line_ids"].to(dev)
 
             cand_idx = batch["candidate_indices"].to(dev)
-            cand_scores = batch["candidate_scores"].to(dev)
             pw_f = batch["pairwise_features"].to(dev)
             labels = batch["labels"].to(dev)
+            unseen_mask = pw_f[..., 0] == 0
 
-            cand_vectors = catalog_product_vectors_dev[cand_idx]
+            cand_vectors = batch["candidate_vectors"]
+            cand_vectors = catalog_product_vectors_dev[cand_idx] if cand_vectors is None else cand_vectors.to(dev)
 
             optimizer.zero_grad()
             out = model(
@@ -816,13 +1072,16 @@ def train_ranker(
                 seq_product_ids=seq_pids,
                 seq_category_ids=seq_cids,
                 seq_subcategory_ids=seq_sub_ids,
+                seq_brand_ids=brand_ids.to(dev) if brand_ids is not None else None,
                 seq_business_line_ids=seq_line_ids,
                 candidate_vectors=cand_vectors,
-                candidate_scores=cand_scores,
                 pairwise_features=pw_f,
+                catalog_product_vectors=catalog_product_vectors_dev,
+                seq_purchase_dates=batch["seq_purchase_dates"].to(dev) if not model.precomputed_purchase_age and batch["seq_purchase_dates"] is not None else None,
+                prediction_day=batch["prediction_day"].to(dev) if not model.precomputed_purchase_age and batch["prediction_day"] is not None else None,
             )
 
-            loss_dict = loss_fn(out.logits, labels)
+            loss_dict = loss_fn(out.logits, labels, unseen_mask=unseen_mask)
             loss = loss_dict["loss"]
             loss.backward()
 
@@ -851,6 +1110,7 @@ def train_ranker(
         ndcg10 = val_metrics["val_ndcg@10"]
         mrr = val_metrics["val_mrr"]
         val_loss = val_metrics["val_loss"]
+        new_recall10 = val_metrics.get("new_recall@10")
         t0_attn = val_metrics["avg_token0_weight"]
         hist_attn = val_metrics["avg_history_weight"]
 
@@ -863,6 +1123,9 @@ def train_ranker(
             "val_recall@20": rec20,
             "val_ndcg@10": ndcg10,
             "val_mrr": mrr,
+            "val_new_recall@10": new_recall10,
+            "val_new_hits@10": val_metrics.get("new_hits@10"),
+            "val_new_target_count": val_metrics.get("new_target_count"),
             "avg_token0_weight": t0_attn,
             "avg_history_weight": hist_attn,
             "Train Loss": avg_train_loss,
@@ -872,6 +1135,9 @@ def train_ranker(
             "Val Recall@20": rec20,
             "Val NDCG@10": ndcg10,
             "Val MRR": mrr,
+            "Val New Recall@10": new_recall10,
+            "Val New Hits@10": val_metrics.get("new_hits@10"),
+            "Val New Target Count": val_metrics.get("new_target_count"),
         }
         training_history.append(epoch_record)
 
@@ -883,48 +1149,99 @@ def train_ranker(
             f"Val Recall@10: {rec10:.4f} | "
             f"Val Recall@20: {rec20:.4f} | "
             f"Val NDCG@10: {ndcg10:.4f} | "
+            f"Val New Recall@10: {new_recall10 if new_recall10 is not None else float('nan'):.4f} "
+            f"({val_metrics.get('new_hits@10', 0)}/{val_metrics.get('new_target_count', 0)}) | "
             f"Val MRR: {mrr:.4f} | "
             f"Token0 Attn: {t0_attn:.4f} | "
             f"Hist Attn: {hist_attn:.4f}"
         )
 
-        # 5. Checkpoint Best Model
+        # 5. Save independent NDCG and discovery selections, plus selected alias.
+        def checkpoint_payload(metric_name: str, metric_value: float) -> Dict[str, Any]:
+            return {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "best_val_ndcg": best_val_ndcg,
+                "best_metric_name": metric_name,
+                "best_metric_value": metric_value,
+                "selection_metric": metric_name,
+                "run_selection_metric": selection_metric,
+                "new_positive_weight": new_positive_weight,
+                "discovery_min_overall_recall": discovery_min_overall_recall,
+                "val_metrics": val_metrics,
+                "product_ids": eligible_pids,
+                "vocabs": vocabs,
+                "retriever_digest": retriever_digest,
+                "slate_schema_version": SLATE_SCHEMA_VERSION,
+                "heuristic_fraction": heuristic_fraction,
+                "category_overdue": category_overdue,
+                "include_complementarity": include_complementarity,
+                "history_gap_reference_days": history_gap_reference_days,
+                "stored_vector_attention": stored_vector_attention,
+                "adapt_candidate_query": resolved_adapt_candidate_query,
+                "history_age_attention": history_age_attention,
+                "statistics_attention": statistics_attention or shared_sku_statistics,
+                "shared_sku_statistics_version": SHARED_SKU_STATISTICS_VERSION if shared_sku_statistics else None,
+                "candidate_peer_affinity": candidate_peer_affinity,
+                "excluded_statistics": excluded_statistics,
+                "history_variant": history_variant,
+                "candidate_timing": candidate_timing,
+                "category_gap_fallback": category_gap_fallback if candidate_timing else None,
+                "candidate_timing_version": TIMING_FEATURE_VERSION if candidate_timing else None,
+                "rolling_candidate_pool": rolling,
+                "config": {
+                    "hidden_dim": model.hidden_dim,
+                    "num_heads": model.num_heads,
+                    "dropout": 0.1,
+                    "pos_weight": pos_weight,
+                    "listwise_weight": listwise_weight,
+                    "new_positive_weight": new_positive_weight,
+                    "seed": seed,
+                    "selection_metric": metric_name,
+                },
+            }
+
         if ndcg10 > best_val_ndcg:
             best_val_ndcg = ndcg10
-            torch.save(
-                {
-                    "epoch": epoch,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "best_val_ndcg": best_val_ndcg,
-                    "val_metrics": val_metrics,
-                    "product_ids": eligible_pids,
-                    "vocabs": vocabs,
-                    "retriever_digest": retriever_digest,
-                    "slate_schema_version": SLATE_SCHEMA_VERSION,
-                    "heuristic_fraction": heuristic_fraction,
-                    "category_overdue": category_overdue,
-                    "config": {
-                        "hidden_dim": model.hidden_dim,
-                        "num_heads": model.num_heads,
-                        "dropout": 0.1,
-                        "pos_weight": pos_weight,
-                        "listwise_weight": listwise_weight,
-                    },
-                },
-                best_checkpoint_path,
-            )
+            payload = checkpoint_payload("ndcg@10", ndcg10)
+            torch.save(payload, best_ndcg_checkpoint_path)
+            if selection_metric == "ndcg":
+                torch.save(payload, best_checkpoint_path)
+
+        guardrail_ok = (
+            discovery_min_overall_recall is None
+            or rec10 >= discovery_min_overall_recall
+        )
+        if new_recall10 is not None and guardrail_ok and new_recall10 > best_new_recall:
+            best_new_recall = new_recall10
+            best_discovery_epoch = epoch
+            payload = checkpoint_payload("new_recall@10", new_recall10)
+            torch.save(payload, best_discovery_checkpoint_path)
+            if selection_metric == "discovery":
+                torch.save(payload, best_checkpoint_path)
 
     # Save full training history to JSON
     with open(history_path, "w", encoding="utf-8") as f:
         json.dump(training_history, f, indent=2)
     print(f"Full training history saved to {history_path}")
-    print(f"Best checkpoint saved to {best_checkpoint_path} with best Val NDCG@10: {best_val_ndcg:.4f}")
+    if selection_metric == "discovery" and best_discovery_epoch is None:
+        raise RuntimeError(
+            "No discovery checkpoint qualified: validation Recall@10 did not meet "
+            f"discovery_min_overall_recall={discovery_min_overall_recall}."
+        )
+    print(f"Best checkpoint saved to {best_checkpoint_path} using {selection_metric} selection.")
 
     return {
         "best_checkpoint_path": str(best_checkpoint_path),
         "history_path": str(history_path),
         "best_val_ndcg": best_val_ndcg,
+        "best_new_recall@10": best_new_recall if best_discovery_epoch is not None else None,
+        "best_discovery_epoch": best_discovery_epoch,
+        "best_ndcg_checkpoint_path": str(best_ndcg_checkpoint_path),
+        "best_discovery_checkpoint_path": (
+            str(best_discovery_checkpoint_path) if best_discovery_epoch is not None else None
+        ),
         "final_history": training_history,
     }
 

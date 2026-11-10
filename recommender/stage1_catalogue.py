@@ -10,6 +10,7 @@ import torch
 
 from recommender.candidates import CandidateRetriever
 from recommender.catalogue import RollingCandidatePool
+from recommender.complementarity import ProductComplementarity
 from recommender.scope import actual_purchase_mask
 from recommender.text import (
     CATALOGUE_CACHE_WITHOUT_SUBCATEGORY,
@@ -80,12 +81,15 @@ def load_stage1_discovery(
         raise ValueError("The merchandise catalogue must include the reference SKU IDs.")
     candidate_ids = trained_ids + sorted(pool.product_ids - set(trained_ids))
     embeddings = load_expanded_catalogue_embeddings(pool.merchandise, embedding_cache, str(device))
+    complementarity = ProductComplementarity(purchases) if config.get("include_complementarity") else None
     inputs = build_retriever_product_inputs(
         purchases, pool.merchandise, embeddings, candidate_ids, ckpt["vocabs"],
         include_subcategory=False, container_encoding=config["container_encoding"],
+        complementarity=complementarity,
     )
     retriever = CandidateRetriever.from_checkpoint(
         checkpoint_path, purchases, catalogue, companies, inputs, device,
         candidate_product_ids=candidate_ids, rolling_pool=pool,
+        product_complementarity=complementarity,
     )
     return retriever, ckpt

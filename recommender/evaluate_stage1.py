@@ -7,6 +7,7 @@ from itertools import chain, combinations
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
@@ -14,8 +15,10 @@ from torch.utils.data import DataLoader
 from recommender.candidates import rank_personal_repeat, rank_unseen_candidates
 from recommender.catalogue import catalogue_blocked_mask, load_product_catalogue
 from recommender.company import load_companies
+from recommender.ranker_statistics import FavoriteCategoryAffinity
 from recommender.scope import get_datasets_locs
 from recommender.split import TEST_START, TRAIN_CUTOFF
+from recommender.stage1_category_peers import CategoryPeerScores
 from recommender.stage1_catalogue import load_stage1_discovery
 from recommender.text import load_cached_embeddings
 from recommender.train_retriever import (
@@ -113,6 +116,7 @@ def evaluate_stage1(
     checkpoint_path: Path, output_dir: Path, device: str | None = None,
     *, embedding_cache: Path = Path("checkpoints/stage1-full-catalogue/text_embeddings"),
     compare_pools: bool = False,
+    compare_category_peers: bool = False,
 ) -> dict:
     """Replay catalogue policies using fixed weights and strictly prior observations."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -149,6 +153,16 @@ def evaluate_stage1(
     )
     industries = companies.set_index("customer_id")["industry_branch"].dropna().astype(str).to_dict()
     heuristics = Heuristics(train, industries)
+    peer_weights = (0.25, 0.5, 1.0)
+    peer_scores = None
+    peer_at_50 = defaultdict(Coverage)
+    if compare_category_peers:
+        active = set().union(*(pool.eligible_on(row["as_of_date"]) for row in validation))
+        peer_indices = [i for i, sku in enumerate(expanded_ids) if sku in active]
+        peer_ids = [expanded_ids[i] for i in peer_indices]
+        peer_scores = CategoryPeerScores(
+            FavoriteCategoryAffinity(retriever.feature_store), peer_ids, heuristics.sales,
+        )
     pool_sizes = {DEFAULT_POOL: len(expanded_ids)}
     if compare_pools:
         pool_sizes.update(training_sold=len(trained_ids), merchandise_without_known_block=len(expanded_ids))
@@ -183,6 +197,9 @@ def evaluate_stage1(
 
     demand = retriever.product_inputs["demand_features"]
     check_range("product_demand", demand[:, :6])
+    if retriever.product_complementarity is not None:
+        check_range("product_five_day_complementarity", demand[:, -1])
+        demand = demand[:, :-1]
     if demand.shape[1] > 6:
         check_range("product_container_one_hot", demand[:, 6:])
 
@@ -217,6 +234,19 @@ def evaluate_stage1(
                     )
                     for name, size in pool_sizes.items()
                 }
+                peer_ranked = {}
+                if peer_scores is not None:
+                    favorite, mixed = zip(*(
+                        peer_scores.scores(cid, snapshot.cat_orders)
+                        for cid, snapshot in zip(customer_ids, snapshots, strict=True)
+                    ), strict=True)
+                    for label, scores in (("favorite", favorite), ("mix", mixed)):
+                        bias = torch.as_tensor(np.stack(scores), device=dev, dtype=logits.dtype)
+                        for weight in peer_weights:
+                            peer_ranked[f"category_peer_{label}_{weight:g}"] = rank_unseen_candidates(
+                                logits[:, peer_indices] + weight * bias, peer_ids,
+                                [dated[DEFAULT_POOL][0] for dated, _ in dated_pools], seen_sets, SLATE_K,
+                            )
                 for i, (row, snapshot, seen) in enumerate(zip(rows, snapshots, seen_sets)):
                     targets = set(row["positive_product_ids"])
                     new = targets - seen
@@ -233,6 +263,10 @@ def evaluate_stage1(
                             eligible, seen, industries.get(row["customer_id"]), available_popularity, popularity_rank,
                         )
                         sources["two_tower"] = ranked[name][i]
+                        if name == DEFAULT_POOL and peer_scores is not None:
+                            sources.update({method: ranking[i] for method, ranking in peer_ranked.items()})
+                            for method in ("two_tower", *peer_ranked):
+                                peer_at_50[method].add(sources[method], targets, groups)
                         repeat = rank_personal_repeat(stats, available_popularity, SLATE_K)
                         slate_metrics[name]["global_popularity"].add(available_popularity[:SLATE_K], targets, groups)
                         slate_metrics[name]["personal_repeat_plus_popularity"].add(repeat, targets, groups)
@@ -268,6 +302,8 @@ def evaluate_stage1(
             for name in pool_sizes
         },
     }
+    if peer_scores is not None:
+        report["category_peer_discovery_at_50"] = {key: metric.report() for key, metric in peer_at_50.items()}
     (output_dir / "validation_comparison.json").write_text(json.dumps(report, indent=2) + "\n")
     return report
 
@@ -280,10 +316,12 @@ def main():
     parser.add_argument("--embedding-cache", type=Path, default=Path("checkpoints/stage1-full-catalogue/text_embeddings"))
     parser.add_argument("--device")
     parser.add_argument("--compare-pools", action="store_true", help="Include the two alternative catalogue pools.")
+    parser.add_argument("--compare-category-peers", action="store_true", help="Compare favorite-category and category-mix peer scores.")
     args = parser.parse_args()
     report = evaluate_stage1(
         args.checkpoint, args.output_dir, args.device,
         embedding_cache=args.embedding_cache, compare_pools=args.compare_pools,
+        compare_category_peers=args.compare_category_peers,
     )
     for name, catalogue in report["catalogues"].items():
         print(f"{name} ({catalogue['candidate_count_min']:,} to {catalogue['candidate_count_max']:,} candidates)")

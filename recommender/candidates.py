@@ -7,28 +7,15 @@ Implements:
      per candidate slate.
    - Looks up global popularity and industry affinity using sales before the
      scoring date, with both counts capped at the training cutoff.
-2. 12 Point-in-Time Pairwise Features strictly bounded in [0.0, 1.0] with zero NaNs:
-   1. stage1_score: sigmoid(stage1_logit) in [0.0, 1.0]
-   2. stage1_rank_inv: 1.0 / (1.0 + rank) in (0.0, 1.0]
-   3. is_repeat_sku: 1.0 if customer ever bought SKU before as_of_date, else 0.0
-   4. user_sku_order_count_norm: log1p(prior_orders) / log1p(50) in [0.0, 1.0]
-   5. user_sku_qty_share: customer volume on SKU / total customer volume in [0.0, 1.0]
-   6. days_since_last_sku_buy_norm: log1p(days) / log1p(365) in [0.0, 1.0] (1.0 if never bought)
-   7. sku_urgency: min(1.0, (delta_t / median_gap) / 5.0) in [0.0, 1.0] (0.0 if < 2 orders)
-   8. user_cat_order_share: fraction of prior orders in product category in [0.0, 1.0]
-   9. user_subcat_order_share: fraction of prior orders in product subcategory in [0.0, 1.0]
-   10. user_brand_order_share: fraction of prior orders in product brand in [0.0, 1.0]
-   11. global_sku_popularity_norm: log1p(train_orders) / log1p(max_orders) in [0.0, 1.0]
-   12. industry_sku_affinity: customer industry orders of SKU / total industry orders in [0.0, 1.0]
+2. 13 Point-in-Time Pairwise Features strictly bounded in [0.0, 1.0] with zero NaNs:
+   Exact-SKU history, category/subcategory/brand shares, SKU popularity,
+   industry affinity, and category/brand/business-line repeat flags.
 3. Candidate Slate Construction:
-   - Both training and evaluation use the same top-C candidates from retrieval.
-   - Target purchases label retrieved candidates without changing the slate.
+   - Targets label retrieved candidates without changing the slate.
 4. CandidateBatch:
-   - Strongly-typed dataclass supporting dictionary-style access, device transfer (.to),
-     and clean zero-NaN tensors for Stage 2 UPS-CANR ranker training and evaluation.
+   - Supports dictionary-style access and device transfer.
 5. CandidateRetriever:
-   - High-level retriever supporting checkpoint loading, catalog embedding caching,
-     and batch candidate generation.
+   - Loads checkpoints and generates candidate batches.
 """
 
 from bisect import bisect_left
@@ -42,6 +29,7 @@ import pandas as pd
 import torch
 
 from recommender.catalogue import RollingCandidatePool
+from recommender.complementarity import ProductComplementarity, group_snapshot_rows, product_snapshot_date
 from recommender.features import LEGACY_PROFILE_FEATURES, PointInTimeNormalizer
 from recommender.familiarity import FamiliarityStore
 from recommender.models import (
@@ -53,12 +41,13 @@ from recommender.models import (
     ProductTower,
     TwoTowerModel,
 )
+from recommender.price_features import (
+    CustomerMedianUnitPrice, PricePreferenceStore, load_price_preference_store, load_reconciled_prices,
+)
 from recommender.scope import actual_purchase_mask
 from recommender.split import TRAIN_CUTOFF
 
 PAIRWISE_FEATURE_NAMES: List[str] = [
-    "stage1_score",
-    "stage1_rank_inv",
     "is_repeat_sku",
     "user_sku_order_count_norm",
     "user_sku_qty_share",
@@ -69,6 +58,9 @@ PAIRWISE_FEATURE_NAMES: List[str] = [
     "user_brand_order_share",
     "global_sku_popularity_norm",
     "industry_sku_affinity",
+    "is_repeat_category",
+    "is_repeat_brand",
+    "is_repeat_business_line",
 ]
 NUM_PAIRWISE_FEATURES: int = len(PAIRWISE_FEATURE_NAMES)
 DEFAULT_TOP_K: int = 100
@@ -132,7 +124,7 @@ class CandidateBatch:
         candidate_pids: List of length B, each containing C candidate product ID strings.
         candidate_indices: LongTensor of shape (B, C) with catalog product indices.
         candidate_scores: FloatTensor of shape (B, C) with Stage 1 scores.
-        pairwise_features: FloatTensor of shape (B, C, 12) strictly bounded in [0.0, 1.0].
+        pairwise_features: FloatTensor of shape (B, C, 13) strictly bounded in [0.0, 1.0].
         labels: Optional FloatTensor of shape (B, C) with binary ground-truth labels {0.0, 1.0}.
         top100_indices: Optional LongTensor of shape (B, K) with Stage 1 top-K catalog indices.
         top100_scores: Optional FloatTensor of shape (B, K) with Stage 1 top-K scores.
@@ -209,6 +201,7 @@ class CustomerSnapshot:
     cat_orders: Dict[str, int]
     subcat_orders: Dict[str, int]
     brand_orders: Dict[str, int]
+    business_lines: set[str]
     sku_stats: Dict[str, Dict[str, Any]]
     # sku_stats[pid] = {
     #     "order_count": int,
@@ -224,7 +217,7 @@ class PointInTimeFeatureStore:
     Guarantees:
     - Zero future leakage: only events strictly prior to as_of_date are accessed.
     - Sub-millisecond pairwise feature extraction per candidate slate via indexed snapshot lookups.
-    - All 12 pairwise features bounded strictly in [0.0, 1.0] with zero NaNs.
+    - All 13 pairwise features bounded strictly in [0.0, 1.0] with zero NaNs.
     """
 
     def __init__(
@@ -298,7 +291,7 @@ class PointInTimeFeatureStore:
         self._index_training_sales(df)
 
         # 5. Build per-customer chronological event logs for point-in-time snapshot generation
-        self.customer_events: Dict[str, List[Tuple[pd.Timestamp, str, float, str, str, str]]] = {}
+        self.customer_events: Dict[str, List[Tuple[pd.Timestamp, str, float, str, str, str, str]]] = {}
         self.customer_event_dates: Dict[str, List[pd.Timestamp]] = {}
         self._index_customer_events(df)
 
@@ -333,7 +326,7 @@ class PointInTimeFeatureStore:
             cid_str = str(cid).strip()
             sorted_grp = grp.sort_values(["purchase_date", "product_id"])
 
-            events: List[Tuple[pd.Timestamp, str, float, str, str, str]] = []
+            events: List[Tuple[pd.Timestamp, str, float, str, str, str, str]] = []
             dates: List[pd.Timestamp] = []
 
             for _, row in sorted_grp.iterrows():
@@ -346,7 +339,9 @@ class PointInTimeFeatureStore:
                 subcat = meta.get("product_subcategory", "")
                 brand = meta.get("brand", "")
 
-                events.append((dt, pid, qty, cat, subcat, brand))
+                line = meta.get("business_line", "")
+
+                events.append((dt, pid, qty, cat, subcat, brand, line))
                 dates.append(dt)
 
             self.customer_events[cid_str] = events
@@ -371,6 +366,17 @@ class PointInTimeFeatureStore:
         """Get brand string for product."""
         pid = str(product_id).strip()
         return self.product_metadata.get(pid, {}).get("brand", "")
+
+    def sku_population_statistics(self, customer_id: str, as_of: pd.Timestamp, sku: str) -> tuple[float, float]:
+        """Training-history popularity and share of this industry's purchases."""
+        count = bisect_left(self._sku_sale_dates.get(sku, ()), as_of)
+        popularity = math.log1p(count) / self._popularity_scale
+        industry = self.get_customer_industry(customer_id)
+        industry_count = bisect_left(self._industry_sale_dates.get(industry, ()), as_of)
+        if not industry_count:
+            return popularity, 0.0
+        sku_count = bisect_left(self._industry_sku_sale_dates.get((industry, sku), ()), as_of)
+        return popularity, sku_count / industry_count
 
     def get_customer_snapshot(
         self,
@@ -400,6 +406,7 @@ class PointInTimeFeatureStore:
                 cat_orders={},
                 subcat_orders={},
                 brand_orders={},
+                business_lines=set(),
                 sku_stats={},
             )
             self._snapshots[cache_key] = snap
@@ -416,6 +423,7 @@ class PointInTimeFeatureStore:
                 cat_orders={},
                 subcat_orders={},
                 brand_orders={},
+                business_lines=set(),
                 sku_stats={},
             )
             self._snapshots[cache_key] = snap
@@ -426,9 +434,10 @@ class PointInTimeFeatureStore:
         cat_counts: Dict[str, int] = {}
         subcat_counts: Dict[str, int] = {}
         brand_counts: Dict[str, int] = {}
+        business_lines: set[str] = set()
         sku_data: Dict[str, Dict[str, Any]] = {}
 
-        for dt, pid, qty, cat, subcat, brand in prior_events:
+        for dt, pid, qty, cat, subcat, brand, line in prior_events:
             total_vol += qty
             if cat:
                 cat_counts[cat] = cat_counts.get(cat, 0) + 1
@@ -436,6 +445,8 @@ class PointInTimeFeatureStore:
                 subcat_counts[subcat] = subcat_counts.get(subcat, 0) + 1
             if brand:
                 brand_counts[brand] = brand_counts.get(brand, 0) + 1
+            if line:
+                business_lines.add(line)
 
             if pid not in sku_data:
                 sku_data[pid] = {
@@ -477,6 +488,7 @@ class PointInTimeFeatureStore:
             cat_orders=cat_counts,
             subcat_orders=subcat_counts,
             brand_orders=brand_counts,
+            business_lines=business_lines,
             sku_stats=sku_stats,
         )
         self._snapshots[cache_key] = snap
@@ -497,6 +509,13 @@ class PointInTimeFeatureStore:
         limit: int,
     ) -> List[str]:
         """Use prior customer purchases and a point-in-time global popularity fallback."""
+        popularity = self.popularity_candidates(as_of_date, eligible_products)
+        snapshot = self.get_customer_snapshot(customer_id, as_of_date)
+        stats = {sku: (row["order_count"], row["last_date"]) for sku, row in snapshot.sku_stats.items()}
+        return rank_personal_repeat(stats, popularity, limit)
+
+    def popularity_candidates(self, as_of_date, eligible_products, *, include_zero_sales=False):
+        """Order candidates by paid sales before the query and the training cutoff."""
         cutoff = min(pd.Timestamp(as_of_date), self.train_cutoff)
         if cutoff not in self._popularity_rankings:
             counts = {sku: bisect_left(dates, cutoff) for sku, dates in self._sku_sale_dates.items()}
@@ -505,37 +524,17 @@ class PointInTimeFeatureStore:
                 key=lambda sku: (-counts[sku], sku),
             )
         popularity = [sku for sku in self._popularity_rankings[cutoff] if sku in eligible_products]
-        snapshot = self.get_customer_snapshot(customer_id, as_of_date)
-        stats = {sku: (row["order_count"], row["last_date"]) for sku, row in snapshot.sku_stats.items()}
-        return rank_personal_repeat(stats, popularity, limit)
+        if include_zero_sales:
+            popularity.extend(sorted(eligible_products - set(popularity)))
+        return popularity
 
     def compute_pairwise_features(
         self,
         customer_id: str,
         as_of_date: Union[str, pd.Timestamp],
         product_id: str,
-        stage1_logit: float,
-        stage1_rank: int,
     ) -> np.ndarray:
-        """Compute the 12 pairwise features strictly scaled into [0.0, 1.0] with zero NaNs.
-
-        Features:
-        1. stage1_score: sigmoid(logit) in [0.0, 1.0]
-        2. stage1_rank_inv: 1.0 / (1.0 + rank) in (0.0, 1.0]
-        3. is_repeat_sku: 1.0 if customer ever bought SKU before as_of_date, else 0.0
-        4. user_sku_order_count_norm: log1p(prior_orders) / log1p(50) in [0.0, 1.0]
-        5. user_sku_qty_share: customer volume on SKU / total customer volume in [0.0, 1.0]
-        6. days_since_last_sku_buy_norm: log1p(days) / log1p(365) in [0.0, 1.0] (1.0 if never bought)
-        7. sku_urgency: min(1.0, (delta_t / median_gap) / 5.0) in [0.0, 1.0] (0.0 if < 2 orders)
-        8. user_cat_order_share: fraction of prior orders in product category in [0.0, 1.0]
-        9. user_subcat_order_share: fraction of prior orders in product subcategory in [0.0, 1.0]
-        10. user_brand_order_share: fraction of prior orders in product brand in [0.0, 1.0]
-        11. global_sku_popularity_norm: log1p(train_orders) / log1p(max_orders) in [0.0, 1.0]
-        12. industry_sku_affinity: customer industry orders of SKU / total industry orders in [0.0, 1.0]
-
-        Returns:
-            np.ndarray of shape (12,) with dtype float32, all values in [0.0, 1.0].
-        """
+        """Compute the customer–SKU features in PAIRWISE_FEATURE_NAMES order."""
         cid = str(customer_id).strip()
         pid = str(product_id).strip()
         as_of_ts = pd.Timestamp(as_of_date)
@@ -543,20 +542,9 @@ class PointInTimeFeatureStore:
 
         feats = np.zeros(NUM_PAIRWISE_FEATURES, dtype=np.float32)
 
-        # 1. stage1_score: sigmoid(logit)
-        if math.isnan(stage1_logit) or math.isinf(stage1_logit):
-            l_val = 0.0
-        else:
-            l_val = min(max(float(stage1_logit), -50.0), 50.0)
-        feats[0] = float(1.0 / (1.0 + math.exp(-l_val)))
-
-        # 2. stage1_rank_inv: 1.0 / (1.0 + rank)
-        r_val = max(0, int(stage1_rank))
-        feats[1] = float(1.0 / (1.0 + r_val))
-
-        # 3. is_repeat_sku
+        # 1. is_repeat_sku
         is_repeat = pid in snap.sku_stats
-        feats[2] = 1.0 if is_repeat else 0.0
+        feats[0] = 1.0 if is_repeat else 0.0
 
         # Customer SKU stats
         if is_repeat:
@@ -566,65 +554,63 @@ class PointInTimeFeatureStore:
             last_dt = sku_info["last_date"]
             med_gap = sku_info["median_gap"]
 
-            # 4. user_sku_order_count_norm: log1p(prior_orders) / log1p(50)
-            feats[3] = float(min(1.0, max(0.0, math.log1p(cnt) / math.log1p(50.0))))
+            # 2. user_sku_order_count_norm: log1p(prior_orders) / log1p(50)
+            feats[1] = float(min(1.0, max(0.0, math.log1p(cnt) / math.log1p(50.0))))
 
-            # 5. user_sku_qty_share: sku_vol / total_vol
+            # 3. user_sku_qty_share: sku_vol / total_vol
             if snap.total_volume > 0.0:
-                feats[4] = float(min(1.0, max(0.0, vol / snap.total_volume)))
+                feats[2] = float(min(1.0, max(0.0, vol / snap.total_volume)))
             else:
-                feats[4] = 0.0
+                feats[2] = 0.0
 
-            # 6. days_since_last_sku_buy_norm: log1p(days) / log1p(365)
+            # 4. days_since_last_sku_buy_norm: log1p(days) / log1p(365)
             delta_days = max(0.0, (as_of_ts - last_dt).total_seconds() / 86400.0)
-            feats[5] = float(min(1.0, max(0.0, math.log1p(delta_days) / math.log1p(365.0))))
+            feats[3] = float(min(1.0, max(0.0, math.log1p(delta_days) / math.log1p(365.0))))
 
-            # 7. sku_urgency: min(1.0, (delta_t / median_gap) / 5.0) (0.0 if < 2 orders)
+            # 5. sku_urgency: min(1.0, (delta_t / median_gap) / 5.0) (0.0 if < 2 orders)
             if cnt >= 2:
                 safe_gap = max(1.0, med_gap)
                 ratio = delta_days / safe_gap
-                feats[6] = float(min(1.0, max(0.0, (ratio / 5.0))))
+                feats[4] = float(min(1.0, max(0.0, (ratio / 5.0))))
             else:
-                feats[6] = 0.0
+                feats[4] = 0.0
         else:
             # Cold SKU for this customer
-            feats[3] = 0.0
-            feats[4] = 0.0
-            feats[5] = 1.0  # 1.0 if never bought
-            feats[6] = 0.0  # 0.0 if < 2 orders
+            feats[1] = 0.0
+            feats[2] = 0.0
+            feats[3] = 1.0  # 1.0 if never bought
+            feats[4] = 0.0  # 0.0 if fewer than two purchases
 
-        # 8. user_cat_order_share
+        # 6. user_cat_order_share
         tot_orders = max(snap.total_orders, 1)
         cat = self.get_product_category(pid)
         if cat and cat in snap.cat_orders and snap.total_orders > 0:
-            feats[7] = float(min(1.0, max(0.0, snap.cat_orders[cat] / tot_orders)))
+            feats[5] = float(min(1.0, max(0.0, snap.cat_orders[cat] / tot_orders)))
+        else:
+            feats[5] = 0.0
+
+        # 7. user_subcat_order_share
+        subcat = self.get_product_subcategory(pid)
+        if subcat and subcat in snap.subcat_orders and snap.total_orders > 0:
+            feats[6] = float(min(1.0, max(0.0, snap.subcat_orders[subcat] / tot_orders)))
+        else:
+            feats[6] = 0.0
+
+        # 8. user_brand_order_share
+        brand = self.get_product_brand(pid)
+        if brand and brand in snap.brand_orders and snap.total_orders > 0:
+            feats[7] = float(min(1.0, max(0.0, snap.brand_orders[brand] / tot_orders)))
         else:
             feats[7] = 0.0
 
-        # 9. user_subcat_order_share
-        subcat = self.get_product_subcategory(pid)
-        if subcat and subcat in snap.subcat_orders and snap.total_orders > 0:
-            feats[8] = float(min(1.0, max(0.0, snap.subcat_orders[subcat] / tot_orders)))
-        else:
-            feats[8] = 0.0
+        # 9–10. Global SKU popularity and industry affinity.
+        feats[8], feats[9] = self.sku_population_statistics(cid, as_of_ts, pid)
 
-        # 10. user_brand_order_share
-        brand = self.get_product_brand(pid)
-        if brand and brand in snap.brand_orders and snap.total_orders > 0:
-            feats[9] = float(min(1.0, max(0.0, snap.brand_orders[brand] / tot_orders)))
-        else:
-            feats[9] = 0.0
-
-        # 11. SKU popularity. Training examples only see preceding sales.
-        count = bisect_left(self._sku_sale_dates.get(pid, ()), as_of_ts)
-        feats[10] = math.log1p(count) / self._popularity_scale
-
-        # 12. Share of the industry's prior purchase events for this SKU.
-        industry = self.get_customer_industry(cid)
-        industry_count = bisect_left(self._industry_sale_dates.get(industry, ()), as_of_ts)
-        if industry_count:
-            sku_count = bisect_left(self._industry_sku_sale_dates.get((industry, pid), ()), as_of_ts)
-            feats[11] = sku_count / industry_count
+        # Attribute familiarity uses all customer events before the basket.
+        line = self.product_metadata.get(pid, {}).get("business_line", "")
+        feats[10] = cat in snap.cat_orders
+        feats[11] = brand in snap.brand_orders
+        feats[12] = line in snap.business_lines
 
         # Clean NaNs and enforce [0.0, 1.0] bounds
         np.nan_to_num(feats, copy=False, nan=0.0, posinf=1.0, neginf=0.0)
@@ -636,12 +622,10 @@ class PointInTimeFeatureStore:
         customer_id: str,
         as_of_date: Union[str, pd.Timestamp],
         product_ids: Sequence[str],
-        stage1_logits: Sequence[float],
-        stage1_ranks: Sequence[int],
         *,
         category_overdue: bool = False,
     ) -> torch.Tensor:
-        """Fast batch extraction of pairwise features for a candidate slate (shape C x 12).
+        """Fast batch extraction of pairwise features for a candidate slate (shape C x 13).
 
         Executes in ~0.03 milliseconds for 50 candidates.
         """
@@ -653,7 +637,7 @@ class PointInTimeFeatureStore:
             as_of = pd.Timestamp(as_of_date)
             cutoff = bisect_left(self.customer_event_dates.get(cid, ()), as_of)
             dates_by_category: Dict[str, List[pd.Timestamp]] = {}
-            for date, _, _, category, _, _ in self.customer_events.get(cid, ())[:cutoff]:
+            for date, _, _, category, _, _, _ in self.customer_events.get(cid, ())[:cutoff]:
                 if category:
                     days = dates_by_category.setdefault(category, [])
                     if not days or days[-1] != date:
@@ -670,8 +654,6 @@ class PointInTimeFeatureStore:
                 customer_id=customer_id,
                 as_of_date=as_of_date,
                 product_id=product_ids[i],
-                stage1_logit=stage1_logits[i],
-                stage1_rank=stage1_ranks[i],
             )
         return torch.from_numpy(mat)
 
@@ -684,19 +666,24 @@ def construct_candidate_slate(
     top_c: int = DEFAULT_TOP_C,
     *,
     heuristic_product_ids: Sequence[str] = (),
+    discovery_product_ids: Sequence[str] = (),
 ) -> Dict[str, Any]:
     """Reserve heuristic picks, then fill the slate in two-tower score order."""
     p_total = min(len(product_ids), stage1_logits.size(-1))
     k_retrieve = min(top_k, p_total)
     c_slate = min(top_c, k_retrieve)
 
-    rank_depth = p_total if heuristic_product_ids else k_retrieve
+    rank_depth = p_total if heuristic_product_ids or discovery_product_ids else k_retrieve
     topk_vals, topk_idx = torch.topk(stage1_logits[:p_total], k=rank_depth, dim=-1)
     indices = topk_idx.cpu().tolist()
     scores = topk_vals.cpu().tolist()
     pids = [product_ids[i] for i in indices]
     ranks = list(range(c_slate))
-    if heuristic_product_ids:
+    if discovery_product_ids:
+        rank_by_sku = {sku: rank for rank, sku in enumerate(pids)}
+        preferred = [rank_by_sku[sku] for sku in (*heuristic_product_ids, *discovery_product_ids) if sku in rank_by_sku]
+        ranks = list(dict.fromkeys([*preferred, *range(c_slate)]))[:c_slate]
+    elif heuristic_product_ids:
         rank_by_sku = {sku: rank for rank, sku in enumerate(pids)}
         reserved = dict.fromkeys(rank_by_sku[sku] for sku in heuristic_product_ids if sku in rank_by_sku)
         ranks = (list(reserved) + [rank for rank in range(c_slate) if rank not in reserved])[:c_slate]
@@ -785,7 +772,7 @@ def load_retriever_from_checkpoint(
         max_seq_len=config.get("max_seq_len", DEFAULT_SEQUENCE_LENGTH),
         history_gap_reference_days=config.get("history_gap_reference_days"),
         num_products=sku_embeddings.shape[0] if sku_embeddings is not None else None,
-        num_tabular_features=len(profile_features),
+        num_tabular_features=len(profile_features) + int(config.get("customer_price_reference") is not None),
     )
     product_tower = ProductTower(
         text_dim=config.get("text_dim", TEXT_DIM),
@@ -806,6 +793,7 @@ def load_retriever_from_checkpoint(
         product_tower=product_tower,
         num_catalog_products=num_products,
         temperature=config.get("temperature", DEFAULT_TEMPERATURE),
+        include_price_preference=config.get("include_price_preference", False),
         num_familiarity_features=len(config.get("familiarity_fields", ())),
     )
 
@@ -836,8 +824,11 @@ class CandidateRetriever:
         quantity_reference: Optional[float] = None,
         customer_vocabs: Optional[Dict[str, Dict[str, int]]] = None,
         company_cache_name: str = "bge_m3_company.parquet",
+        price_preference: Optional[PricePreferenceStore] = None,
+        customer_median_price: Optional[CustomerMedianUnitPrice] = None,
         familiarity: Optional[FamiliarityStore] = None,
         rolling_pool: Optional[RollingCandidatePool] = None,
+        product_complementarity: Optional[ProductComplementarity] = None,
     ):
         self.device = torch.device(device) if device is not None else torch.device("cpu")
         self.model = model
@@ -855,10 +846,14 @@ class CandidateRetriever:
         self.quantity_reference = quantity_reference
         self.customer_vocabs = customer_vocabs or {}
         self.company_cache_name = company_cache_name
+        self.price_preference = price_preference
+        self.customer_median_price = customer_median_price
         self.familiarity = familiarity
         self.rolling_pool = rolling_pool
+        self.product_complementarity = product_complementarity
 
         self._cached_product_vectors: Optional[torch.Tensor] = None
+        self._dated_product_vectors: dict[pd.Timestamp, torch.Tensor] = {}
 
     @classmethod
     def from_checkpoint(
@@ -872,6 +867,7 @@ class CandidateRetriever:
         *,
         candidate_product_ids: Optional[Sequence[str]] = None,
         rolling_pool: Optional[RollingCandidatePool] = None,
+        product_complementarity: Optional[ProductComplementarity] = None,
     ) -> "CandidateRetriever":
         """Load the checkpoint, optionally appending cold candidates in input order."""
         model, ckpt = load_retriever_from_checkpoint(checkpoint_path, device=device)
@@ -900,6 +896,16 @@ class CandidateRetriever:
                 rolling_pool = RollingCandidatePool(catalogue_df, purchases_df)
         normalizer_state = config.get("profile_normalizer")
         vocabs = ckpt.get("vocabs", {})
+        price_preference = None
+        if model.price_weights is not None:
+            if catalogue_df is None:
+                raise ValueError("Price-aware retrieval requires catalogue units and categories.")
+            price_preference = load_price_preference_store(purchases_df, catalogue_df, eligible_pids)
+        price_reference = config.get("customer_price_reference")
+        customer_median_price = (
+            CustomerMedianUnitPrice(load_reconciled_prices(purchases_df), price_reference)
+            if price_reference is not None else None
+        )
         familiarity = None
         if model.familiarity_weights is not None:
             if catalogue_df is None:
@@ -924,16 +930,30 @@ class CandidateRetriever:
             ),
             quantity_reference=config.get("quantity_reference"),
             company_cache_name=config.get("company_cache_name", "bge_m3_company.parquet"),
+            price_preference=price_preference,
+            customer_median_price=customer_median_price,
             familiarity=familiarity,
             rolling_pool=rolling_pool,
+            product_complementarity=product_complementarity,
             customer_vocabs={
                 key: vocabs[key] for key in ("city_vocab", "region_vocab", "industry_vocab") if key in vocabs
             },
         )
 
-    def get_product_vectors(self) -> torch.Tensor:
+    def customer_profile_inputs(
+        self, profiles: torch.Tensor, customer_ids: Sequence[str], as_of_dates: Sequence[object],
+    ) -> torch.Tensor:
+        """Append the optional point-in-time price scalar to the company profile."""
+        if self.customer_median_price is not None:
+            return self.customer_median_price.append_to(profiles, customer_ids, as_of_dates)
+        return profiles
+
+    def get_product_vectors(self, as_of: Optional[pd.Timestamp] = None) -> torch.Tensor:
         """Compute or retrieve cached L2-normalized product catalog vectors v_p (P, 128)."""
-        if self._cached_product_vectors is not None:
+        snapshot = product_snapshot_date(as_of) if as_of is not None and self.product_complementarity is not None else TRAIN_CUTOFF
+        if snapshot in self._dated_product_vectors:
+            return self._dated_product_vectors[snapshot]
+        if snapshot == TRAIN_CUTOFF and self._cached_product_vectors is not None:
             return self._cached_product_vectors
 
         if self.model is None or self.product_inputs is None:
@@ -944,17 +964,24 @@ class CandidateRetriever:
                 k: v.to(self.device) if isinstance(v, torch.Tensor) else v
                 for k, v in self.product_inputs.items()
             }
+            demand = p_inputs["demand_features"]
+            if snapshot < TRAIN_CUTOFF:
+                share = torch.from_numpy(self.product_complementarity.shares(self.eligible_product_ids, snapshot))
+                demand = torch.cat((demand[:, :-1], share[:, None].to(demand.device)), dim=1)
             v_p = self.model.product_tower(
                 p_inputs["text_embedding"],
                 p_inputs["brand_id"],
                 p_inputs["category_id"],
                 p_inputs.get("subcategory_id"),
                 p_inputs["business_line_id"],
-                p_inputs["demand_features"],
+                demand,
                 container_id=p_inputs.get("container_id"),
             )
-            self._cached_product_vectors = v_p
-            return self._cached_product_vectors
+            if snapshot == TRAIN_CUTOFF:
+                self._cached_product_vectors = v_p
+            else:
+                self._dated_product_vectors[snapshot] = v_p
+            return v_p
 
     def compute_logits(
         self,
@@ -965,18 +992,43 @@ class CandidateRetriever:
         as_of_dates: Optional[Sequence[Union[str, pd.Timestamp]]] = None,
     ) -> torch.Tensor:
         """Score products, using query dates and customer IDs for contextual features."""
+        if (
+            product_vectors is None and self.product_complementarity is not None
+            and as_of_dates is not None and len(as_of_dates)
+        ):
+            dates = [product_snapshot_date(date) for date in as_of_dates]
+            groups = group_snapshot_rows(dates)
+            if len(groups) == 1:
+                product_vectors = self.get_product_vectors(dates[0])
+            else:
+                scores = [
+                    self.compute_logits(
+                        customer_vectors[rows],
+                        self.get_product_vectors(dates[rows[0]]),
+                        customer_ids=[customer_ids[i] for i in rows] if customer_ids is not None else None,
+                        as_of_dates=[as_of_dates[i] for i in rows],
+                    )
+                    for rows in groups
+                ]
+                order = torch.tensor([i for rows in groups for i in rows], device=self.device).argsort()
+                return torch.cat(scores)[order]
         u_c = customer_vectors.to(self.device)
         v_p = product_vectors.to(self.device) if product_vectors is not None else self.get_product_vectors()
 
         if self.model is not None:
             prod_idx = torch.arange(v_p.size(0), device=self.device)
+            price_features = None
+            if self.model.price_weights is not None:
+                if self.price_preference is None or customer_ids is None or as_of_dates is None:
+                    raise ValueError("Price-aware retrieval requires customer IDs and scoring dates.")
+                price_features = self.price_preference.batch_features(customer_ids, as_of_dates)
             familiarity_features = None
             if self.model.familiarity_weights is not None:
                 if self.familiarity is None or customer_ids is None or as_of_dates is None:
                     raise ValueError("Familiarity-aware retrieval requires customer IDs and scoring dates.")
                 familiarity_features = self.familiarity.batch_features(customer_ids, as_of_dates)
             return self.model.compute_logits(
-                u_c, v_p, product_indices=prod_idx,
+                u_c, v_p, product_indices=prod_idx, price_features=price_features,
                 familiarity_features=familiarity_features,
             )
 
@@ -1022,7 +1074,7 @@ class CandidateRetriever:
         heuristic_fraction: float = 0.0,
         category_overdue: bool = False,
     ) -> CandidateBatch:
-        """Construct CandidateBatch with 12 pairwise features for a batch of transitions.
+        """Construct CandidateBatch with 13 pairwise features for a batch of transitions.
 
         Args:
             logits: FloatTensor of shape (B, P) with Stage 1 retrieval scores.
@@ -1055,6 +1107,20 @@ class CandidateRetriever:
                 f"PROD_{i}" for i in range(len(self.eligible_product_ids), p_total)
             ]
         eligible_products = set(current_pids)
+        rolling_pools = None
+        discovery = None
+        row_indices_by_date = {}
+        if self.rolling_pool is not None and b_size and c_slate:
+            by_date = {date: self.rolling_pool.eligible_on(date) & eligible_products for date in set(as_of_dates)}
+            index = {sku: i for i, sku in enumerate(current_pids)}
+            row_indices_by_date = {date: sorted(index[sku] for sku in pool) for date, pool in by_date.items()}
+            rolling_pools = [by_date[date] for date in as_of_dates]
+            seen = [set(self.feature_store.get_customer_snapshot(cid, date).sku_stats)
+                    for cid, date in zip(customer_ids, as_of_dates)]
+            discovery = rank_unseen_candidates(logits, current_pids, rolling_pools, seen, c_slate)
+            k_retrieve = min(k_retrieve, min(map(len, rolling_pools)))
+            c_slate = min(c_slate, k_retrieve)
+            heuristic_count = int(c_slate * heuristic_fraction)
         if heuristic_count:
             # One transfer for the catalog-wide rankings and scores in this batch.
             logits = logits.cpu()
@@ -1074,18 +1140,34 @@ class CandidateRetriever:
             pos_pids = positive_product_ids[b] if positive_product_ids is not None else None
             row_logits = logits[b]
 
-            heuristic_products = (
-                self.feature_store.personal_repeat_candidates(cid, as_of, eligible_products, heuristic_count)
-                if heuristic_count else ()
-            )
+            row_pids = current_pids
+            row_indices = None
+            if rolling_pools is not None:
+                pool = rolling_pools[b]
+                row_indices = row_indices_by_date[as_of]
+                row_pids = [current_pids[i] for i in row_indices]
+                row_logits = row_logits[row_indices]
+                snapshot = self.feature_store.get_customer_snapshot(cid, as_of)
+                stats = {sku: (data["order_count"], data["last_date"]) for sku, data in snapshot.sku_stats.items()}
+                popularity = self.feature_store.popularity_candidates(as_of, pool, include_zero_sales=True)
+                heuristic_products = rank_personal_repeat(stats, popularity, heuristic_count)
+            else:
+                heuristic_products = (
+                    self.feature_store.personal_repeat_candidates(cid, as_of, eligible_products, heuristic_count)
+                    if heuristic_count else ()
+                )
             slate_dict = construct_candidate_slate(
                 stage1_logits=row_logits,
-                product_ids=current_pids,
+                product_ids=row_pids,
                 positive_product_ids=pos_pids,
-                top_k=top_k,
-                top_c=top_c,
+                top_k=k_retrieve,
+                top_c=c_slate,
                 heuristic_product_ids=heuristic_products,
+                discovery_product_ids=discovery[b][:c_slate] if discovery is not None else (),
             )
+            if row_indices is not None:
+                for key in ("candidate_indices", "top100_indices"):
+                    slate_dict[key] = [row_indices[i] for i in slate_dict[key]]
 
             all_candidate_indices.append(slate_dict["candidate_indices"])
             all_candidate_pids.append(slate_dict["candidate_pids"])
@@ -1103,17 +1185,10 @@ class CandidateRetriever:
                     customer_id=cid,
                     as_of_date=as_of,
                     product_ids=slate_dict["candidate_pids"],
-                    stage1_logits=slate_dict["candidate_scores"],
-                    stage1_ranks=slate_dict["candidate_ranks"],
                     category_overdue=category_overdue,
                 )
             else:
-                # Standalone fallback when feature store not provided
-                feat_np = np.zeros((len(slate_dict["candidate_pids"]), NUM_PAIRWISE_FEATURES), dtype=np.float32)
-                for i, (l_val, r_val) in enumerate(zip(slate_dict["candidate_scores"], slate_dict["candidate_ranks"])):
-                    feat_np[i, 0] = float(1.0 / (1.0 + math.exp(-min(max(l_val, -50.0), 50.0))))
-                    feat_np[i, 1] = float(1.0 / (1.0 + max(0, r_val)))
-                feat_matrix = torch.from_numpy(feat_np)
+                feat_matrix = torch.zeros((len(slate_dict["candidate_pids"]), NUM_PAIRWISE_FEATURES))
 
             all_pairwise_features.append(feat_matrix)
 

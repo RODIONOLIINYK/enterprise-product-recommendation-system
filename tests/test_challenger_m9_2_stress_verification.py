@@ -172,8 +172,6 @@ def test_temporal_isolation_future_purchases_modification():
     df_base = pd.DataFrame(base_rows)
     as_of = pd.Timestamp("2025-10-15 00:00:00")
     test_pids = [f"P_{i:02d}" for i in range(10)]
-    test_logits = [float(x) for x in np.linspace(5.0, -5.0, 10)]
-    test_ranks = list(range(10))
 
     # Compute baseline features
     store_base = PointInTimeFeatureStore(purchases_df=df_base)
@@ -181,8 +179,6 @@ def test_temporal_isolation_future_purchases_modification():
         customer_id="CUST_STRESS",
         as_of_date=as_of,
         product_ids=test_pids,
-        stage1_logits=test_logits,
-        stage1_ranks=test_ranks,
     )
     snap_base = store_base.get_customer_snapshot("CUST_STRESS", as_of)
 
@@ -206,8 +202,6 @@ def test_temporal_isolation_future_purchases_modification():
         customer_id="CUST_STRESS",
         as_of_date=as_of,
         product_ids=test_pids,
-        stage1_logits=test_logits,
-        stage1_ranks=test_ranks,
     )
     snap_spike = store_spike.get_customer_snapshot("CUST_STRESS", as_of)
 
@@ -218,8 +212,6 @@ def test_temporal_isolation_future_purchases_modification():
         customer_id="CUST_STRESS",
         as_of_date=as_of,
         product_ids=test_pids,
-        stage1_logits=test_logits,
-        stage1_ranks=test_ranks,
     )
     snap_no_future = store_no_future.get_customer_snapshot("CUST_STRESS", as_of)
 
@@ -233,8 +225,6 @@ def test_temporal_isolation_future_purchases_modification():
         customer_id="CUST_STRESS",
         as_of_date=as_of,
         product_ids=test_pids,
-        stage1_logits=test_logits,
-        stage1_ranks=test_ranks,
     )
 
     # 1. Check Bit-for-bit identity across tensors
@@ -272,9 +262,9 @@ def test_temporal_isolation_exact_boundary_instant():
     assert "P_FUTURE" not in snap.sku_stats
 
     # Check pairwise feature for P_EXACT: must have is_repeat_sku == 0.0 and days_since == 1.0
-    feats_exact = store.compute_pairwise_features("C_BOUND", as_of, "P_EXACT", 0.0, 0)
-    assert feats_exact[2] == 0.0  # is_repeat_sku
-    assert feats_exact[5] == 1.0  # days_since_last_sku_buy_norm (never bought before as_of)
+    feats_exact = store.compute_pairwise_features("C_BOUND", as_of, "P_EXACT")
+    assert feats_exact[0] == 0.0  # is_repeat_sku
+    assert feats_exact[3] == 1.0  # days_since_last_sku_buy_norm (never bought before as_of)
 
 
 # ==============================================================================
@@ -300,8 +290,6 @@ def test_feature_extraction_throughput_500_slates():
         catalogue_pids = [f"P_{i}" for i in range(50)]
 
     c_slate = 50
-    test_logits = [float(x) for x in np.linspace(3.0, -3.0, c_slate)]
-    test_ranks = list(range(c_slate))
     as_of = pd.Timestamp("2025-11-01")
 
     # Run 500 candidate slate extractions across varying customers
@@ -311,13 +299,13 @@ def test_feature_extraction_throughput_500_slates():
     # Warmup
     for i in range(10):
         cid = unique_customers[i % len(unique_customers)]
-        store.compute_slate_pairwise_features(cid, as_of, catalogue_pids, test_logits, test_ranks)
+        store.compute_slate_pairwise_features(cid, as_of, catalogue_pids)
 
     t_start = time.perf_counter()
     for i in range(n_slates):
         cid = unique_customers[i % len(unique_customers)]
         t0 = time.perf_counter()
-        feats = store.compute_slate_pairwise_features(cid, as_of, catalogue_pids, test_logits, test_ranks)
+        feats = store.compute_slate_pairwise_features(cid, as_of, catalogue_pids)
         t1 = time.perf_counter()
         latencies_ms.append((t1 - t0) * 1000.0)
         assert feats.shape == (c_slate, NUM_PAIRWISE_FEATURES)
@@ -440,49 +428,6 @@ def test_slate_eval_mode_pure_retrieval_ranking_preserved():
     assert "PROD_088" not in slate_c["candidate_pids"]
 
 
-def test_pairwise_numerical_bounds_and_stage1_rank_inv():
-    """Challenger R2 Test 5: Verify all 12 pairwise features and stage1_rank_inv strictly in [0.0, 1.0].
-
-    Verifies:
-    1. stage1_rank_inv = 1.0 / (1.0 + rank) strictly in [0.0, 1.0] across ranks 0..1,000,000 and negative ranks.
-    2. All 12 pairwise features strictly in [0.0, 1.0] under adversarial logits (-1e9, +1e9, NaN, Inf).
-    3. No NaNs or Infs in any feature under any conditions.
-    """
-    # Create synthetic store
-    df = pd.DataFrame([
-        {"customer_id": "C_TEST", "product_id": "P_0", "purchase_date": "2025-01-01", "quantity": 10.0},
-        {"customer_id": "C_TEST", "product_id": "P_0", "purchase_date": "2025-02-01", "quantity": 20.0},
-    ])
-    store = PointInTimeFeatureStore(purchases_df=df)
-    as_of = pd.Timestamp("2025-06-01")
-
-    # 1. Test stage1_rank_inv exact mathematical values and bounds
-    test_ranks = [-5, 0, 1, 2, 9, 49, 50, 99, 100, 499, 999, 100_000, 1_000_000]
-    for r in test_ranks:
-        feats = store.compute_pairwise_features("C_TEST", as_of, "P_0", stage1_logit=1.0, stage1_rank=r)
-        rank_inv = feats[1]
-        expected_r = max(0, r)
-        expected_val = 1.0 / (1.0 + expected_r)
-        assert np.isclose(rank_inv, expected_val, atol=1e-6), (
-            f"Rank {r}: expected {expected_val}, got {rank_inv}"
-        )
-        assert 0.0 <= rank_inv <= 1.0, f"Rank {r}: rank_inv {rank_inv} out of [0.0, 1.0]!"
-
-    # 2. Test adversarial logits and boundary conditions
-    adversarial_logits = [
-        -1e9, -100.0, -50.0, -10.0, -1.0, 0.0, 1.0, 10.0, 50.0, 100.0, 1e9,
-        float("nan"), float("inf"), float("-inf"),
-    ]
-    for logit in adversarial_logits:
-        feats = store.compute_pairwise_features("C_TEST", as_of, "P_0", stage1_logit=logit, stage1_rank=0)
-        assert not np.isnan(feats).any(), f"NaN detected for logit {logit}!"
-        assert not np.isinf(feats).any(), f"Inf detected for logit {logit}!"
-        assert (feats >= 0.0).all(), f"Values < 0.0 detected for logit {logit}: {feats}"
-        assert (feats <= 1.0).all(), f"Values > 1.0 detected for logit {logit}: {feats}"
-        assert feats.shape == (NUM_PAIRWISE_FEATURES,)
-        assert feats.dtype == np.float32
-
-
 def test_mixed_datetime_robustness_temporal_ordering():
     """Challenger R2 Test 6: Transaction logs containing mixed date formats.
 
@@ -573,21 +518,21 @@ def test_temporal_boundary_isolation_exact_date_and_cold_customers():
     assert snap_cold.sku_stats == {}
 
     # Pairwise feature extraction for cold customer
-    feats_cold = store.compute_pairwise_features("C_COLD", as_of_t, "P_TARGET", stage1_logit=1.5, stage1_rank=0)
+    feats_cold = store.compute_pairwise_features("C_COLD", as_of_t, "P_TARGET")
     assert feats_cold.shape == (NUM_PAIRWISE_FEATURES,)
     assert not np.isnan(feats_cold).any(), "NaN detected in cold customer pairwise features!"
     assert not np.isinf(feats_cold).any(), "Inf detected in cold customer pairwise features!"
     assert (feats_cold >= 0.0).all() and (feats_cold <= 1.0).all(), "Features out of [0, 1]!"
 
     # Specific default feature contracts
-    assert feats_cold[2] == 0.0, "is_repeat_sku must be 0.0 for cold customer"
-    assert feats_cold[3] == 0.0, "user_sku_order_count_norm must be 0.0 for cold customer"
-    assert feats_cold[4] == 0.0, "user_sku_qty_share must be 0.0 for cold customer"
-    assert feats_cold[5] == 1.0, "days_since_last_sku_buy_norm must be 1.0 (never bought)"
-    assert feats_cold[6] == 0.0, "sku_urgency must be 0.0 for cold customer (< 2 orders)"
-    assert feats_cold[7] == 0.0, "user_cat_order_share must be 0.0 for cold customer"
-    assert feats_cold[8] == 0.0, "user_subcat_order_share must be 0.0 for cold customer"
-    assert feats_cold[9] == 0.0, "user_brand_order_share must be 0.0 for cold customer"
+    assert feats_cold[0] == 0.0, "is_repeat_sku must be 0.0 for cold customer"
+    assert feats_cold[1] == 0.0, "user_sku_order_count_norm must be 0.0 for cold customer"
+    assert feats_cold[2] == 0.0, "user_sku_qty_share must be 0.0 for cold customer"
+    assert feats_cold[3] == 1.0, "days_since_last_sku_buy_norm must be 1.0 (never bought)"
+    assert feats_cold[4] == 0.0, "sku_urgency must be 0.0 for cold customer (< 2 orders)"
+    assert feats_cold[5] == 0.0, "user_cat_order_share must be 0.0 for cold customer"
+    assert feats_cold[6] == 0.0, "user_subcat_order_share must be 0.0 for cold customer"
+    assert feats_cold[7] == 0.0, "user_brand_order_share must be 0.0 for cold customer"
 
 
 def test_candidate_slate_exhaustion_small_catalog_and_empty_retriever():

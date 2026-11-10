@@ -52,34 +52,34 @@ def test_adversarial_cold_customer_and_future_only_history():
     as_of = pd.Timestamp("2025-06-01")
 
     # 1. Completely unknown customer
-    f_unknown = store.compute_pairwise_features("C_UNKNOWN", as_of, "PROD_01", 0.0, 0)
+    f_unknown = store.compute_pairwise_features("C_UNKNOWN", as_of, "PROD_01")
     assert f_unknown.shape == (NUM_PAIRWISE_FEATURES,)
     assert not np.isnan(f_unknown).any() and not np.isinf(f_unknown).any()
     assert (f_unknown >= 0.0).all() and (f_unknown <= 1.0).all()
-    assert f_unknown[2] == 0.0  # is_repeat_sku
-    assert f_unknown[3] == 0.0  # user_sku_order_count_norm
-    assert f_unknown[4] == 0.0  # user_sku_qty_share
-    assert f_unknown[5] == 1.0  # days_since_last_sku_buy_norm (1.0 if never bought)
-    assert f_unknown[6] == 0.0  # sku_urgency
-    assert f_unknown[7] == 0.0  # user_cat_order_share
-    assert f_unknown[8] == 0.0  # user_subcat_order_share
-    assert f_unknown[9] == 0.0  # user_brand_order_share
+    assert f_unknown[0] == 0.0  # is_repeat_sku
+    assert f_unknown[1] == 0.0  # user_sku_order_count_norm
+    assert f_unknown[2] == 0.0  # user_sku_qty_share
+    assert f_unknown[3] == 1.0  # days_since_last_sku_buy_norm (1.0 if never bought)
+    assert f_unknown[4] == 0.0  # sku_urgency
+    assert f_unknown[5] == 0.0  # user_cat_order_share
+    assert f_unknown[6] == 0.0  # user_subcat_order_share
+    assert f_unknown[7] == 0.0  # user_brand_order_share
 
     # 2. Known company with zero purchase history ever
-    f_cold = store.compute_pairwise_features("C_COLD", as_of, "PROD_01", 1.5, 5)
+    f_cold = store.compute_pairwise_features("C_COLD", as_of, "PROD_01")
     assert (f_cold >= 0.0).all() and (f_cold <= 1.0).all()
-    assert f_cold[2] == 0.0
-    assert f_cold[5] == 1.0
-    assert f_cold[6] == 0.0
+    assert f_cold[0] == 0.0
+    assert f_cold[3] == 1.0
+    assert f_cold[4] == 0.0
 
     # 3. Customer with history strictly AFTER as_of_date (future data leakage test)
-    f_future = store.compute_pairwise_features("C_FUTURE", as_of, "PROD_01", -0.5, 10)
+    f_future = store.compute_pairwise_features("C_FUTURE", as_of, "PROD_01")
     assert (f_future >= 0.0).all() and (f_future <= 1.0).all()
-    assert f_future[2] == 0.0  # must NOT see the 2025-06-15 purchase!
-    assert f_future[3] == 0.0
+    assert f_future[0] == 0.0  # must NOT see the 2025-06-15 purchase!
+    assert f_future[1] == 0.0
+    assert f_future[2] == 0.0
+    assert f_future[3] == 1.0  # treated as never bought prior to as_of
     assert f_future[4] == 0.0
-    assert f_future[5] == 1.0  # treated as never bought prior to as_of
-    assert f_future[6] == 0.0
 
 
 def test_adversarial_single_purchase_urgency_and_zero_gap():
@@ -99,24 +99,24 @@ def test_adversarial_single_purchase_urgency_and_zero_gap():
     as_of = pd.Timestamp("2025-02-01")
 
     # 1. Single purchase customer: urgency must be strictly 0.0
-    f_single = store.compute_pairwise_features("C_SINGLE", as_of, "PROD_01", 0.0, 0)
-    assert f_single[2] == 1.0  # is_repeat_sku
-    assert f_single[3] == float(np.log1p(1) / np.log1p(50))
-    assert f_single[4] == 1.0  # 100% of volume
-    assert f_single[6] == 0.0, f"Single purchase urgency must be 0.0, got {f_single[6]}"
+    f_single = store.compute_pairwise_features("C_SINGLE", as_of, "PROD_01")
+    assert f_single[0] == 1.0  # is_repeat_sku
+    assert f_single[1] == float(np.log1p(1) / np.log1p(50))
+    assert f_single[2] == 1.0  # 100% of volume
+    assert f_single[4] == 0.0, f"Single purchase urgency must be 0.0, got {f_single[4]}"
     assert (f_single >= 0.0).all() and (f_single <= 1.0).all()
 
     # 2. Zero-gap customer: 2 purchases on exact same second -> med_gap = 0.0
-    f_zero_gap = store.compute_pairwise_features("C_ZERO_GAP", as_of, "PROD_02", 0.0, 0)
+    f_zero_gap = store.compute_pairwise_features("C_ZERO_GAP", as_of, "PROD_02")
     assert not np.isnan(f_zero_gap).any() and not np.isinf(f_zero_gap).any()
     assert (f_zero_gap >= 0.0).all() and (f_zero_gap <= 1.0).all()
-    assert f_zero_gap[2] == 1.0
+    assert f_zero_gap[0] == 1.0
     # Safe gap defaults to max(1.0, med_gap) = 1.0 day
     # Delta days = 31 days -> ratio = 31 / 1.0 = 31 -> min(1.0, 31 / 5.0) = 1.0
-    assert f_zero_gap[6] == 1.0
+    assert f_zero_gap[4] == 1.0
 
     # 3. Sub-second gap customer
-    f_subsecond = store.compute_pairwise_features("C_SUBSECOND", as_of, "PROD_03", 0.0, 0)
+    f_subsecond = store.compute_pairwise_features("C_SUBSECOND", as_of, "PROD_03")
     assert not np.isnan(f_subsecond).any() and not np.isinf(f_subsecond).any()
     assert (f_subsecond >= 0.0).all() and (f_subsecond <= 1.0).all()
 
@@ -144,11 +144,9 @@ def test_adversarial_high_order_customer_stress():
 
     # Candidate slate of 50 products
     candidate_pids = [f"PROD_{i:03d}" for i in range(50)]
-    logits = [float(x) for x in np.random.randn(50)]
-    ranks = list(range(50))
 
     t0 = time.perf_counter()
-    feats = store.compute_slate_pairwise_features("C_SUPER_HEAVY", as_of, candidate_pids, logits, ranks)
+    feats = store.compute_slate_pairwise_features("C_SUPER_HEAVY", as_of, candidate_pids)
     latency_ms = (time.perf_counter() - t0) * 1000.0
 
     assert feats.shape == (50, NUM_PAIRWISE_FEATURES)
@@ -186,43 +184,29 @@ def test_adversarial_zero_training_orders_cold_catalog_items():
     as_of = pd.Timestamp("2025-12-01")
 
     # 1. PROD_VAL_ONLY: bought in val split, but 0 training orders
-    f_val_only = store.compute_pairwise_features("C1", as_of, "PROD_VAL_ONLY", 0.0, 1)
+    f_val_only = store.compute_pairwise_features("C1", as_of, "PROD_VAL_ONLY")
     assert (f_val_only >= 0.0).all() and (f_val_only <= 1.0).all()
-    assert f_val_only[10] == 0.0, "PROD_VAL_ONLY must have 0.0 global popularity norm from train split"
-    assert f_val_only[11] == 0.0
+    assert f_val_only[8] == 0.0, "PROD_VAL_ONLY must have 0.0 global popularity norm from train split"
+    assert f_val_only[9] == 0.0
 
     # 2. PROD_NEVER_BOUGHT: 0 orders in entire catalog
-    f_never = store.compute_pairwise_features("C1", as_of, "PROD_NEVER_BOUGHT", -1.0, 49)
+    f_never = store.compute_pairwise_features("C1", as_of, "PROD_NEVER_BOUGHT")
     assert (f_never >= 0.0).all() and (f_never <= 1.0).all()
-    assert f_never[10] == 0.0
-    assert f_never[11] == 0.0
+    assert f_never[8] == 0.0
+    assert f_never[9] == 0.0
 
     # 3. PROD_TRAIN: has non-zero popularity norm
-    f_train = store.compute_pairwise_features("C1", as_of, "PROD_TRAIN", 1.0, 0)
-    assert f_train[10] > 0.0
-    before_first_sale = store.compute_pairwise_features("C1", "2024-01-01", "PROD_TRAIN", 1.0, 0)
+    f_train = store.compute_pairwise_features("C1", as_of, "PROD_TRAIN")
+    assert f_train[8] > 0.0
+    before_first_sale = store.compute_pairwise_features("C1", "2024-01-01", "PROD_TRAIN")
     assert before_first_sale[10] == 0.0
 
 
 def test_adversarial_infinite_and_extreme_logits():
-    """Validates behavior under extreme, infinite, and NaN logits in single and batch calls."""
+    """Validates candidate batches under extreme, infinite, and NaN retrieval logits."""
     store = PointInTimeFeatureStore(
         purchases_df=pd.DataFrame([{"customer_id": "C1", "product_id": "P1", "purchase_date": "2025-01-01", "quantity": 1.0}])
     )
-
-    as_of = pd.Timestamp("2025-02-01")
-
-    # Extreme logits
-    extreme_logits = [-1e12, -1000.0, -100.0, -50.0, 0.0, 50.0, 100.0, 1000.0, 1e12, float("inf"), float("-inf"), float("nan")]
-    for l in extreme_logits:
-        f = store.compute_pairwise_features("C1", as_of, "P1", l, 0)
-        assert not np.isnan(f).any() and not np.isinf(f).any()
-        assert (f >= 0.0).all() and (f <= 1.0).all()
-        # feat 0 is sigmoid
-        if l == 1000.0:
-            assert f[0] == 1.0
-        elif l == -1000.0:
-            assert np.isclose(f[0], 0.0, atol=1e-6)
 
     # Batch CandidateRetriever with extreme values
     retriever = CandidateRetriever(
@@ -243,7 +227,7 @@ def test_adversarial_infinite_and_extreme_logits():
     batch = retriever.generate_candidate_batch(
         logits=logits,
         customer_ids=["C1"] * b_size,
-        as_of_dates=[as_of] * b_size,
+        as_of_dates=["2025-02-01"] * b_size,
         top_k=100,
         top_c=50,
     )

@@ -24,6 +24,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, Subset
 
 from recommender.catalogue import load_product_catalogue, order_retriever_catalogue, select_eligible_products
+from recommender.complementarity import ProductComplementarity, group_snapshot_rows, product_snapshot_date
 from recommender.familiarity import ATTRIBUTE_COLUMNS, BASE_FAMILIARITY_FIELDS, FamiliarityStore
 from recommender.merging import EVENT_KEY_COLUMNS, merge_purchase_events
 from recommender.features import (
@@ -44,6 +45,7 @@ from recommender.models import (
     ProductTower,
     TwoTowerModel,
 )
+from recommender.price_features import CustomerMedianUnitPrice, load_price_preference_store, load_reconciled_prices
 from recommender.sequences import (
     ENRICHED_FEATURE_DIM,
     build_customer_sequence,
@@ -395,6 +397,7 @@ class RetrieverDataset(Dataset):
         *,
         profile_features: Sequence[str] = LEGACY_PROFILE_FEATURES,
         quantity_reference: Optional[float] = None,
+        include_novel_target_mask: bool = False,
         include_unseen_candidates: bool = False,
     ):
         self.transitions = transitions
@@ -409,6 +412,7 @@ class RetrieverDataset(Dataset):
         self.seq_feature_dim = seq_feature_dim
         self.profile_features = tuple(profile_features)
         self.quantity_reference = quantity_reference
+        self.include_novel_target_mask = include_novel_target_mask
         self.include_unseen_candidates = include_unseen_candidates
         self.histories = {str(cid): rows for cid, rows in purchases_df.groupby("customer_id")}
         self.empty_history = purchases_df.iloc[:0]
@@ -476,6 +480,12 @@ class RetrieverDataset(Dataset):
             **sequence_inputs,
             "target": target,
         }
+        if self.include_novel_target_mask:
+            novel = torch.zeros(self.num_products, dtype=torch.bool)
+            for product_id in new_to_customer_targets(history, as_of, target_ids):
+                if product_id in self.product_to_idx:
+                    novel[self.product_to_idx[product_id]] = True
+            item["novel_target_mask"] = novel
         if self.include_unseen_candidates:
             unseen = torch.ones(self.num_products, dtype=torch.bool)
             for product_id in prior_customer_products(history, as_of):
@@ -547,6 +557,7 @@ def build_retriever_product_inputs(
     include_sku_median_quantity: bool = False,
     container_encoding: str = "one_hot",
     sku_prices_uah: Optional[Dict[str, float]] = None,
+    complementarity: Optional[ProductComplementarity] = None,
 ) -> Dict[str, torch.Tensor]:
     """Share the training snapshot and product index order with downstream scoring."""
     ordered = order_retriever_catalogue(catalogue_df, product_ids)
@@ -580,6 +591,9 @@ def build_retriever_product_inputs(
     )
     if container_ids is not None and container_encoding == "embedding_none":
         inputs["container_id"] = container_ids
+    if complementarity is not None:
+        share = torch.from_numpy(complementarity.shares(product_ids, TRAIN_CUTOFF))
+        inputs["demand_features"] = torch.cat((inputs["demand_features"], share[:, None]), dim=1)
     return inputs
 
 
@@ -614,9 +628,13 @@ def train_retriever(
     dropout: float = 0.1,
     train_eval_size: int = 0,
     memorization_baskets: int = 0,
+    novel_positive_multiplier: float = 1.0,
     discovery_only: bool = False,
+    include_price_preference: bool = False,
+    include_customer_median_price: bool = False,
     familiarity_fields: Sequence[str] = (),
     remove_product_attribute_embeddings: bool = False,
+    include_complementarity: bool = False,
 ) -> Dict[str, Any]:
     """Train Modular Two-Tower Retriever and save best checkpoint + metrics history.
 
@@ -641,8 +659,12 @@ def train_retriever(
         raise ValueError("The output dimension must be positive and diagnostic sizes must be nonnegative.")
     if memorization_baskets and dry_run:
         raise ValueError("A memorization check and a dry run cannot be combined.")
-    if discovery_only and memorization_baskets:
-        raise ValueError("Discovery-only training cannot be combined with memorization.")
+    if not math.isfinite(novel_positive_multiplier) or novel_positive_multiplier <= 0:
+        raise ValueError("The new-to-customer positive multiplier must be finite and positive.")
+    if discovery_only and (memorization_baskets or novel_positive_multiplier != 1.0):
+        raise ValueError("Discovery-only training cannot be combined with memorization or positive reweighting.")
+    if include_customer_median_price and include_price_preference:
+        raise ValueError("Use the customer median price and the candidate-relative price in separate experiments.")
     if len(set(familiarity_fields)) != len(familiarity_fields) or not set(familiarity_fields) <= ATTRIBUTE_COLUMNS.keys():
         raise ValueError("Invalid or duplicate familiarity field.")
     if remove_product_attribute_embeddings and (
@@ -808,6 +830,7 @@ def train_retriever(
         profile_features=profile_features,
         quantity_reference=quantity_reference,
         max_seq_len=max_seq_len if history_encoder != "none" else 0,
+        include_novel_target_mask=novel_positive_multiplier != 1.0,
         include_unseen_candidates=discovery_only,
     )
     val_ds = RetrieverDataset(
@@ -826,6 +849,31 @@ def train_retriever(
         include_unseen_candidates=discovery_only,
     )
 
+    customer_price_reference = None
+    if include_customer_median_price:
+        print("Building point-in-time customer median unit prices.", flush=True)
+        prices = load_reconciled_prices(purchases_df)
+        customer_price_reference = fit_quantity_reference(
+            prices.loc[prices["purchase_date"] < TRAIN_CUTOFF, "unit_price_uah"],
+        )
+        price_profile = CustomerMedianUnitPrice(prices, customer_price_reference)
+        for dataset in (train_ds, val_ds):
+            if dataset.preloaded is not None:
+                dataset.preloaded["tabular_features"] = price_profile.append_to(
+                    dataset.preloaded["tabular_features"],
+                    [t["customer_id"] for t in dataset.transitions],
+                    [t["as_of_date"] for t in dataset.transitions],
+                )
+    if include_price_preference:
+        print("Building point-in-time Stage 1 price preferences.", flush=True)
+        price_store = load_price_preference_store(purchases_df, catalogue_df, eligible_pids)
+        for dataset in (train_ds, val_ds):
+            if dataset.preloaded is not None:
+                dataset.preloaded["price_features"] = price_store.batch_features(
+                    [t["customer_id"] for t in dataset.transitions],
+                    [t["as_of_date"] for t in dataset.transitions],
+                )
+        del price_store
     if familiarity_fields:
         store = FamiliarityStore(purchases_df, familiarity_catalogue, eligible_pids, familiarity_fields)
         for dataset in (train_ds, val_ds):
@@ -846,13 +894,37 @@ def train_retriever(
         train_examples = Subset(train_ds, discovery_rows)
         print(f"Discovery objective uses {len(discovery_rows)} training baskets with "
               f"{int(novel_targets.sum())} eligible new targets.")
-    train_loader = DataLoader(train_examples, batch_size=batch_size, shuffle=True)
+    complementarity = ProductComplementarity(purchases_df) if include_complementarity else None
+    train_batches = []
+    if complementarity is not None:
+        train_snapshot_dates = [product_snapshot_date(t["as_of_date"]) for t in train_transitions]
+        snapshot_dates = sorted(set(train_snapshot_dates))
+        snapshot_index = {date: i for i, date in enumerate(snapshot_dates)}
+        train_ds.preloaded["product_snapshot"] = torch.tensor([snapshot_index[date] for date in train_snapshot_dates])
+        example_rows = train_examples.indices if discovery_only else range(len(train_examples))
+        example_snapshots = [train_snapshot_dates[i] for i in example_rows]
+        for rows in group_snapshot_rows(example_snapshots):
+            for start in range(0, len(rows), batch_size):
+                train_batches.append(rows[start:start + batch_size])
+        train_loader = DataLoader(train_examples, batch_sampler=train_batches)
+    else:
+        train_loader = DataLoader(train_examples, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
     train_eval_indices = sorted(diagnostic_rng.choice(
         len(train_ds), min(train_eval_size, len(train_ds)), replace=False,
     )) if train_eval_size else []
+    train_eval_batches = []
+    if complementarity is not None and train_eval_indices:
+        snapshot_rows = group_snapshot_rows([train_snapshot_dates[i] for i in train_eval_indices])
+        train_eval_indices = [train_eval_indices[row] for group in snapshot_rows for row in group]
+        offset = 0
+        for group in snapshot_rows:
+            for start in range(offset, offset + len(group), batch_size):
+                train_eval_batches.append(list(range(start, min(start + batch_size, offset + len(group)))))
+            offset += len(group)
     train_eval_loader = DataLoader(
-        Subset(train_ds, train_eval_indices), batch_size=batch_size,
+        Subset(train_ds, train_eval_indices),
+        **({"batch_sampler": train_eval_batches} if train_eval_batches else {"batch_size": batch_size}),
         generator=torch.Generator().manual_seed(seed),
     ) if train_eval_indices else None
     history_gap_reference_days = (
@@ -871,10 +943,15 @@ def train_retriever(
         include_sku_median_quantity=include_sku_median_quantity,
         container_encoding=container_encoding,
         sku_prices_uah=sku_prices_uah,
+        complementarity=complementarity,
     )
     # Move product inputs to device
     for k in prod_inputs:
         prod_inputs[k] = prod_inputs[k].to(dev)
+    snapshot_shares = [
+        torch.from_numpy(complementarity.shares(eligible_pids, date)).to(dev)
+        for date in snapshot_dates
+    ] if complementarity is not None else []
 
     # 8. Model Initialization
     customer_tower = CustomerTower(
@@ -889,7 +966,7 @@ def train_retriever(
         catalog_history_encoder=history_encoder,
         history_gap_reference_days=history_gap_reference_days,
         max_seq_len=max_seq_len,
-        num_tabular_features=len(profile_features),
+        num_tabular_features=len(profile_features) + int(include_customer_median_price),
         hidden_dim=tower_hidden_dim,
         num_heads=4,
         num_layers=history_layers,
@@ -923,6 +1000,7 @@ def train_retriever(
         product_tower=product_tower,
         num_catalog_products=num_products,
         temperature=DEFAULT_TEMPERATURE,
+        include_price_preference=include_price_preference,
         num_familiarity_features=len(familiarity_fields),
     ).to(dev)
 
@@ -958,10 +1036,13 @@ def train_retriever(
         raise ValueError("Discovery-only checkpoint selection requires first-time purchases in validation.")
     train_eval_targets = [target_indices(train_transitions[i]["positive_product_ids"]) for i in train_eval_indices]
 
-    def product_vectors() -> torch.Tensor:
+    def product_vectors(snapshot_id: Optional[int] = None) -> torch.Tensor:
+        demand = prod_inputs["demand_features"]
+        if snapshot_id is not None:
+            demand = torch.cat((demand[:, :-1], snapshot_shares[snapshot_id][:, None]), dim=1)
         return model.product_tower(
             prod_inputs["text_embedding"], prod_inputs["brand_id"], prod_inputs["category_id"],
-            None, prod_inputs["business_line_id"], prod_inputs["demand_features"],
+            None, prod_inputs["business_line_id"], demand,
             container_id=prod_inputs.get("container_id"),
         )
 
@@ -977,7 +1058,7 @@ def train_retriever(
             catalog_product_vectors=vectors, **sequence_inputs,
         )
         return model.compute_logits(
-            customers, vectors, product_indices=product_indices_all,
+            customers, vectors, product_indices=product_indices_all, price_features=batch.get("price_features"),
             familiarity_features=batch.get("familiarity_features"),
         )
 
@@ -990,8 +1071,15 @@ def train_retriever(
         discovery_pairs = 0
         discovery_targets = 0
         discovery_hits = {25: 0, 50: 0}
+        snapshot_vectors = {}
         for batch in loader:
-            logits = score_batch(batch, vectors)
+            batch_vectors = vectors
+            if "product_snapshot" in batch:
+                snapshot = int(batch["product_snapshot"][0])
+                if snapshot not in snapshot_vectors:
+                    snapshot_vectors[snapshot] = product_vectors(snapshot)
+                batch_vectors = snapshot_vectors[snapshot]
+            logits = score_batch(batch, batch_vectors)
             targets = batch["target"].to(dev)
             total_loss += model.compute_multi_label_loss(logits, targets, pos_weight=pos_weight_t).item()
             topk_rows.append(torch.topk(logits, k=min(top_k, num_products), dim=-1).indices.cpu().numpy())
@@ -1021,15 +1109,21 @@ def train_retriever(
     for epoch in range(1, epochs + 1):
         model.train()
         total_train_loss = 0.0
+        diagnostic_rng.shuffle(train_batches)
 
         for batch in train_loader:
             optimizer.zero_grad()
-            logits = score_batch(batch, product_vectors())
+            snapshot = int(batch["product_snapshot"][0]) if "product_snapshot" in batch else None
+            logits = score_batch(batch, product_vectors(snapshot))
             targets = batch["target"].to(dev)
             if discovery_only:
                 loss = compute_discovery_loss(logits, targets, batch["unseen_candidates"].to(dev), pos_weight_t)
             else:
-                loss = model.compute_multi_label_loss(logits, targets, pos_weight=pos_weight_t)
+                batch_pos_weight = pos_weight_t
+                if "novel_target_mask" in batch:
+                    novel = batch["novel_target_mask"].to(dev)
+                    batch_pos_weight = pos_weight_t * (1.0 + (novel_positive_multiplier - 1.0) * novel)
+                loss = model.compute_multi_label_loss(logits, targets, pos_weight=batch_pos_weight)
             loss.backward()
             optimizer.step()
             total_train_loss += loss.item()
@@ -1137,7 +1231,10 @@ def train_retriever(
                         "num_catalog_products": num_products,
                         "temperature": DEFAULT_TEMPERATURE,
                         "pos_weight": pos_weight,
+                        "novel_positive_multiplier": novel_positive_multiplier,
                         "discovery_only": discovery_only,
+                        "include_price_preference": include_price_preference,
+                        "customer_price_reference": customer_price_reference,
                         "familiarity_fields": list(familiarity_fields),
                         "profile_features": list(profile_features),
                         "company_cache_name": company_cache_name,
@@ -1151,6 +1248,7 @@ def train_retriever(
                         "dropout": dropout,
                         "container_encoding": container_encoding,
                         "sku_prices_uah": sku_prices_uah,
+                        "include_complementarity": include_complementarity,
                         "catalog_history_encoder": history_encoder,
                         "max_seq_len": max_seq_len,
                         "history_gap_reference_days": history_gap_reference_days,

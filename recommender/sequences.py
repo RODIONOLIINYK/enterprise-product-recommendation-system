@@ -49,6 +49,14 @@ def fit_history_gap_reference(purchase_dates: torch.Tensor, attention_mask: torc
     return float(positive.quantile(0.5).item()) if positive.numel() else 1.0
 
 
+def normalize_purchase_history_gaps(
+    purchase_dates: torch.Tensor, attention_mask: torch.Tensor, reference_days: float,
+) -> torch.Tensor:
+    """Compress the gap from the most recent purchase with a training-fitted scale."""
+    log_gaps = torch.log1p(purchase_history_gaps(purchase_dates, attention_mask))
+    return log_gaps / (log_gaps + np.log1p(reference_days))
+
+
 def _map_token_id(
     val: Any,
     vocab: Optional[Dict[str, int]] = None,

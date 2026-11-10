@@ -357,6 +357,17 @@ class TestTwoTowerModel(unittest.TestCase):
         expected_tensor = F.binary_cross_entropy_with_logits(logits, targets, pos_weight=pw_tensor)
         torch.testing.assert_close(loss_tensor, expected_tensor)
 
+    def test_batch_positive_weights_only_scale_the_selected_positive_gradient(self):
+        logits = torch.zeros(1, 3, requires_grad=True)
+        targets = torch.tensor([[1.0, 1.0, 0.0]])
+        base = self.model.compute_multi_label_loss(logits, targets, pos_weight=20.0)
+        weighted = self.model.compute_multi_label_loss(logits, targets, pos_weight=torch.tensor([[20.0, 40.0, 20.0]]))
+        (base_gradient,) = torch.autograd.grad(base, logits)
+        (weighted_gradient,) = torch.autograd.grad(weighted, logits)
+        torch.testing.assert_close(weighted_gradient, base_gradient * torch.tensor([[1.0, 2.0, 1.0]]))
+        self.assertTrue((weighted_gradient[0, :2] < 0).all())
+        self.assertGreater(weighted_gradient[0, 2].item(), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

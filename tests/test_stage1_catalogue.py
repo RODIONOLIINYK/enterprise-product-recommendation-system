@@ -80,6 +80,13 @@ def test_discovery_default_admits_paid_skus_after_first_sale_and_excludes_known_
         torch.zeros(len(ids), 2),
     )
     assert ranked == [[], ["trained"], ["trained", "late"]]
+    slates = retriever.generate_candidate_batch(
+        torch.tensor([[2., 3., 9., 8., 6.]] * 2), ["buyer"] * 2, ["2025-10-02", "2025-10-03"],
+        [["late", "blocked", "gift_only"]] * 2, top_k=2, top_c=2, heuristic_fraction=0.5,
+    )
+    assert slates.candidate_pids == [["seen", "trained"], ["seen", "late"]]
+    assert slates.candidate_indices.tolist() == [[4, 0], [4, 1]]
+    assert slates.labels.tolist() == [[0., 0.], [0., 1.]]
 
 
 def test_cold_product_demand_ignores_sales_at_or_after_training_cutoff():

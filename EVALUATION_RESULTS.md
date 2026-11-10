@@ -1,5 +1,40 @@
 # Evaluation & Training Report: Modular Two-Tower Retriever + UPS-CANR Ranker
 
+## Category peer scores and Stage 2 input tests
+
+The Stage 1 replay used the same frozen vectors and paid-sale candidate pool. The
+two-tower reference recovered 652 of 1,857 new targets at 25 and 921 at 50. The
+best favorite-category setting recovered 657 at 25 and 914 at 50. The category-mix
+setting with the highest mixed-slate recall recovered 765 of 1,857 in the mixed
+slate, compared with 763 for the reference. The six peer settings were compared
+on the same validation split.
+
+The Stage 2 runs reused the same 50 candidates, seed 42, and 10 epochs. Each
+checkpoint maximized new-to-customer Recall@10 with an overall Recall@10 floor
+of 75.59%. The repeat and month ablations masked those inputs while preserving
+the model dimensions.
+
+| Stage 2 run | New-to-customer Recall@10 | Overall Recall@10 |
+| --- | ---: | ---: |
+| All-statistics control | 10.99% (204) | 76.07% |
+| Shared six statistics + brand | 9.85% (183) | 76.05% |
+| Add only category peer affinity | 10.99% (204) | 76.01% |
+| Remove history month sine and cosine | 11.15% (207) | 76.07% |
+| **Remove history repeat flag (Stage 2 reference)** | **11.25% (209)** | **76.15%** |
+| Remove candidate repeat flag | 10.77% (200) | 76.29% |
+| Remove month and both repeat flags | 10.66% (198) | 76.23% |
+| Replace history subcategory with brand | 10.50% (195) | 75.72% |
+| Add popularity and industry affinity to history | 10.77% (200) | 75.92% |
+| Reorder timing with SKU fallback | 10.72% (199) | 75.98% |
+| Reorder timing with SKU and category fallback | 11.04% (205) | 75.94% |
+
+Removing the redundant history repeat flag (`excluded_statistics=("history_repeat",)` with
+`statistics_attention=True`) is promoted as the Stage 2 reference (`checkpoints/stage2-statistics-ablations/history_repeat/`).
+Note for Stage 1 vs. Stage 2 cadence features: raw `inter_purchase_gap_norm` is kept for
+Stage 1 customer sequence cadence modeling, while Stage 2 replaces raw purchase-gap
+features with relative due-ness (`gap - age`). Full results and earlier experiment
+locations are saved in `checkpoints/proposal-validation/validation_comparison.json`.
+
 ## Stage 1 discovery reference
 
 The reference uses 128D towers, 32 purchase records, and a two-layer history Transformer.
@@ -44,10 +79,32 @@ validation Recall@50 on 6,191 baskets from the 790-SKU catalogue.
 | --- | ---: | ---: | ---: | ---: |
 | Previous 10-epoch schedule | 10 | 0.08235 | 79.74% | 43.19% |
 | **30-epoch schedule** | **21** | **0.07543** | **83.12%** | **44.53%** |
+| 30 epochs, 2× new-to-customer positive weight | 29 | 0.07640 | 83.73% | 44.86% |
 
-The selected Stage 1 checkpoint and full training history are saved locally in
-`checkpoints/retriever-128d-30epochs/`. This run evaluated Stage 1 on validation. The standard
-two-stage evaluation uses the earlier matching retriever and ranker checkpoints.
+The unweighted checkpoint and full history are saved locally in
+`checkpoints/retriever-128d-30epochs/`. The 2× weighted checkpoint, full history, comparison,
+and checksums are saved in `checkpoints/retriever-128d-30epochs-new-positive-2x/`. Both runs
+selected checkpoints by overall validation Recall@50. The standard two-stage evaluation
+uses the earlier matching retriever and ranker checkpoints.
+
+## Stage 1 discovery-only regularization
+
+These runs use 8,773 training baskets with at least one first-time purchase. Each run
+uses a 30-epoch schedule and selects its checkpoint by validation Recall@25 among
+previously unbought SKUs. The denominator is all 1,857 first-time validation targets,
+including 96 outside the 790-SKU candidate catalogue.
+
+| Discovery-only run | Dropout | AdamW weight decay | Checkpoint epoch | New-to-customer Recall@25 |
+| --- | ---: | ---: | ---: | ---: |
+| 128D reference | 0.10 | 0.0001 | 23 | 34.95% (649) |
+| 256D control | 0.10 | 0.0001 | 20 | 33.93% (630) |
+| 256D with higher dropout | 0.20 | 0.0001 | 27 | 33.93% (630) |
+| 256D with stronger weight decay | 0.10 | 0.001 | 24 | 34.36% (638) |
+
+With the same unseen-only filter, the saved 128D unweighted and 2× weighted checkpoints
+retrieved 627 (33.76%) and 638 (34.36%) of the same targets, respectively. Those checkpoints
+were selected by overall validation Recall@50. Experiment outputs are under
+`checkpoints/stage1-discovery-regularization/`.
 
 The remaining sections document the original run. The input schema, quantity scaling, and slate
 construction have since changed.

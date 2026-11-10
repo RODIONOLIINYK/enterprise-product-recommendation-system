@@ -67,20 +67,27 @@ def load_source_purchases(input_path: str | Path, *, include_turnover: bool = Fa
     return purchases
 
 
-def sku_median_prices_uah(paid: pd.DataFrame, product_ids: Sequence[str], cutoff: pd.Timestamp) -> dict[str, float]:
-    """Compute the median turnover per unit across unified pre-cutoff purchase records."""
-    dates = pd.to_datetime(paid["purchase_date"], format="mixed").dt.normalize()
-    prior = paid.loc[dates.lt(cutoff) & paid["product_id"].isin(product_ids)].copy()
-    prior["purchase_date"] = dates.loc[prior.index]
-    prior["complete_turnover"] = np.isfinite(prior["turnover_uah"]) & prior["turnover_uah"].ge(0)
-    events = prior.groupby(EVENT_KEY_COLUMNS, observed=True).agg(
+def priced_purchase_events(paid: pd.DataFrame) -> pd.DataFrame:
+    """Compute UAH per unit after merging invoice lines for each customer, SKU and day."""
+    paid = paid.copy()
+    paid["purchase_date"] = pd.to_datetime(paid["purchase_date"], format="mixed").dt.normalize()
+    paid["complete_turnover"] = np.isfinite(paid["turnover_uah"]) & paid["turnover_uah"].ge(0)
+    events = paid.groupby(EVENT_KEY_COLUMNS, observed=True).agg(
         quantity=("quantity", "sum"),
         turnover=("turnover_uah", "sum"),
         complete_turnover=("complete_turnover", "all"),
     )
-    valid = events.loc[events["complete_turnover"] & events["turnover"].gt(0)]
-    unit_price = valid["turnover"] / valid["quantity"]
-    return unit_price.groupby(level="product_id").median().to_dict()
+    valid = events.loc[events["complete_turnover"] & events["turnover"].gt(0)].copy()
+    valid["unit_price_uah"] = valid["turnover"] / valid["quantity"]
+    return valid[["quantity", "unit_price_uah"]].reset_index()
+
+
+def sku_median_prices_uah(paid: pd.DataFrame, product_ids: Sequence[str], cutoff: pd.Timestamp) -> dict[str, float]:
+    """Compute the median turnover per unit across unified pre-cutoff purchase records."""
+    dates = pd.to_datetime(paid["purchase_date"], format="mixed").dt.normalize()
+    prior = paid.loc[dates.lt(cutoff) & paid["product_id"].isin(product_ids)]
+    prices = priced_purchase_events(prior)
+    return prices.groupby("product_id")["unit_price_uah"].median().to_dict()
 
 
 def load_sku_median_prices_uah(

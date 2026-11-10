@@ -2,7 +2,7 @@
 
 Covers:
 1. test_stage1_candidate_retrieval_shapes: top-100 and top-50 shapes.
-2. test_12_pairwise_features_bounded_zero_one: all 12 features strictly within [0.0, 1.0].
+2. test_pairwise_features_bounded_zero_one: all features strictly within [0.0, 1.0].
 3. test_pairwise_features_no_nan: edge cases producing zero NaNs or Infs.
 5. test_candidate_slate_eval_no_injection: strictly top 50 from Stage 1 in evaluation mode.
 6. test_candidate_batch_dict_access_and_device: dataclass and dict protocol compatibility.
@@ -141,8 +141,8 @@ def test_stage1_candidate_retrieval_shapes(sample_catalog_data, sample_companies
     assert batch_small.pairwise_features.shape == (b_size, 25, NUM_PAIRWISE_FEATURES)
 
 
-def test_12_pairwise_features_bounded_zero_one(sample_catalog_data, sample_companies_data, sample_purchases_data):
-    """Validates that all 12 pairwise features fall strictly in [0.0, 1.0] across edge cases."""
+def test_pairwise_features_bounded_zero_one(sample_catalog_data, sample_companies_data, sample_purchases_data):
+    """Validates that all pairwise features fall strictly in [0.0, 1.0] across edge cases."""
     store = PointInTimeFeatureStore(
         purchases_df=sample_purchases_data,
         catalogue_df=sample_catalog_data,
@@ -157,73 +157,55 @@ def test_12_pairwise_features_bounded_zero_one(sample_catalog_data, sample_compa
         customer_id="CUST_001",
         as_of_date=as_of,
         product_id="PROD_000",
-        stage1_logit=2.5,
-        stage1_rank=0,
     )
-    assert f_repeat.shape == (12,)
+    assert f_repeat.shape == (NUM_PAIRWISE_FEATURES,)
     assert (f_repeat >= 0.0).all() and (f_repeat <= 1.0).all()
 
     # Exact checks for repeat product
-    # stage1_score
-    expected_score = 1.0 / (1.0 + np.exp(-2.5))
-    assert np.isclose(f_repeat[0], expected_score, atol=1e-4)
-    # stage1_rank_inv
-    assert np.isclose(f_repeat[1], 1.0, atol=1e-4)  # rank 0 -> 1.0 / (1+0) = 1.0
     # is_repeat_sku
-    assert f_repeat[2] == 1.0
+    assert f_repeat[0] == 1.0
     # user_sku_order_count_norm (3 orders)
-    assert np.isclose(f_repeat[3], np.log1p(3) / np.log1p(50), atol=1e-4)
+    assert np.isclose(f_repeat[1], np.log1p(3) / np.log1p(50), atol=1e-4)
     # user_sku_qty_share: 45 / (45 + 5 + 5) = 45 / 55 = 0.8181
-    assert np.isclose(f_repeat[4], 45.0 / 55.0, atol=1e-4)
+    assert np.isclose(f_repeat[2], 45.0 / 55.0, atol=1e-4)
     # days_since_last_sku_buy_norm: last purchase 2025-03-10, as_of 2025-04-01 -> 22 days
-    assert np.isclose(f_repeat[5], np.log1p(22) / np.log1p(365), atol=1e-4)
+    assert np.isclose(f_repeat[3], np.log1p(22) / np.log1p(365), atol=1e-4)
     # sku_urgency: 3 orders, gap between dates is 31d and 28d -> median_gap = 29.5d
     # delta_t = 22d -> ratio = 22 / 29.5 = 0.7457 -> urgency = 0.7457 / 5.0
     expected_urgency = (22.0 / 29.5) / 5.0
-    assert np.isclose(f_repeat[6], expected_urgency, atol=1e-3)
+    assert np.isclose(f_repeat[4], expected_urgency, atol=1e-3)
     # user_cat_order_share: PROD_000 is CAT_0, CUST_001 has 3 orders in CAT_0 out of 5 total orders -> 3/5 = 0.6
-    assert np.isclose(f_repeat[7], 3.0 / 5.0, atol=1e-4)
+    assert np.isclose(f_repeat[5], 3.0 / 5.0, atol=1e-4)
 
     # 2. Never bought product (CUST_001 on PROD_050)
     f_cold_prod = store.compute_pairwise_features(
         customer_id="CUST_001",
         as_of_date=as_of,
         product_id="PROD_050",
-        stage1_logit=-1.2,
-        stage1_rank=49,
     )
     assert (f_cold_prod >= 0.0).all() and (f_cold_prod <= 1.0).all()
-    assert f_cold_prod[2] == 0.0  # is_repeat_sku == 0.0
-    assert f_cold_prod[3] == 0.0  # order_count == 0.0
-    assert f_cold_prod[4] == 0.0  # qty_share == 0.0
-    assert f_cold_prod[5] == 1.0  # days_since_last_sku_buy_norm == 1.0 if never bought
-    assert f_cold_prod[6] == 0.0  # sku_urgency == 0.0 if < 2 orders
-    assert np.isclose(f_cold_prod[1], 1.0 / 50.0, atol=1e-4)  # rank 49 -> 1.0 / 50.0
+    assert f_cold_prod[0] == 0.0  # is_repeat_sku == 0.0
+    assert f_cold_prod[1] == 0.0  # order_count == 0.0
+    assert f_cold_prod[2] == 0.0  # qty_share == 0.0
+    assert f_cold_prod[3] == 1.0  # days_since_last_sku_buy_norm == 1.0 if never bought
+    assert f_cold_prod[4] == 0.0  # sku_urgency == 0.0 if < 2 orders
 
     # 3. Completely cold customer (CUST_COLD)
     f_cold_cust = store.compute_pairwise_features(
         customer_id="CUST_COLD",
         as_of_date=as_of,
         product_id="PROD_000",
-        stage1_logit=0.0,
-        stage1_rank=10,
     )
     assert (f_cold_cust >= 0.0).all() and (f_cold_cust <= 1.0).all()
+    assert f_cold_cust[0] == 0.0
+    assert f_cold_cust[1] == 0.0
     assert f_cold_cust[2] == 0.0
-    assert f_cold_cust[3] == 0.0
+    assert f_cold_cust[3] == 1.0
     assert f_cold_cust[4] == 0.0
-    assert f_cold_cust[5] == 1.0
+    assert f_cold_cust[5] == 0.0
     assert f_cold_cust[6] == 0.0
     assert f_cold_cust[7] == 0.0
-    assert f_cold_cust[8] == 0.0
-    assert f_cold_cust[9] == 0.0
 
-    # 4. Extreme logits and ranks
-    for logit in (-1000.0, -50.0, 0.0, 50.0, 1000.0):
-        for rank in (0, 1, 49, 100, 500):
-            feats = store.compute_pairwise_features("CUST_001", as_of, "PROD_000", logit, rank)
-            assert (feats >= 0.0).all()
-            assert (feats <= 1.0).all()
 
 
 def test_pairwise_features_no_nan(sample_catalog_data):
@@ -234,22 +216,11 @@ def test_pairwise_features_no_nan(sample_catalog_data):
         catalogue_df=sample_catalog_data,
     )
 
-    # Unknown customer, unknown product, NaN / Inf logits
-    edge_cases = [
-        ("UNKNOWN_CUST", "UNKNOWN_PROD", float("nan"), 0),
-        ("UNKNOWN_CUST", "PROD_001", float("inf"), 10),
-        ("UNKNOWN_CUST", "PROD_002", float("-inf"), -5),
-        ("UNKNOWN_CUST", "PROD_003", 1e9, 999999),
-        ("UNKNOWN_CUST", "PROD_004", -1e9, 0),
-    ]
-
-    for cid, pid, logit, rank in edge_cases:
+    for pid in ("UNKNOWN_PROD", "PROD_001"):
         feats = empty_store.compute_pairwise_features(
-            customer_id=cid,
+            customer_id="UNKNOWN_CUST",
             as_of_date="2026-01-01",
             product_id=pid,
-            stage1_logit=logit,
-            stage1_rank=rank,
         )
         assert not np.isnan(feats).any()
         assert not np.isinf(feats).any()
@@ -331,11 +302,38 @@ def test_hybrid_slate_preserves_tower_ranks_and_uses_only_prior_sales():
     assert batch.candidate_indices.tolist() == [[1, 4, 0, 2]]
     assert batch.candidate_scores.tolist() == [[4.0, 1.0, 5.0, 3.0]]
     assert batch.labels.tolist() == [[0.0, 1.0, 0.0, 0.0]]
-    torch.testing.assert_close(batch.pairwise_features[0, :, 1], torch.tensor([0.5, 0.2, 1.0, 1 / 3]))
+    torch.testing.assert_close(batch.pairwise_features[0, :, 0], torch.tensor([1.0, 0.0, 0.0, 0.0]))
     cold = retriever.generate_candidate_batch(
         logits, ["cold"], ["2025-01-02"], top_k=4, top_c=4, heuristic_fraction=0.5,
     )
     assert cold.candidate_pids == [list("ABCD")]
+
+
+def test_attribute_repeat_flags_use_strictly_prior_history_for_unseen_skus():
+    purchases = pd.DataFrame(
+        [("C1", "A", "2025-01-01"), ("C1", "B", "2025-01-02")],
+        columns=["customer_id", "product_id", "purchase_date"],
+    )
+    catalogue = pd.DataFrame(
+        [
+            ("A", "category-a", "brand-a", "line-a"),
+            ("B", "category-b", "brand-b", "line-b"),
+            ("C", "category-a", "brand-a", "line-a"),
+            ("D", "category-b", "brand-b", "line-b"),
+            ("E", None, None, None),
+            ("F", "category-a", "brand-b", "line-b"),
+            ("G", "category-b", "brand-a", "line-b"),
+            ("H", "category-b", "brand-b", "line-a"),
+        ],
+        columns=["product_id", "product_category", "brand", "business_line"],
+    )
+    store = PointInTimeFeatureStore(purchases, catalogue)
+    rows = store.compute_slate_pairwise_features("C1", "2025-01-02", ["C", "D", "E"])
+    assert rows[:, 0].tolist() == [0.0, 0.0, 0.0]
+    assert rows[:, -3:].tolist() == [[1.0, 1.0, 1.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+    separated = store.compute_slate_pairwise_features("C1", "2025-01-02", ["F", "G", "H"])
+    torch.testing.assert_close(separated[:, -3:], torch.eye(3))
+    assert store.compute_pairwise_features("C1", "2025-01-03", "D")[-3:].tolist() == [1.0, 1.0, 1.0]
 
 
 def test_category_overdue_counts_distinct_prior_dates_for_unseen_sku():
@@ -346,13 +344,13 @@ def test_category_overdue_counts_distinct_prior_dates_for_unseen_sku():
     catalogue = pd.DataFrame({"product_id": ["A", "B", "C"], "product_category": ["X", "X", "Y"]})
     store = PointInTimeFeatureStore(purchases, catalogue)
     result = store.compute_slate_pairwise_features(
-        "C1", "2025-01-19", ["B", "C"], [0.0, 0.0], [0, 1], category_overdue=True,
+        "C1", "2025-01-19", ["B", "C"], category_overdue=True,
     )
-    assert result.shape == (2, 13)
-    assert result[:, 2].tolist() == [0.0, 0.0]
+    assert result.shape == (2, NUM_PAIRWISE_FEATURES + 1)
+    assert result[:, 0].tolist() == [0.0, 0.0]
     assert result[:, -1].tolist() == [1.0, 0.0]
     at_median = store.compute_slate_pairwise_features(
-        "C1", "2025-01-16", ["B"], [0.0], [0], category_overdue=True,
+        "C1", "2025-01-16", ["B"], category_overdue=True,
     )
     assert at_median[0, -1].item() == 0.0
 
@@ -397,18 +395,16 @@ def test_submillisecond_pairwise_feature_extraction(sample_catalog_data, sample_
     )
 
     pids_50 = sample_catalog_data["product_id"].tolist()[:50]
-    logits_50 = [float(x) for x in np.random.randn(50)]
-    ranks_50 = list(range(50))
     as_of = pd.Timestamp("2025-04-01")
 
     # Warm-up call
-    store.compute_slate_pairwise_features("CUST_001", as_of, pids_50, logits_50, ranks_50)
+    store.compute_slate_pairwise_features("CUST_001", as_of, pids_50)
 
     # Benchmark 200 consecutive candidate slate computations
     n_iterations = 200
     t0 = time.perf_counter()
     for _ in range(n_iterations):
-        store.compute_slate_pairwise_features("CUST_001", as_of, pids_50, logits_50, ranks_50)
+        store.compute_slate_pairwise_features("CUST_001", as_of, pids_50)
     elapsed_total = time.perf_counter() - t0
     avg_ms = (elapsed_total / n_iterations) * 1000.0
 
@@ -506,9 +502,9 @@ def test_point_in_time_feature_store_mixed_datetime_parsing():
     assert "P_02" not in snap_mid.sku_stats
 
     # Check pairwise feature extraction
-    feats = store.compute_pairwise_features("C_MIXED", as_of, "P_01", stage1_logit=2.5, stage1_rank=0)
+    feats = store.compute_pairwise_features("C_MIXED", as_of, "P_01")
     assert feats.shape == (NUM_PAIRWISE_FEATURES,)
     assert not np.isnan(feats).any()
     assert (feats >= 0.0).all() and (feats <= 1.0).all()
-    assert feats[2] == 1.0  # is_repeat_sku
-    assert feats[4] == 15.0 / 22.0  # quantity share
+    assert feats[0] == 1.0  # is_repeat_sku
+    assert feats[2] == 15.0 / 22.0  # quantity share

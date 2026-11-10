@@ -83,10 +83,10 @@ class TestChallengerM9AdversarialVerification(unittest.TestCase):
 
         # 1. Attribute access
         self.assertEqual(batch.customer_ids, ["C1", "C2", "C3"])
-        self.assertEqual(batch.pairwise_features.shape, (b, c, 12))
+        self.assertEqual(batch.pairwise_features.shape, (b, c, NUM_PAIRWISE_FEATURES))
 
         # 2. Dict indexing
-        self.assertEqual(batch["pairwise_features"].shape, (b, c, 12))
+        self.assertEqual(batch["pairwise_features"].shape, (b, c, NUM_PAIRWISE_FEATURES))
         self.assertEqual(batch["candidate_indices"].shape, (b, c))
         self.assertIn("candidate_scores", batch)
         self.assertEqual(batch.get("customer_ids"), ["C1", "C2", "C3"])
@@ -144,14 +144,12 @@ class TestChallengerM9AdversarialVerification(unittest.TestCase):
 
         cids = df["customer_id"].astype(str).unique()[:20]
         pids = df["product_id"].astype(str).unique()[:50].tolist()
-        logits = [0.5] * 50
-        ranks = list(range(50))
         as_of = pd.Timestamp("2025-10-15")
 
         latencies = []
         for cid in cids:
             t0 = time.perf_counter()
-            _ = store.compute_slate_pairwise_features(cid, as_of, pids, logits, ranks)
+            _ = store.compute_slate_pairwise_features(cid, as_of, pids)
             latencies.append((time.perf_counter() - t0) * 1000.0)
 
         avg_latency = float(np.mean(latencies))
@@ -170,19 +168,17 @@ class TestChallengerM9AdversarialVerification(unittest.TestCase):
             customer_id="NON_EXISTENT_CUSTOMER",
             as_of_date="2026-01-01",
             product_id="NON_EXISTENT_PRODUCT",
-            stage1_logit=1.5,
-            stage1_rank=10,
         )
 
-        self.assertEqual(feats.shape, (12,))
+        self.assertEqual(feats.shape, (NUM_PAIRWISE_FEATURES,))
         self.assertFalse(np.isnan(feats).any())
         self.assertTrue((feats >= 0.0).all() and (feats <= 1.0).all())
         # Check specific semantics for cold customer / SKU
-        self.assertEqual(feats[2], 0.0)  # is_repeat_sku
-        self.assertEqual(feats[3], 0.0)  # user_sku_order_count_norm
-        self.assertEqual(feats[4], 0.0)  # user_sku_qty_share
-        self.assertEqual(feats[5], 1.0)  # days_since_last_sku_buy_norm (1.0 if never bought)
-        self.assertEqual(feats[6], 0.0)  # sku_urgency (0.0 if < 2 orders)
+        self.assertEqual(feats[0], 0.0)  # is_repeat_sku
+        self.assertEqual(feats[1], 0.0)  # user_sku_order_count_norm
+        self.assertEqual(feats[2], 0.0)  # user_sku_qty_share
+        self.assertEqual(feats[3], 1.0)  # days_since_last_sku_buy_norm (1.0 if never bought)
+        self.assertEqual(feats[4], 0.0)  # sku_urgency (0.0 if < 2 orders)
 
     def test_06_single_order_customer_contract(self):
         """Verify customer with exactly 1 order has urgency=0.0 and correct repeat stats."""
@@ -193,16 +189,16 @@ class TestChallengerM9AdversarialVerification(unittest.TestCase):
         as_of = pd.Timestamp("2025-03-21")  # 20 days later
 
         # Repeat product P_BOUGHT
-        feats_bought = store.compute_pairwise_features("C_SINGLE", as_of, "P_BOUGHT", 1.0, 0)
-        self.assertEqual(feats_bought[2], 1.0)  # is_repeat_sku
-        self.assertEqual(feats_bought[4], 1.0)  # 100% quantity share
-        self.assertEqual(feats_bought[6], 0.0)  # urgency MUST be 0.0 for < 2 orders!
+        feats_bought = store.compute_pairwise_features("C_SINGLE", as_of, "P_BOUGHT")
+        self.assertEqual(feats_bought[0], 1.0)  # is_repeat_sku
+        self.assertEqual(feats_bought[2], 1.0)  # 100% quantity share
+        self.assertEqual(feats_bought[4], 0.0)  # urgency MUST be 0.0 for < 2 orders!
 
         # Unbought product P_OTHER
-        feats_other = store.compute_pairwise_features("C_SINGLE", as_of, "P_OTHER", 0.0, 1)
-        self.assertEqual(feats_other[2], 0.0)
-        self.assertEqual(feats_other[5], 1.0)  # 1.0 if never bought
-        self.assertEqual(feats_other[6], 0.0)
+        feats_other = store.compute_pairwise_features("C_SINGLE", as_of, "P_OTHER")
+        self.assertEqual(feats_other[0], 0.0)
+        self.assertEqual(feats_other[3], 1.0)  # 1.0 if never bought
+        self.assertEqual(feats_other[4], 0.0)
 
     def test_07_extreme_gaps_and_zero_median_gap(self):
         """Verify zero-gap repeat purchases and 10-year gaps do not produce NaNs or exceed bounds."""
@@ -217,15 +213,15 @@ class TestChallengerM9AdversarialVerification(unittest.TestCase):
         store = PointInTimeFeatureStore(purchases_df=df)
 
         # Zero median gap customer
-        feats_zero = store.compute_pairwise_features("C_SAME", "2025-01-10 00:00:00", "P_ZERO_GAP", 0.0, 0)
+        feats_zero = store.compute_pairwise_features("C_SAME", "2025-01-10 00:00:00", "P_ZERO_GAP")
         self.assertFalse(np.isnan(feats_zero).any())
         self.assertTrue((feats_zero >= 0.0).all() and (feats_zero <= 1.0).all())
 
         # 10-year ancient gap customer
-        feats_ancient = store.compute_pairwise_features("C_ANCIENT", "2025-01-01 00:00:00", "P_ANCIENT", 0.0, 0)
+        feats_ancient = store.compute_pairwise_features("C_ANCIENT", "2025-01-01 00:00:00", "P_ANCIENT")
         self.assertFalse(np.isnan(feats_ancient).any())
-        self.assertEqual(feats_ancient[5], 1.0)  # days_ago capped at 1.0
-        self.assertEqual(feats_ancient[6], 1.0)  # urgency capped at 1.0
+        self.assertEqual(feats_ancient[3], 1.0)  # days_ago capped at 1.0
+        self.assertEqual(feats_ancient[4], 1.0)  # urgency capped at 1.0
 
     def test_09_evaluation_slate_strict_isolation(self):
         """Verify evaluation slates strictly contain top 50 without positive injection."""
