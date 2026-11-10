@@ -60,6 +60,8 @@ After imports and device tests pass, create an ignored exact-version environment
 
 ## 3. Prepare company and product metadata
 
+> **Note on container_type**: The feature `container_type` is marked to implement after discussion with the user. It is currently omitted from automated metadata preparation and model feature sets pending specification of its business definitions and source mappings.
+
 Create company enrichment in `recommender/metadata.py` and a `prepare_metadata` module command. Reuse the implemented `recommender.catalogue.load_product_catalogue` for item loading and its validated identities/classification; do not create a second item parser. Read the company CSV with `sep=";"`, `header=None`, `dtype="string"` and `encoding="utf-8-sig"`. Normalize whitespace and treat empty strings and literal `NULL` as missing. Define the column mappings centrally rather than scattering numeric indices.
 
 The inspected export positions below are **one-based**. Meanings are inferred from values and checked joins; record that status rather than claiming a provided source schema exists.
@@ -154,19 +156,21 @@ Save local caches under `text_cache/`. These standalone vectors serve the towers
 
 Create `recommender/models.py` and `train_retriever`. Both towers output L2-normalized 128-dimensional vectors.
 
-**History encoder:** concatenate purchased-product text embeddings with learned ID/attribute embeddings and normalized event numbers, project to width 128, add position/time information, and use a two-layer Transformer with four heads, feed-forward width 256 and dropout 0.1. Pool only valid event positions. Use one unmasked learned missing-history token for an empty sequence so padding cannot produce NaNs.
+**Customer Tower (Solution A — Global Profile Prefix Token):**
+1. **Global Profile Token (Position 0):** Encode company text (1024-d frozen `BAAI/bge-m3`), customer metadata (`city`, `region_code`, `industry_branch` embeddings), and lifetime summary aggregates into a single dense token $\mathbf{z}_{\text{profile}} \in \mathbb{R}^{128}$.
+2. **Purchase Sequence (Positions 1..32):** Concatenate purchased-product text/attribute embeddings with normalized event quantity ($\log1p$ robust scaled), recency (days ago), inter-purchase gap, and sinusoidal month (seasonality). Project each event to width 128.
+3. **Sequence Transformer:** Form the full sequence $[\mathbf{z}_{\text{profile}}, P_1, \dots, P_{32}]$ (shape $33 \times 128$). Apply a 2-layer Transformer with 4 attention heads, feed-forward width 256, dropout 0.1, and **bidirectional self-attention** across all historical tokens (valid point-in-time since all events precede scoring time).
+4. **Readout & Output Projection:** Pool the profile state and valid historical event states through a 256-to-128 GELU projection with L2 normalization to produce the final 128-d customer vector $\mathbf{u}_c$. Handle empty history gracefully via the profile token without NaNs.
 
-**Company tower:** concatenate company text embedding, pooled history representation, city/region embeddings, preference vectors and all company numeric fields/missing flags. Apply a 256-unit GELU layer, dropout 0.1 and a 128-unit output projection.
+**Product Tower:**
+Concatenate product text embedding (`BAAI/bge-m3`, 1024-d projected to 128), catalog categorical embeddings (`brand`, `product_category`, `product_subcategory`, `business_line`), and point-in-time popularity features (lifetime sales count/volume, 30/90-day order velocity, unique buying companies, category market share). Project through a 256-to-128 GELU layer with L2 normalization to produce the 128-d product vector $\mathbf{v}_p$.
 
-**Product tower:** concatenate product text embedding, product-ID embedding (width 32), other categorical embeddings (width 16 each), technical/package fields, and every product numeric field/missing flag. Apply the same 256-to-128 projection structure.
+**Scoring & Training Objective:**
+Compute candidate logits $s(c, p) = (\mathbf{u}_c^\top \mathbf{v}_p) / \tau + b_p$, where $\tau = 0.1$ and $b_p$ is a learnable product bias. Because B2B purchase baskets contain multiple unordered complementary items, train with **multi-label binary cross-entropy (Sigmoid)** over eligible catalog products at scoring time:
+$$\mathcal{L}_{\text{basket}} = -\sum_{p \in \mathcal{C}_t} \left[ y_{c,p} \log \sigma(s_{c,p}) + (1 - y_{c,p}) \log(1 - \sigma(s_{c,p})) \right]$$
+Do not use single-positive Softmax that forces artificial competition between items in the same basket.
 
-Use width 16 for history attribute embeddings and width 32 for history product IDs. Keep the pretrained text encoder frozen. Train categorical embeddings, history encoder and tower projections. Unknown product IDs still retain product content and attributes.
-
-For each scoring-date batch, compute vectors only for products returned by the shared for-sale-and-prior-purchase filter, using that date's demand features. Score company/product pairs by dot product divided by temperature 0.1. Use a multi-positive catalogue-softmax loss with uniform target mass over each company's eligible next-basket products; do not treat basket co-positives as negatives.
-
-Training defaults: seed 42, AdamW, learning rate `1e-3`, weight decay `1e-4`, batch up to 64 companies from the same scoring date, gradient clipping at 1.0 and a maximum of 10 epochs. Evaluate validation Recall@100 each epoch and stop after two epochs without improvement. Save the best checkpoint, not just the final one.
-
-Record model configuration, schema/preprocessing versions, checkpoint revision, input hashes, epoch and metrics. Store weights locally under `checkpoints/retriever/`. Cache candidate input features by date, not trainable product vectors across optimizer updates.
+Training defaults: seed 42, AdamW, learning rate `1e-3`, weight decay `1e-4`, batch size 64–128, gradient clipping at 1.0, maximum 10 epochs. Evaluate validation Recall@100 each epoch and stop after two epochs without improvement. Store weights under `checkpoints/retriever/`.
 
 **Completion:** the model can overfit a small synthetic batch, validation retrieval runs on the actual eligible catalogue, and the best checkpoint reloads with identical scores within floating-point tolerance.
 
@@ -182,15 +186,24 @@ Validation and test candidates are the actual retrieved top 100 without positive
 
 **Completion:** every pair has the correct basket label, no positive enters a negative pool, and evaluation candidate lists are unaltered retrieval outputs.
 
-## 9. Implement and train the hybrid cross-encoder
+## 9. Implement and train the candidate reranker
 
-Create `recommender/ranker.py` and `train_ranker`. Use the **same company and product bundles**, but process them through three branches:
+Create `recommender/ranker.py` and `train_ranker`. The reranker evaluates the top-100 candidates produced by the Two-Tower retriever at each scoring date.
 
-1. **Joint natural-language branch:** tokenize company activity text and candidate product text as a pair with `AutoTokenizer`, including separator/boundary tokens. Load the multilingual E5-small backbone with `AutoModel`. Limit the combined input to 384 tokens, truncating longer text first. Pool its final non-padding token representations into one joint text vector. Missing text is represented explicitly in both stages.
-2. **History branch:** process the identical selected 32-event sequence with a copy of the trained company history encoder. Copy its required event categorical embeddings/projections as well. Subsequent ranker updates never alter retriever weights or its vector cache.
-3. **Structured branch:** embed every company/product categorical field and concatenate all preference vectors, technical/package fields, numeric fields and missingness indicators; project this concatenation through a 128-unit GELU layer.
-
-Concatenate the joint text vector, history vector and structured vector. Use a 128-unit GELU scoring layer with dropout 0.1 followed by one scalar logit. Do not replace text interaction with a cosine-similarity feature, and do not substitute final retrieval vectors for the full feature bundles. The candidate does not enter the separate history Transformer; candidate/history relationships can be learned by the scoring head in this chosen hybrid design.
+**Benchmark Strategy (Trees First, Neural as Deep Candidate-Aware Head):**
+1. **Primary High-Efficiency Baseline (CatBoost / LightGBM with LambdaRank):**
+   Given the 71k event size, fit a grouped tree ranker on top-100 candidate pairs. Features include:
+   - Two-Tower dot-product similarity score and product bias.
+   - Candidate-specific cadence urgency $u_{c,p} = \log\left(\frac{1 + d_{\text{since last purchase of } p}}{1 + \text{median interval of } p}\right)$ with hierarchical fallback (SKU $\to$ Category $\to$ Company median).
+   - Candidate brand share and category share in customer history.
+   - Product point-in-time velocity (30d and 90d demand, market share).
+   - Industry sector $\times$ product category interactions.
+2. **Hybrid Neural Cross-Encoder (Evaluation Track):**
+   Run the 3-branch hybrid architecture:
+   - Branch 1: Joint text representation (Customer profile text + Candidate text).
+   - Branch 2: Candidate-aware attention over the 32 historical purchase events.
+   - Branch 3: Tabular feature projection (categorical embeddings + normalized numerical features).
+   Concatenate all three branches through a 128-unit GELU scoring head $\to$ scalar logit.
 
 Train with `torch.nn.BCEWithLogitsLoss` on purchase labels and AdamW. Use float32, physical batch size four, gradient accumulation over eight batches, weight decay `1e-4` and gradient clipping at 1.0. Average losses within each example group so companies with larger candidate groups do not dominate solely because of group size.
 

@@ -143,15 +143,32 @@ class UPSCANRRanker(nn.Module):
         num_history_brands: Optional[int] = None,
         excluded_statistics: tuple[str, ...] = (),
         precomputed_purchase_age: bool = False,
+        precompiled_history_vectors: bool = False,
+        precompiled_customer_vector: bool = False,
+        aligned_11d_statistics: bool = False,
+        aligned_11d_mode: str = "diagonal",
+        favorite_attribute_embeddings: bool = False,
     ):
         super().__init__()
         if statistics_attention and (history_age_attention or adapt_candidate_query or history_gap_reference_days is not None):
             raise ValueError("Statistics attention uses the reference vectors and replaces the age-only bias.")
         if precomputed_purchase_age and not statistics_attention:
             raise ValueError("Precomputed purchase age requires statistics attention.")
+        if aligned_11d_statistics and not statistics_attention:
+            raise ValueError("Aligned 11-d statistics require statistics attention.")
+        if aligned_11d_mode not in {"diagonal", "full"}:
+            raise ValueError("aligned_11d_mode must be 'diagonal' or 'full'.")
         if excluded_statistics and (
             not statistics_attention or precomputed_purchase_age
-            or not set(excluded_statistics) <= {"history_month", "history_repeat", "candidate_repeat"}
+            or not set(excluded_statistics) <= {
+                "history_gap",
+                "history_month",
+                "history_repeat",
+                "history_real_indicator",
+                "company_distinct_orders",
+                "company_median_gap",
+                "candidate_repeat",
+            }
         ):
             raise ValueError("Unknown exclusion or incompatible statistics attention schema.")
         dim = hidden_dim if hidden_dim is not None else memory_dim
@@ -165,6 +182,11 @@ class UPSCANRRanker(nn.Module):
         self.history_gap_reference_days = history_gap_reference_days
         self.excluded_statistics = tuple(excluded_statistics)
         self.precomputed_purchase_age = precomputed_purchase_age
+        self.precompiled_history_vectors = precompiled_history_vectors
+        self.precompiled_customer_vector = precompiled_customer_vector
+        self.aligned_11d_statistics = aligned_11d_statistics
+        self.aligned_11d_mode = aligned_11d_mode
+        self.favorite_attribute_embeddings = favorite_attribute_embeddings
 
         # -------------------------------------------------------------
         # 1. Customer Profile (Token 0) Modules
@@ -209,6 +231,17 @@ class UPSCANRRanker(nn.Module):
             nn.Embedding(num_history_brands, 16, padding_idx=0) if num_history_brands is not None else None
         )
         self.line_embedding = nn.Embedding(num_business_lines, 16, padding_idx=0)
+        if favorite_attribute_embeddings:
+            self.shared_brand_embedding = (
+                self.history_brand_embedding
+                if self.history_brand_embedding is not None
+                else nn.Embedding(max(num_brands, 1), 16, padding_idx=0)
+            )
+            self.shared_attribute_proj = nn.Linear(32 + 16 + 16, dim, bias=False)
+            nn.init.zeros_(self.shared_attribute_proj.weight)
+        else:
+            self.shared_brand_embedding = None
+            self.shared_attribute_proj = None
 
         self.habit_proj = nn.Linear(seq_feature_dim, 32)
         self.product_text_proj = nn.Linear(text_dim, 32)
@@ -261,10 +294,20 @@ class UPSCANRRanker(nn.Module):
             batch_first=True,
         )
         self.history_age_weight = nn.Parameter(torch.zeros(num_heads)) if history_age_attention else None
-        self.statistics_attention_weights = (
-            nn.Parameter(torch.zeros(num_heads, num_pairwise_features + 1, seq_feature_dim + num_tabular_features))
-            if statistics_attention else None
-        )
+        if aligned_11d_statistics:
+            self.aligned_diag_weights = nn.Parameter(torch.zeros(num_heads, 11))
+            self.aligned_key_bias = nn.Parameter(torch.zeros(num_heads, 11))
+            self.statistics_attention_weights = (
+                nn.Parameter(torch.zeros(num_heads, 12, 11))
+                if aligned_11d_mode == "full" else nn.Parameter(torch.zeros(num_heads, 1, 11))
+            )
+        else:
+            self.aligned_diag_weights = None
+            self.aligned_key_bias = None
+            self.statistics_attention_weights = (
+                nn.Parameter(torch.zeros(num_heads, num_pairwise_features + 1, seq_feature_dim + num_tabular_features))
+                if statistics_attention else None
+            )
         self.candidate_query_adjustment = (
             nn.Linear(dim + num_pairwise_features, dim) if adapt_candidate_query else None
         )
@@ -322,21 +365,41 @@ class UPSCANRRanker(nn.Module):
         seq_product_text: Optional[torch.Tensor] = None,
         seq_purchase_dates: Optional[torch.Tensor] = None,
         catalog_product_vectors: Optional[torch.Tensor] = None,
+        customer_vector: Optional[torch.Tensor] = None,
+        fav_category_id: Optional[torch.Tensor] = None,
+        fav_brand_id: Optional[torch.Tensor] = None,
+        fav_business_line_id: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Construct and contextualize the Unified 33-Token Customer Memory."""
         b_size = text_embedding.size(0)
         seq_len = sequence.size(1)
 
         # 1. Profile Token 0
-        z_text = self.text_proj(text_embedding)  # (B, 128)
-        c_city = self.city_embedding(city_id)
-        c_reg = self.region_embedding(region_id)
-        c_ind = self.industry_embedding(industry_id)
+        if self.precompiled_customer_vector:
+            if customer_vector is None:
+                raise ValueError("precompiled_customer_vector=True requires customer_vector.")
+            z_prof = customer_vector.detach()
+        else:
+            z_text = self.text_proj(text_embedding)  # (B, 128)
+            c_city = self.city_embedding(city_id)
+            c_reg = self.region_embedding(region_id)
+            c_ind = self.industry_embedding(industry_id)
 
-        tab_concat = torch.cat([c_city, c_reg, c_ind, tabular_features], dim=-1)
-        z_tab = self.tabular_proj(tab_concat)  # (B, 128)
+            tab_concat = torch.cat([c_city, c_reg, c_ind, tabular_features], dim=-1)
+            z_tab = self.tabular_proj(tab_concat)  # (B, 128)
 
-        z_prof = self.profile_fusion(torch.cat([z_text, z_tab], dim=-1))  # (B, 128)
+            z_prof = self.profile_fusion(torch.cat([z_text, z_tab], dim=-1))  # (B, 128)
+
+        if self.shared_attribute_proj is not None:
+            if fav_category_id is None or fav_brand_id is None or fav_business_line_id is None:
+                raise ValueError("favorite_attribute_embeddings=True requires favorite category/brand/line IDs.")
+            fav_attr = torch.cat([
+                self.cat_embedding(fav_category_id),
+                self.shared_brand_embedding(fav_brand_id),
+                self.line_embedding(fav_business_line_id),
+            ], dim=-1)
+            z_prof = z_prof + self.shared_attribute_proj(fav_attr)
+
         t_0 = (z_prof + self.type_embedding.weight[0]).unsqueeze(1)  # (B, 1, 128)
 
         # 2. History Tokens 1..32
@@ -348,40 +411,55 @@ class UPSCANRRanker(nn.Module):
             seq_business_line_ids = torch.zeros((b_size, seq_len), dtype=torch.long, device=sequence.device)
 
         cat_emb = self.cat_embedding(seq_category_ids)        # (B, 32, 32)
-        if self.history_brand_embedding is not None:
-            if seq_brand_ids is None:
-                raise ValueError("Brand history requires purchase brand IDs.")
-            attribute_emb = self.history_brand_embedding(seq_brand_ids)
-        else:
-            if seq_subcategory_ids is None:
-                seq_subcategory_ids = torch.zeros_like(seq_product_ids)
-            attribute_emb = self.subcat_embedding(seq_subcategory_ids)
         line_emb = self.line_embedding(seq_business_line_ids) # (B, 32, 16)
-        if self.history_age_weight is not None:
-            # Age enters only the attention scores in this mode.
-            sequence = sequence.clone()
-            sequence[..., HISTORY_AGE_INDEX] = 0
-        h_proj = self.habit_proj(sequence)                    # (B, 32, 32)
-        if self.history_gap_reference_days is not None:
-            if seq_purchase_dates is None or catalog_product_vectors is None:
-                raise ValueError("Stored-vector history requires purchase dates and catalogue product vectors.")
-            # The one-based history IDs index the retriever catalogue; zero is padding or unknown.
-            p_emb = F.embedding(seq_product_ids, F.pad(catalog_product_vectors.detach(), (0, 0, 1, 0)))
-            gaps = normalize_purchase_history_gaps(
-                seq_purchase_dates, attention_mask, self.history_gap_reference_days,
-            )
-            extra = gaps.unsqueeze(-1)
+        if self.precompiled_history_vectors:
+            if catalog_product_vectors is None:
+                raise ValueError("precompiled_history_vectors=True requires catalog_product_vectors.")
+            t_hist = F.embedding(seq_product_ids, F.pad(catalog_product_vectors.detach(), (0, 0, 1, 0)), padding_idx=0)
         else:
-            p_emb = self.product_embedding(seq_product_ids)
-            if seq_product_text is not None:
-                txt_emb = seq_product_text
-            elif self.catalog_text_embeddings is not None:
-                txt_emb = self.catalog_text_embeddings[seq_product_ids]
+            if self.history_brand_embedding is not None:
+                if seq_brand_ids is None:
+                    raise ValueError("Brand history requires purchase brand IDs.")
+                attribute_emb = self.history_brand_embedding(seq_brand_ids)
             else:
-                txt_emb = sequence.new_zeros((b_size, seq_len, self.text_dim))
-            extra = self.product_text_proj(txt_emb)
-        hist_raw = torch.cat([p_emb, cat_emb, attribute_emb, line_emb, h_proj, extra], dim=-1)
-        t_hist = self.token_proj(hist_raw)  # (B, 32, 128)
+                if seq_subcategory_ids is None:
+                    seq_subcategory_ids = torch.zeros_like(seq_product_ids)
+                attribute_emb = self.subcat_embedding(seq_subcategory_ids)
+            if self.history_age_weight is not None:
+                # Age enters only the attention scores in this mode.
+                sequence = sequence.clone()
+                sequence[..., HISTORY_AGE_INDEX] = 0
+            h_proj = self.habit_proj(sequence)                    # (B, 32, 32)
+            if self.history_gap_reference_days is not None:
+                if seq_purchase_dates is None or catalog_product_vectors is None:
+                    raise ValueError("Stored-vector history requires purchase dates and catalogue product vectors.")
+                # The one-based history IDs index the retriever catalogue; zero is padding or unknown.
+                p_emb = F.embedding(seq_product_ids, F.pad(catalog_product_vectors.detach(), (0, 0, 1, 0)))
+                gaps = normalize_purchase_history_gaps(
+                    seq_purchase_dates, attention_mask, self.history_gap_reference_days,
+                )
+                extra = gaps.unsqueeze(-1)
+            else:
+                p_emb = self.product_embedding(seq_product_ids)
+                if seq_product_text is not None:
+                    txt_emb = seq_product_text
+                elif self.catalog_text_embeddings is not None:
+                    txt_emb = self.catalog_text_embeddings[seq_product_ids]
+                else:
+                    txt_emb = sequence.new_zeros((b_size, seq_len, self.text_dim))
+                extra = self.product_text_proj(txt_emb)
+            hist_raw = torch.cat([p_emb, cat_emb, attribute_emb, line_emb, h_proj, extra], dim=-1)
+            t_hist = self.token_proj(hist_raw)  # (B, 32, 128)
+
+        if self.shared_attribute_proj is not None:
+            if seq_brand_ids is None:
+                raise ValueError("favorite_attribute_embeddings=True requires seq_brand_ids.")
+            hist_attr = torch.cat([
+                cat_emb,
+                self.shared_brand_embedding(seq_brand_ids),
+                line_emb,
+            ], dim=-1)
+            t_hist = t_hist + self.shared_attribute_proj(hist_attr)
 
         # Positional and token-type embeddings
         if seq_len <= self.pos_embedding.size(1):
@@ -481,17 +559,36 @@ class UPSCANRRanker(nn.Module):
         seq_purchase_dates: Optional[torch.Tensor] = None,
         prediction_day: Optional[torch.Tensor] = None,
         seq_brand_ids: Optional[torch.Tensor] = None,
+        customer_vector: Optional[torch.Tensor] = None,
+        aligned_company_stats: Optional[torch.Tensor] = None,
+        aligned_history_stats: Optional[torch.Tensor] = None,
+        aligned_candidate_stats: Optional[torch.Tensor] = None,
+        fav_category_id: Optional[torch.Tensor] = None,
+        fav_brand_id: Optional[torch.Tensor] = None,
+        fav_business_line_id: Optional[torch.Tensor] = None,
     ) -> RankerOutput:
         """Forward pass of Stage 2 UPS-CANR ranker."""
         b_size = text_embedding.size(0)
         sequence = _fit_feature_width(sequence, self.seq_feature_dim)
-        if {"history_month", "history_repeat"}.intersection(self.excluded_statistics):
+        if {
+            "history_gap", "history_month", "history_repeat", "history_real_indicator",
+        }.intersection(self.excluded_statistics):
             sequence = sequence.clone()
+            if "history_gap" in self.excluded_statistics:
+                sequence[..., 2] = 0
             if "history_month" in self.excluded_statistics:
                 sequence[..., 3:5] = 0
             if "history_repeat" in self.excluded_statistics:
                 sequence[..., 7] = 0
+            if "history_real_indicator" in self.excluded_statistics:
+                sequence[..., 8] = 0
         tabular_features = _fit_feature_width(tabular_features, self.num_tabular_features)
+        if {"company_distinct_orders", "company_median_gap"}.intersection(self.excluded_statistics):
+            tabular_features = tabular_features.clone()
+            if "company_distinct_orders" in self.excluded_statistics:
+                tabular_features[..., 3] = 0
+            if "company_median_gap" in self.excluded_statistics:
+                tabular_features[..., 7] = 0
         statistics_in_scores = self.statistics_attention_weights is not None
 
         # 1. Customer Memory Contextualization (B, 33, 128)
@@ -511,6 +608,10 @@ class UPSCANRRanker(nn.Module):
             seq_product_text=seq_product_text,
             seq_purchase_dates=seq_purchase_dates,
             catalog_product_vectors=catalog_product_vectors,
+            customer_vector=customer_vector,
+            fav_category_id=fav_category_id,
+            fav_brand_id=fav_brand_id,
+            fav_business_line_id=fav_business_line_id,
         )
 
         # 2. Resolve Candidate Queries Q (B, C, 128)
@@ -543,7 +644,29 @@ class UPSCANRRanker(nn.Module):
         # Query Q: (B, C, 128), Key K: (B, 33, 128), Value V: (B, 33, 128)
         attention_bias = None
         attention_padding = key_padding_mask
-        if statistics_in_scores or self.history_age_weight is not None:
+        if self.aligned_11d_statistics:
+            if aligned_company_stats is None or aligned_history_stats is None or aligned_candidate_stats is None:
+                raise ValueError("Aligned 11-d statistics require company, history, and candidate 11-d tensors.")
+            key_statistics = torch.cat([aligned_company_stats[:, None, :], aligned_history_stats], dim=1)
+            diag_term = (
+                aligned_candidate_stats[:, None, :, :] * self.aligned_diag_weights[None, :, None, :]
+                + self.aligned_key_bias[None, :, None, :]
+            ) @ key_statistics.transpose(-1, -2)[:, None]
+            if self.aligned_11d_mode == "full":
+                candidate_statistics = F.pad(aligned_candidate_stats, (1, 0), value=1.0)
+                bilinear_term = (
+                    (candidate_statistics[:, None] @ self.statistics_attention_weights)
+                    @ key_statistics.transpose(-1, -2)[:, None]
+                )
+                bias = diag_term + bilinear_term
+            else:
+                bias = diag_term
+            bias = bias.masked_fill(key_padding_mask[:, None, None, :], -torch.inf)
+            attention_bias = bias.expand(-1, -1, c_slate, -1).reshape(
+                b_size * self.num_heads, c_slate, memory.size(1),
+            ).to(query.dtype)
+            attention_padding = None
+        elif statistics_in_scores or self.history_age_weight is not None:
             purchase_statistics = sequence
             if not self.precomputed_purchase_age:
                 if prediction_day is None or seq_purchase_dates is None:

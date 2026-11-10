@@ -44,7 +44,10 @@ from recommender.ranker_statistics import (
     SHARED_SKU_STATISTICS_VERSION,
     FavoriteCategoryAffinity,
     ranker_history_options,
+    with_aligned_11d_statistics,
     with_candidate_peer_affinity,
+    with_due_score_statistics,
+    with_favorite_attribute_features,
     with_history_variant,
     with_shared_sku_statistics,
 )
@@ -108,6 +111,13 @@ class RankerDataset(Dataset):
         self.positive_pids = data["positive_pids"]            # List of length N (list of strings)
         self.new_positive_pids = data.get("new_positive_pids")
         self.customer_ids = data["customer_ids"]              # List of length N (strings)
+        self.customer_vector = data.get("customer_vector")
+        self.aligned_company_stats = data.get("aligned_company_stats")
+        self.aligned_history_stats = data.get("aligned_history_stats")
+        self.aligned_candidate_stats = data.get("aligned_candidate_stats")
+        self.fav_category_id = data.get("fav_category_id")
+        self.fav_brand_id = data.get("fav_brand_id")
+        self.fav_business_line_id = data.get("fav_business_line_id")
 
     def __len__(self) -> int:
         return len(self.text_embedding)
@@ -140,6 +150,13 @@ class RankerDataset(Dataset):
             "positive_pids": self.positive_pids[idx],
             "new_positive_pids": self.new_positive_pids[idx] if self.new_positive_pids is not None else None,
             "customer_id": self.customer_ids[idx],
+            "customer_vector": self.customer_vector[idx] if self.customer_vector is not None else None,
+            "aligned_company_stats": self.aligned_company_stats[idx] if self.aligned_company_stats is not None else None,
+            "aligned_history_stats": self.aligned_history_stats[idx] if self.aligned_history_stats is not None else None,
+            "aligned_candidate_stats": self.aligned_candidate_stats[idx] if self.aligned_candidate_stats is not None else None,
+            "fav_category_id": self.fav_category_id[idx] if self.fav_category_id is not None else None,
+            "fav_brand_id": self.fav_brand_id[idx] if self.fav_brand_id is not None else None,
+            "fav_business_line_id": self.fav_business_line_id[idx] if self.fav_business_line_id is not None else None,
         }
 
 
@@ -189,6 +206,34 @@ def collate_ranker_batch(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
             if batch[0].get("new_positive_pids") is not None else None
         ),
         "customer_ids": [x["customer_id"] for x in batch],
+        "customer_vector": (
+            torch.stack([x["customer_vector"] for x in batch])
+            if batch[0].get("customer_vector") is not None else None
+        ),
+        "aligned_company_stats": (
+            torch.stack([x["aligned_company_stats"] for x in batch])
+            if batch[0].get("aligned_company_stats") is not None else None
+        ),
+        "aligned_history_stats": (
+            torch.stack([x["aligned_history_stats"] for x in batch])
+            if batch[0].get("aligned_history_stats") is not None else None
+        ),
+        "aligned_candidate_stats": (
+            torch.stack([x["aligned_candidate_stats"] for x in batch])
+            if batch[0].get("aligned_candidate_stats") is not None else None
+        ),
+        "fav_category_id": (
+            torch.stack([x["fav_category_id"] for x in batch])
+            if batch[0].get("fav_category_id") is not None else None
+        ),
+        "fav_brand_id": (
+            torch.stack([x["fav_brand_id"] for x in batch])
+            if batch[0].get("fav_brand_id") is not None else None
+        ),
+        "fav_business_line_id": (
+            torch.stack([x["fav_business_line_id"] for x in batch])
+            if batch[0].get("fav_business_line_id") is not None else None
+        ),
     }
 
 
@@ -603,6 +648,42 @@ def build_slate_cache(
     return data
 
 
+def _attach_precompiled_customer_vectors(
+    data: Dict[str, Any],
+    retriever: CandidateRetriever,
+    product_vectors: torch.Tensor,
+    device: torch.device,
+    batch_size: int = 256,
+) -> Dict[str, Any]:
+    """Compute frozen Stage 1 CustomerTower u_c vectors for every transition row."""
+    n_rows = len(data["text_embedding"])
+    tower_inputs = data.get("retriever_sequence") or {
+        "sequence": data["sequence"],
+        "attention_mask": data["attention_mask"],
+        "seq_product_ids": data["seq_product_ids"],
+        "seq_category_ids": data["seq_category_ids"],
+        "seq_purchase_dates": data["seq_purchase_dates"],
+    }
+    tab_tensor = data.get("retriever_tabular_features", data["tabular_features"])
+    vectors_dev = product_vectors.to(device)
+    chunks: List[torch.Tensor] = []
+    retriever.model.eval()
+    with torch.no_grad():
+        for start in range(0, n_rows, batch_size):
+            end = min(start + batch_size, n_rows)
+            u_c = retriever.model.customer_tower(
+                text_embedding=data["text_embedding"][start:end].to(device),
+                city_id=data["city_id"][start:end].to(device),
+                region_id=data["region_id"][start:end].to(device),
+                industry_id=data["industry_id"][start:end].to(device),
+                tabular_features=tab_tensor[start:end].to(device),
+                catalog_product_vectors=vectors_dev,
+                **{k: v[start:end].to(device) for k, v in tower_inputs.items()},
+            )
+            chunks.append(u_c.cpu())
+    return {**data, "customer_vector": torch.cat(chunks, dim=0)}
+
+
 def load_or_precompute_slates(
     purchases_df: pd.DataFrame,
     catalogue_df: pd.DataFrame,
@@ -620,6 +701,10 @@ def load_or_precompute_slates(
     shared_sku_statistics: bool = False,
     candidate_peer_affinity: bool = False,
     history_variant: str | None = None,
+    due_score_mode: str | None = None,
+    precompiled_customer_vector: bool = False,
+    aligned_11d_statistics: bool = False,
+    favorite_attribute_mode: str | None = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], torch.Tensor, List[str], Dict[str, Dict[str, int]]]:
     """Load or generate slates for both splits using the configured mix."""
     retriever, vocabs = load_ranker_retriever(
@@ -688,7 +773,47 @@ def load_or_precompute_slates(
         brand_vocab = vocabs.get("brand_vocab", {})
         train_data = with_history_variant(train_data, train_transitions, store, brand_vocab, history_variant)
         val_data = with_history_variant(val_data, val_transitions, store, brand_vocab, history_variant)
-    return train_data, val_data, retriever.get_product_vectors(), retriever.eligible_product_ids, vocabs
+    if due_score_mode is not None:
+        if due_score_mode not in {"memory_only", "all"}:
+            raise ValueError("due_score_mode must be 'memory_only' or 'all'.")
+        store = retriever.feature_store
+        timing = PurchaseTiming(purchases_df, catalogue_df, category_gap_fallback=category_gap_fallback)
+        update_cands = (due_score_mode == "all")
+        print(f"Building due_score = gap_norm - age_norm statistics (mode={due_score_mode})")
+        train_data = with_due_score_statistics(train_data, train_transitions, store, timing, update_candidates=update_cands)
+        val_data = with_due_score_statistics(val_data, val_transitions, store, timing, update_candidates=update_cands)
+    if aligned_11d_statistics:
+        store = retriever.feature_store
+        timing = PurchaseTiming(purchases_df, catalogue_df, category_gap_fallback=category_gap_fallback)
+        print("Building 11-d aligned correlating statistics for Company, History, and Candidates")
+        train_data = with_aligned_11d_statistics(
+            train_data, train_transitions, store, timing, quantity_reference=retriever.quantity_reference,
+        )
+        val_data = with_aligned_11d_statistics(
+            val_data, val_transitions, store, timing, quantity_reference=retriever.quantity_reference,
+        )
+    if favorite_attribute_mode is not None:
+        if favorite_attribute_mode not in {"embeddings", "features"}:
+            raise ValueError("favorite_attribute_mode must be 'embeddings' or 'features'.")
+        store = retriever.feature_store
+        append_cands = (favorite_attribute_mode == "features")
+        print(f"Building favorite category/brand/line attributes (mode={favorite_attribute_mode})")
+        train_data = with_favorite_attribute_features(
+            train_data, train_transitions, store, vocabs, append_candidate_features=append_cands,
+        )
+        val_data = with_favorite_attribute_features(
+            val_data, val_transitions, store, vocabs, append_candidate_features=append_cands,
+        )
+        if favorite_attribute_mode == "embeddings" and train_data.get("seq_brand_ids") is None:
+            brand_vocab = vocabs.get("brand_vocab", {})
+            train_data = with_history_variant(train_data, train_transitions, store, brand_vocab, "brand")
+            val_data = with_history_variant(val_data, val_transitions, store, brand_vocab, "brand")
+    product_vectors = retriever.get_product_vectors()
+    if precompiled_customer_vector:
+        print("Precomputing Stage 1 CustomerTower u_c vectors for Token 0")
+        train_data = _attach_precompiled_customer_vectors(train_data, retriever, product_vectors, device)
+        val_data = _attach_precompiled_customer_vectors(val_data, retriever, product_vectors, device)
+    return train_data, val_data, product_vectors, retriever.eligible_product_ids, vocabs
 
 
 def prediction_day_offsets(transitions: Sequence[Dict[str, Any]]) -> torch.Tensor:
@@ -804,6 +929,13 @@ def evaluate_ranker(
                 catalog_product_vectors=cat_vectors_dev,
                 seq_purchase_dates=batch["seq_purchase_dates"].to(device) if not precomputed_age and batch["seq_purchase_dates"] is not None else None,
                 prediction_day=batch["prediction_day"].to(device) if not precomputed_age and batch.get("prediction_day") is not None else None,
+                customer_vector=batch["customer_vector"].to(device) if batch.get("customer_vector") is not None else None,
+                aligned_company_stats=batch["aligned_company_stats"].to(device) if batch.get("aligned_company_stats") is not None else None,
+                aligned_history_stats=batch["aligned_history_stats"].to(device) if batch.get("aligned_history_stats") is not None else None,
+                aligned_candidate_stats=batch["aligned_candidate_stats"].to(device) if batch.get("aligned_candidate_stats") is not None else None,
+                fav_category_id=batch["fav_category_id"].to(device) if batch.get("fav_category_id") is not None else None,
+                fav_brand_id=batch["fav_brand_id"].to(device) if batch.get("fav_brand_id") is not None else None,
+                fav_business_line_id=batch["fav_business_line_id"].to(device) if batch.get("fav_business_line_id") is not None else None,
             )
 
             loss_dict = loss_module(out.logits, labels, unseen_mask=unseen_mask)
@@ -909,6 +1041,12 @@ def train_ranker(
     candidate_peer_affinity: bool = False,
     excluded_statistics: tuple[str, ...] = DEFAULT_EXCLUDED_STATISTICS,
     history_variant: str | None = None,
+    due_score_mode: str | None = None,
+    precompiled_history_vectors: bool = False,
+    precompiled_customer_vector: bool = False,
+    aligned_11d_statistics: bool = False,
+    aligned_11d_mode: str = "diagonal",
+    favorite_attribute_mode: str | None = None,
     new_positive_weight: float = 1.0,
     selection_metric: str = "ndcg",
     discovery_min_overall_recall: Optional[float] = None,
@@ -979,6 +1117,10 @@ def train_ranker(
         shared_sku_statistics=shared_sku_statistics,
         candidate_peer_affinity=candidate_peer_affinity,
         history_variant=history_variant,
+        due_score_mode=due_score_mode,
+        precompiled_customer_vector=precompiled_customer_vector,
+        aligned_11d_statistics=aligned_11d_statistics,
+        favorite_attribute_mode=favorite_attribute_mode,
     )
 
     train_dataset = RankerDataset(train_data)
@@ -1010,6 +1152,11 @@ def train_ranker(
         history_age_attention=history_age_attention,
         statistics_attention=statistics_attention or shared_sku_statistics,
         excluded_statistics=excluded_statistics,
+        precompiled_history_vectors=precompiled_history_vectors,
+        precompiled_customer_vector=precompiled_customer_vector,
+        aligned_11d_statistics=aligned_11d_statistics,
+        aligned_11d_mode=aligned_11d_mode,
+        favorite_attribute_embeddings=(favorite_attribute_mode == "embeddings"),
         **ranker_history_options(vocabs, shared_sku_statistics, history_variant),
     )
     if checkpoint_digest(retriever_checkpoint_path) != retriever_digest:
@@ -1079,6 +1226,13 @@ def train_ranker(
                 catalog_product_vectors=catalog_product_vectors_dev,
                 seq_purchase_dates=batch["seq_purchase_dates"].to(dev) if not model.precomputed_purchase_age and batch["seq_purchase_dates"] is not None else None,
                 prediction_day=batch["prediction_day"].to(dev) if not model.precomputed_purchase_age and batch["prediction_day"] is not None else None,
+                customer_vector=batch["customer_vector"].to(dev) if batch.get("customer_vector") is not None else None,
+                aligned_company_stats=batch["aligned_company_stats"].to(dev) if batch.get("aligned_company_stats") is not None else None,
+                aligned_history_stats=batch["aligned_history_stats"].to(dev) if batch.get("aligned_history_stats") is not None else None,
+                aligned_candidate_stats=batch["aligned_candidate_stats"].to(dev) if batch.get("aligned_candidate_stats") is not None else None,
+                fav_category_id=batch["fav_category_id"].to(dev) if batch.get("fav_category_id") is not None else None,
+                fav_brand_id=batch["fav_brand_id"].to(dev) if batch.get("fav_brand_id") is not None else None,
+                fav_business_line_id=batch["fav_business_line_id"].to(dev) if batch.get("fav_business_line_id") is not None else None,
             )
 
             loss_dict = loss_fn(out.logits, labels, unseen_mask=unseen_mask)
