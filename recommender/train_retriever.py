@@ -24,7 +24,6 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, Subset
 
 from recommender.catalogue import load_product_catalogue, order_retriever_catalogue, select_eligible_products
-from recommender.complementarity import ProductComplementarity, group_snapshot_rows, product_snapshot_date
 from recommender.familiarity import ATTRIBUTE_COLUMNS, BASE_FAMILIARITY_FIELDS, FamiliarityStore
 from recommender.merging import EVENT_KEY_COLUMNS, merge_purchase_events
 from recommender.features import (
@@ -45,7 +44,6 @@ from recommender.models import (
     ProductTower,
     TwoTowerModel,
 )
-from recommender.price_features import CustomerMedianUnitPrice, load_price_preference_store, load_reconciled_prices
 from recommender.sequences import (
     ENRICHED_FEATURE_DIM,
     build_customer_sequence,
@@ -556,8 +554,6 @@ def build_retriever_product_inputs(
     include_subcategory: bool,
     include_sku_median_quantity: bool = False,
     container_encoding: str = "one_hot",
-    sku_prices_uah: Optional[Dict[str, float]] = None,
-    complementarity: Optional[ProductComplementarity] = None,
 ) -> Dict[str, torch.Tensor]:
     """Share the training snapshot and product index order with downstream scoring."""
     ordered = order_retriever_catalogue(catalogue_df, product_ids)
@@ -570,11 +566,6 @@ def build_retriever_product_inputs(
         log_values = torch.log1p(torch.as_tensor(medians.to_numpy(dtype=np.float32)))
         reference = math.log1p(fit_quantity_reference(medians))
         demand = torch.cat([demand, (log_values / (log_values + reference)).unsqueeze(1)], dim=1)
-    if sku_prices_uah is not None:
-        prices = np.array([sku_prices_uah.get(sku, 0.0) for sku in product_ids], dtype=np.float32)
-        log_prices = torch.log1p(torch.from_numpy(prices))
-        reference = math.log1p(fit_quantity_reference(prices))
-        demand = torch.cat([demand, (log_prices / (log_prices + reference)).unsqueeze(1)], dim=1)
     container_ids = None
     if "container_vocab" in vocabs:
         container_vocab = vocabs["container_vocab"]
@@ -591,9 +582,6 @@ def build_retriever_product_inputs(
     )
     if container_ids is not None and container_encoding == "embedding_none":
         inputs["container_id"] = container_ids
-    if complementarity is not None:
-        share = torch.from_numpy(complementarity.shares(product_ids, TRAIN_CUTOFF))
-        inputs["demand_features"] = torch.cat((inputs["demand_features"], share[:, None]), dim=1)
     return inputs
 
 
@@ -619,7 +607,6 @@ def train_retriever(
     include_container_type: bool = True,
     container_encoding: str = "one_hot_none",
     include_region_in_text: bool = False,
-    include_sku_price: bool = False,
     one_hot_product_fields: Sequence[str] = (),
     tower_hidden_dim: int = 128,
     history_layers: int = 2,
@@ -627,14 +614,10 @@ def train_retriever(
     output_dim: int = OUTPUT_DIM,
     dropout: float = 0.1,
     train_eval_size: int = 0,
-    memorization_baskets: int = 0,
     novel_positive_multiplier: float = 1.0,
     discovery_only: bool = False,
-    include_price_preference: bool = False,
-    include_customer_median_price: bool = False,
     familiarity_fields: Sequence[str] = (),
     remove_product_attribute_embeddings: bool = False,
-    include_complementarity: bool = False,
 ) -> Dict[str, Any]:
     """Train Modular Two-Tower Retriever and save best checkpoint + metrics history.
 
@@ -655,16 +638,12 @@ def train_retriever(
         raise ValueError("The tower hidden width must be a positive multiple of four attention heads.")
     if history_layers < 1:
         raise ValueError("The history Transformer must have at least one layer.")
-    if output_dim < 1 or train_eval_size < 0 or memorization_baskets < 0:
+    if output_dim < 1 or train_eval_size < 0:
         raise ValueError("The output dimension must be positive and diagnostic sizes must be nonnegative.")
-    if memorization_baskets and dry_run:
-        raise ValueError("A memorization check and a dry run cannot be combined.")
     if not math.isfinite(novel_positive_multiplier) or novel_positive_multiplier <= 0:
         raise ValueError("The new-to-customer positive multiplier must be finite and positive.")
-    if discovery_only and (memorization_baskets or novel_positive_multiplier != 1.0):
-        raise ValueError("Discovery-only training cannot be combined with memorization or positive reweighting.")
-    if include_customer_median_price and include_price_preference:
-        raise ValueError("Use the customer median price and the candidate-relative price in separate experiments.")
+    if discovery_only and novel_positive_multiplier != 1.0:
+        raise ValueError("Discovery-only training cannot be combined with positive reweighting.")
     if len(set(familiarity_fields)) != len(familiarity_fields) or not set(familiarity_fields) <= ATTRIBUTE_COLUMNS.keys():
         raise ValueError("Invalid or duplicate familiarity field.")
     if remove_product_attribute_embeddings and (
@@ -760,13 +739,6 @@ def train_retriever(
     # 4. Transitions
     train_transitions, val_transitions, _ = build_retriever_transitions(purchases_df)
     diagnostic_rng = np.random.default_rng(seed)
-    if memorization_baskets:
-        if len(train_transitions) < memorization_baskets:
-            raise ValueError("The training split is too small for the requested memorization sample.")
-        sample = diagnostic_rng.choice(len(train_transitions), memorization_baskets, replace=False)
-        train_transitions = [train_transitions[i] for i in sorted(sample)]
-        val_transitions = []
-        train_eval_size = memorization_baskets
     if dry_run:
         train_transitions = train_transitions[:64]
         val_transitions = val_transitions[:32]
@@ -849,31 +821,6 @@ def train_retriever(
         include_unseen_candidates=discovery_only,
     )
 
-    customer_price_reference = None
-    if include_customer_median_price:
-        print("Building point-in-time customer median unit prices.", flush=True)
-        prices = load_reconciled_prices(purchases_df)
-        customer_price_reference = fit_quantity_reference(
-            prices.loc[prices["purchase_date"] < TRAIN_CUTOFF, "unit_price_uah"],
-        )
-        price_profile = CustomerMedianUnitPrice(prices, customer_price_reference)
-        for dataset in (train_ds, val_ds):
-            if dataset.preloaded is not None:
-                dataset.preloaded["tabular_features"] = price_profile.append_to(
-                    dataset.preloaded["tabular_features"],
-                    [t["customer_id"] for t in dataset.transitions],
-                    [t["as_of_date"] for t in dataset.transitions],
-                )
-    if include_price_preference:
-        print("Building point-in-time Stage 1 price preferences.", flush=True)
-        price_store = load_price_preference_store(purchases_df, catalogue_df, eligible_pids)
-        for dataset in (train_ds, val_ds):
-            if dataset.preloaded is not None:
-                dataset.preloaded["price_features"] = price_store.batch_features(
-                    [t["customer_id"] for t in dataset.transitions],
-                    [t["as_of_date"] for t in dataset.transitions],
-                )
-        del price_store
     if familiarity_fields:
         store = FamiliarityStore(purchases_df, familiarity_catalogue, eligible_pids, familiarity_fields)
         for dataset in (train_ds, val_ds):
@@ -894,37 +841,14 @@ def train_retriever(
         train_examples = Subset(train_ds, discovery_rows)
         print(f"Discovery objective uses {len(discovery_rows)} training baskets with "
               f"{int(novel_targets.sum())} eligible new targets.")
-    complementarity = ProductComplementarity(purchases_df) if include_complementarity else None
-    train_batches = []
-    if complementarity is not None:
-        train_snapshot_dates = [product_snapshot_date(t["as_of_date"]) for t in train_transitions]
-        snapshot_dates = sorted(set(train_snapshot_dates))
-        snapshot_index = {date: i for i, date in enumerate(snapshot_dates)}
-        train_ds.preloaded["product_snapshot"] = torch.tensor([snapshot_index[date] for date in train_snapshot_dates])
-        example_rows = train_examples.indices if discovery_only else range(len(train_examples))
-        example_snapshots = [train_snapshot_dates[i] for i in example_rows]
-        for rows in group_snapshot_rows(example_snapshots):
-            for start in range(0, len(rows), batch_size):
-                train_batches.append(rows[start:start + batch_size])
-        train_loader = DataLoader(train_examples, batch_sampler=train_batches)
-    else:
-        train_loader = DataLoader(train_examples, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_examples, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
     train_eval_indices = sorted(diagnostic_rng.choice(
         len(train_ds), min(train_eval_size, len(train_ds)), replace=False,
     )) if train_eval_size else []
-    train_eval_batches = []
-    if complementarity is not None and train_eval_indices:
-        snapshot_rows = group_snapshot_rows([train_snapshot_dates[i] for i in train_eval_indices])
-        train_eval_indices = [train_eval_indices[row] for group in snapshot_rows for row in group]
-        offset = 0
-        for group in snapshot_rows:
-            for start in range(offset, offset + len(group), batch_size):
-                train_eval_batches.append(list(range(start, min(start + batch_size, offset + len(group)))))
-            offset += len(group)
     train_eval_loader = DataLoader(
         Subset(train_ds, train_eval_indices),
-        **({"batch_sampler": train_eval_batches} if train_eval_batches else {"batch_size": batch_size}),
+        batch_size=batch_size,
         generator=torch.Generator().manual_seed(seed),
     ) if train_eval_indices else None
     history_gap_reference_days = (
@@ -933,25 +857,14 @@ def train_retriever(
     )
 
     # 7. Build the fixed product snapshot shared with downstream scoring.
-    sku_prices_uah = None
-    if include_sku_price:
-        from recommender.data import load_sku_median_prices_uah
-        from recommender.scope import get_datasets_locs
-        sku_prices_uah = load_sku_median_prices_uah(get_datasets_locs("purchases"), eligible_pids, TRAIN_CUTOFF)
     prod_inputs = build_retriever_product_inputs(
         purchases_df, catalogue_df, catalogue_embeddings, eligible_pids, vocabs, include_subcategory=False,
         include_sku_median_quantity=include_sku_median_quantity,
         container_encoding=container_encoding,
-        sku_prices_uah=sku_prices_uah,
-        complementarity=complementarity,
     )
     # Move product inputs to device
     for k in prod_inputs:
         prod_inputs[k] = prod_inputs[k].to(dev)
-    snapshot_shares = [
-        torch.from_numpy(complementarity.shares(eligible_pids, date)).to(dev)
-        for date in snapshot_dates
-    ] if complementarity is not None else []
 
     # 8. Model Initialization
     customer_tower = CustomerTower(
@@ -966,7 +879,7 @@ def train_retriever(
         catalog_history_encoder=history_encoder,
         history_gap_reference_days=history_gap_reference_days,
         max_seq_len=max_seq_len,
-        num_tabular_features=len(profile_features) + int(include_customer_median_price),
+        num_tabular_features=len(profile_features),
         hidden_dim=tower_hidden_dim,
         num_heads=4,
         num_layers=history_layers,
@@ -1000,7 +913,6 @@ def train_retriever(
         product_tower=product_tower,
         num_catalog_products=num_products,
         temperature=DEFAULT_TEMPERATURE,
-        include_price_preference=include_price_preference,
         num_familiarity_features=len(familiarity_fields),
     ).to(dev)
 
@@ -1036,13 +948,10 @@ def train_retriever(
         raise ValueError("Discovery-only checkpoint selection requires first-time purchases in validation.")
     train_eval_targets = [target_indices(train_transitions[i]["positive_product_ids"]) for i in train_eval_indices]
 
-    def product_vectors(snapshot_id: Optional[int] = None) -> torch.Tensor:
-        demand = prod_inputs["demand_features"]
-        if snapshot_id is not None:
-            demand = torch.cat((demand[:, :-1], snapshot_shares[snapshot_id][:, None]), dim=1)
+    def product_vectors() -> torch.Tensor:
         return model.product_tower(
             prod_inputs["text_embedding"], prod_inputs["brand_id"], prod_inputs["category_id"],
-            None, prod_inputs["business_line_id"], demand,
+            None, prod_inputs["business_line_id"], prod_inputs["demand_features"],
             container_id=prod_inputs.get("container_id"),
         )
 
@@ -1058,7 +967,7 @@ def train_retriever(
             catalog_product_vectors=vectors, **sequence_inputs,
         )
         return model.compute_logits(
-            customers, vectors, product_indices=product_indices_all, price_features=batch.get("price_features"),
+            customers, vectors, product_indices=product_indices_all,
             familiarity_features=batch.get("familiarity_features"),
         )
 
@@ -1071,15 +980,8 @@ def train_retriever(
         discovery_pairs = 0
         discovery_targets = 0
         discovery_hits = {25: 0, 50: 0}
-        snapshot_vectors = {}
         for batch in loader:
-            batch_vectors = vectors
-            if "product_snapshot" in batch:
-                snapshot = int(batch["product_snapshot"][0])
-                if snapshot not in snapshot_vectors:
-                    snapshot_vectors[snapshot] = product_vectors(snapshot)
-                batch_vectors = snapshot_vectors[snapshot]
-            logits = score_batch(batch, batch_vectors)
+            logits = score_batch(batch, vectors)
             targets = batch["target"].to(dev)
             total_loss += model.compute_multi_label_loss(logits, targets, pos_weight=pos_weight_t).item()
             topk_rows.append(torch.topk(logits, k=min(top_k, num_products), dim=-1).indices.cpu().numpy())
@@ -1105,16 +1007,13 @@ def train_retriever(
             }
         return total_loss / max(len(loader), 1), topk, discovery_metrics
 
-    best_selection_loss = math.inf
     for epoch in range(1, epochs + 1):
         model.train()
         total_train_loss = 0.0
-        diagnostic_rng.shuffle(train_batches)
 
         for batch in train_loader:
             optimizer.zero_grad()
-            snapshot = int(batch["product_snapshot"][0]) if "product_snapshot" in batch else None
-            logits = score_batch(batch, product_vectors(snapshot))
+            logits = score_batch(batch, product_vectors())
             targets = batch["target"].to(dev)
             if discovery_only:
                 loss = compute_discovery_loss(logits, targets, batch["unseen_candidates"].to(dev), pos_weight_t)
@@ -1136,16 +1035,15 @@ def train_retriever(
         train_eval_metrics: Dict[str, float] = {}
         with torch.no_grad():
             vectors = product_vectors()
-            if not memorization_baskets:
-                avg_val_loss, val_topk, val_discovery = evaluate_batches(val_loader, vectors, 100)
-                val_metrics = compute_retrieval_metrics(val_topk, val_targets, k_list=(10, 50, 100))
-                if val_new_count:
-                    new_hits = sum(len(targets.intersection(predicted[:50])) for targets, predicted in zip(val_new_targets, val_topk))
-                    val_metrics["new_to_customer_recall@50"] = new_hits / val_new_count
-                if discovery_only:
-                    val_metrics.update(val_discovery)
-                    for k in (25, 50):
-                        val_metrics[f"discovery_recall@{k}"] = val_discovery[f"discovery_hits@{k}"] / val_new_count
+            avg_val_loss, val_topk, val_discovery = evaluate_batches(val_loader, vectors, 100)
+            val_metrics = compute_retrieval_metrics(val_topk, val_targets, k_list=(10, 50, 100))
+            if val_new_count:
+                new_hits = sum(len(targets.intersection(predicted[:50])) for targets, predicted in zip(val_new_targets, val_topk))
+                val_metrics["new_to_customer_recall@50"] = new_hits / val_new_count
+            if discovery_only:
+                val_metrics.update(val_discovery)
+                for k in (25, 50):
+                    val_metrics[f"discovery_recall@{k}"] = val_discovery[f"discovery_hits@{k}"] / val_new_count
             if train_eval_loader is not None:
                 train_eval_loss, train_topk, train_discovery = evaluate_batches(train_eval_loader, vectors, 50)
                 train_eval_metrics = compute_retrieval_metrics(train_topk, train_eval_targets, k_list=(10, 50))
@@ -1195,23 +1093,18 @@ def train_retriever(
                 summary += f" | Val New Recall@50: {novel:.4f}"
             if discovery_only:
                 epoch_record.update({f"val_{key}": value for key, value in val_discovery.items()})
-                epoch_record.update({f"val_discovery_recall@{k}": val_metrics[f"discovery_recall@{k}"] for k in (25, 50)})
+                epoch_record.update({f"val_discovery_recall@{k}": val_metrics[f"val_discovery_recall@{k}"] if f"val_discovery_recall@{k}" in val_metrics else val_metrics[f"discovery_recall@{k}"] for k in (25, 50)})
                 summary += (f" | Val Discovery Loss: {val_discovery['discovery_loss']:.4f}"
                             f" | Val Discovery Recall@25: {val_metrics['discovery_recall@25']:.4f}")
         training_history.append(epoch_record)
         print(summary)
 
-        # Select by validation coverage. The memorization diagnostic only uses the training sample.
-        selected_metrics = train_eval_metrics if memorization_baskets else val_metrics
+        # Select by validation coverage.
         selection_metric = "discovery_recall@25" if discovery_only else "recall@50"
-        selection = selected_metrics[selection_metric]
-        selection_loss = train_eval_loss if memorization_baskets else avg_val_loss
-        if selection > best_selection or (
-            memorization_baskets and selection == best_recall_50 and selection_loss < best_selection_loss
-        ):
+        selection = val_metrics[selection_metric]
+        if selection > best_selection:
             best_selection = selection
-            best_recall_50 = selected_metrics["recall@50"]
-            best_selection_loss = selection_loss
+            best_recall_50 = val_metrics["recall@50"]
             torch.save(
                 {
                     "epoch": epoch,
@@ -1233,8 +1126,6 @@ def train_retriever(
                         "pos_weight": pos_weight,
                         "novel_positive_multiplier": novel_positive_multiplier,
                         "discovery_only": discovery_only,
-                        "include_price_preference": include_price_preference,
-                        "customer_price_reference": customer_price_reference,
                         "familiarity_fields": list(familiarity_fields),
                         "profile_features": list(profile_features),
                         "company_cache_name": company_cache_name,
@@ -1247,8 +1138,6 @@ def train_retriever(
                         "extra_tower_mlp_layer": extra_tower_mlp_layer,
                         "dropout": dropout,
                         "container_encoding": container_encoding,
-                        "sku_prices_uah": sku_prices_uah,
-                        "include_complementarity": include_complementarity,
                         "catalog_history_encoder": history_encoder,
                         "max_seq_len": max_seq_len,
                         "history_gap_reference_days": history_gap_reference_days,

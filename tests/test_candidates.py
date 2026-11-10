@@ -336,25 +336,6 @@ def test_attribute_repeat_flags_use_strictly_prior_history_for_unseen_skus():
     assert store.compute_pairwise_features("C1", "2025-01-03", "D")[-3:].tolist() == [1.0, 1.0, 1.0]
 
 
-def test_category_overdue_counts_distinct_prior_dates_for_unseen_sku():
-    purchases = pd.DataFrame(
-        [("C1", "A", date) for date in ("2025-01-01", "2025-01-06", "2025-01-11", "2025-01-19")],
-        columns=["customer_id", "product_id", "purchase_date"],
-    )
-    catalogue = pd.DataFrame({"product_id": ["A", "B", "C"], "product_category": ["X", "X", "Y"]})
-    store = PointInTimeFeatureStore(purchases, catalogue)
-    result = store.compute_slate_pairwise_features(
-        "C1", "2025-01-19", ["B", "C"], category_overdue=True,
-    )
-    assert result.shape == (2, NUM_PAIRWISE_FEATURES + 1)
-    assert result[:, 0].tolist() == [0.0, 0.0]
-    assert result[:, -1].tolist() == [1.0, 0.0]
-    at_median = store.compute_slate_pairwise_features(
-        "C1", "2025-01-16", ["B"], category_overdue=True,
-    )
-    assert at_median[0, -1].item() == 0.0
-
-
 def test_candidate_batch_dict_access_and_device():
     """Validates CandidateBatch dataclass supports dict indexing, to_dict, and device transfer."""
     b_size, c_slate = 2, 5

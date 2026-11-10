@@ -38,19 +38,7 @@ from recommender.candidates import (
 )
 from recommender.catalogue import load_product_catalogue
 from recommender.company import load_companies
-from recommender.complementarity import SKU_COMPLEMENTARITY_FEATURE
-from recommender.purchase_timing import TIMING_FEATURE_NAMES, TIMING_FEATURE_VERSION, PurchaseTiming, add_candidate_timing
 from recommender.ranker import UPSCANRRanker
-from recommender.ranker_statistics import (
-    CATEGORY_PEER_AFFINITY,
-    SHARED_SKU_STATISTICS,
-    SHARED_SKU_STATISTICS_VERSION,
-    FavoriteCategoryAffinity,
-    ranker_history_options,
-    with_candidate_peer_affinity,
-    with_history_variant,
-    with_shared_sku_statistics,
-)
 from recommender.scope import get_datasets_locs
 from recommender.split import TEST_START, TRAIN_CUTOFF
 from recommender.train_ranker import (
@@ -220,9 +208,7 @@ def evaluate_split(
     batch_size: int = 64,
 ) -> Dict[str, Any]:
     """Evaluate all 4 methods on a given split (Validation or Test)."""
-    if not ranker.precomputed_purchase_age and (
-        ranker.history_age_weight is not None or ranker.statistics_attention_weights is not None
-    ):
+    if ranker.statistics_attention_weights is not None:
         slates_data = {**slates_data, "prediction_days": prediction_day_offsets(transitions)}
     dataset = RankerDataset(slates_data)
     loader = DataLoader(
@@ -309,12 +295,10 @@ def evaluate_split(
             tab_f = batch["tabular_features"].to(device)
             retriever_tab_f = batch["retriever_tabular_features"].to(device)
             seq = batch["sequence"].to(device)
-            shared_sequence = batch["ranker_sequence"]
             mask = batch["attention_mask"].to(device)
             seq_pids = batch["seq_product_ids"].to(device)
             seq_cids = batch["seq_category_ids"].to(device)
-            brand_ids = batch["seq_brand_ids"]
-            seq_sub_ids = batch["seq_subcategory_ids"].to(device) if brand_ids is None else None
+            seq_sub_ids = batch["seq_subcategory_ids"].to(device)
             seq_line_ids = batch["seq_business_line_ids"].to(device)
 
             cand_idx = batch["candidate_indices"].to(device)
@@ -364,18 +348,17 @@ def evaluate_split(
                 region_id=reg_id,
                 industry_id=ind_id,
                 tabular_features=tab_f,
-                sequence=seq if shared_sequence is None else shared_sequence.to(device),
+                sequence=seq,
                 attention_mask=mask,
                 seq_product_ids=seq_pids,
                 seq_category_ids=seq_cids,
                 seq_subcategory_ids=seq_sub_ids,
-                seq_brand_ids=brand_ids.to(device) if brand_ids is not None else None,
                 seq_business_line_ids=seq_line_ids,
                 candidate_vectors=cand_vectors,
                 pairwise_features=pw_f,
                 catalog_product_vectors=cat_vectors_dev,
-                seq_purchase_dates=purchase_dates.to(device) if not ranker.precomputed_purchase_age and purchase_dates is not None else None,
-                prediction_day=batch["prediction_day"].to(device) if not ranker.precomputed_purchase_age and batch["prediction_day"] is not None else None,
+                seq_purchase_dates=purchase_dates.to(device) if purchase_dates is not None else None,
+                prediction_day=batch["prediction_day"].to(device) if batch["prediction_day"] is not None else None,
             )
 
             ranker_logits_np = out.logits.cpu().numpy()
@@ -476,7 +459,7 @@ def evaluate_split(
 
 
 def run_full_evaluation(
-    retriever_checkpoint_path: Union[str, Path] = "checkpoints/retriever/best_retriever.pt",
+    retriever_checkpoint_path: Union[str, Path] = "checkpoints/retriever-discovery-reference/best_retriever.pt",
     ranker_checkpoint_path: Union[str, Path] = "checkpoints/ranker/best_ranker.pt",
     output_report_path: Union[str, Path] = "checkpoints/evaluation_report.json",
     device: Optional[str] = None,
@@ -499,17 +482,6 @@ def run_full_evaluation(
             "Train the ranker with the selected retriever before running evaluation."
         )
     heuristic_fraction = ranker_ckpt.get("heuristic_fraction", 0.0)
-    category_overdue = ranker_ckpt.get("category_overdue", False)
-    include_complementarity = ranker_ckpt.get("include_complementarity", False)
-    candidate_timing = ranker_ckpt.get("candidate_timing", False)
-    category_gap_fallback = ranker_ckpt.get("category_gap_fallback", True)
-    shared_version = ranker_ckpt.get("shared_sku_statistics_version")
-    candidate_peer_affinity = ranker_ckpt.get("candidate_peer_affinity", False)
-    history_variant = ranker_ckpt.get("history_variant")
-    if shared_version is not None and shared_version != SHARED_SKU_STATISTICS_VERSION:
-        raise ValueError("The ranker checkpoint uses a different shared SKU statistics schema.")
-    if candidate_timing and ranker_ckpt.get("candidate_timing_version") != TIMING_FEATURE_VERSION:
-        raise ValueError("The ranker checkpoint uses a different candidate timing rule. Retrain the ranker.")
 
     purchases_df = pd.read_csv(
         "data/interim/cleaned_purchases.csv",
@@ -526,30 +498,16 @@ def run_full_evaluation(
         retriever_checkpoint_path, purchases_df, catalogue_df, companies_df, dev,
     )
     rolling = retriever.rolling_pool is not None
-    slate_options = dict(
-        category_overdue=category_overdue, rolling=rolling, include_complementarity=include_complementarity,
-        dated_vectors=retriever.product_complementarity is not None,
-    )
     if ranker_ckpt.get("rolling_candidate_pool", False) != rolling:
         raise ValueError("The ranker checkpoint does not match the rolling candidate policy.")
     eligible_pids = retriever.eligible_product_ids
     product_vectors = retriever.get_product_vectors()
-    brand_vocab = vocabs.get("brand_vocab", {})
     ranker = UPSCANRRanker.from_retriever_checkpoint(
         checkpoint_path=retriever_checkpoint_path,
         device=dev,
-        num_pairwise_features=(
-            len(SHARED_SKU_STATISTICS) if shared_version is not None else
-            NUM_PAIRWISE_FEATURES + int(category_overdue) + int(include_complementarity)
-            + int(candidate_peer_affinity)
-            + len(TIMING_FEATURE_NAMES) * int(candidate_timing)
-        ),
-        history_gap_reference_days=ranker_ckpt.get("history_gap_reference_days"),
-        adapt_candidate_query=ranker_ckpt.get("adapt_candidate_query", False),
-        history_age_attention=ranker_ckpt.get("history_age_attention", False),
+        num_pairwise_features=NUM_PAIRWISE_FEATURES,
         statistics_attention=ranker_ckpt.get("statistics_attention", False),
         excluded_statistics=tuple(ranker_ckpt.get("excluded_statistics", ())),
-        **ranker_history_options(vocabs, shared_version is not None, history_variant),
     )
     ranker.load_state_dict(ranker_ckpt["model_state_dict"])
     ranker.eval()
@@ -562,34 +520,17 @@ def run_full_evaluation(
         include_subcategory=retriever.model.product_tower.subcat_embedding is not None,
         heuristic_fraction=heuristic_fraction,
         company_cache_name=retriever.company_cache_name,
-        category_overdue=category_overdue,
         rolling=rolling,
-        include_complementarity=include_complementarity,
     )
-    val_path = slate_cache_path("val", heuristic_fraction, **slate_options)
+    val_path = slate_cache_path("val", heuristic_fraction, rolling=rolling)
     val_slates = load_slate_cache(val_path, f"{val_identity}:val")
     if val_slates is None:
         slate_inputs = prepare_slate_inputs(
             retriever, retriever_checkpoint_path, purchases_df, catalogue_df, companies_df,
             train_transitions, vocabs,
-            include_complementarity=include_complementarity,
         )
         slate_inputs["heuristic_fraction"] = heuristic_fraction
-        slate_inputs["category_overdue"] = category_overdue
         val_slates = build_slate_cache(val_path, f"{val_identity}:val", val_transitions, slate_inputs)
-    if candidate_timing:
-        timing = PurchaseTiming(purchases_df, catalogue_df, category_gap_fallback=category_gap_fallback)
-        val_slates = add_candidate_timing(val_slates, val_transitions, timing)
-    if shared_version is not None:
-        store = retriever.feature_store
-        val_slates = with_shared_sku_statistics(
-            val_slates, val_transitions, store, FavoriteCategoryAffinity(store), brand_vocab,
-        )
-    elif candidate_peer_affinity:
-        store = retriever.feature_store
-        val_slates = with_candidate_peer_affinity(val_slates, val_transitions, store, FavoriteCategoryAffinity(store))
-    if history_variant is not None:
-        val_slates = with_history_variant(val_slates, val_transitions, retriever.feature_store, brand_vocab, history_variant)
 
     print(f"Evaluating on Validation split ({len(val_transitions)} transitions)...")
     val_report = evaluate_split(
@@ -619,16 +560,8 @@ def run_full_evaluation(
     report: Dict[str, Any] = {
         "architecture_name": "Modular Two-Tower Retriever + Unified Profile-Sequence Candidate-Aware Neural Ranker (UPS-CANR)",
         "heuristic_fraction": heuristic_fraction,
-        "category_overdue": category_overdue,
-        "stage1_product_complementarity": retriever.product_complementarity is not None,
-        "stored_vector_attention": ranker.history_gap_reference_days is not None,
-        "adapt_candidate_query": ranker.candidate_query_adjustment is not None,
-        "history_age_attention": ranker.history_age_weight is not None,
         "statistics_attention": ranker.statistics_attention_weights is not None,
-        "shared_sku_statistics_version": shared_version,
-        "candidate_peer_affinity": candidate_peer_affinity,
         "excluded_statistics": list(ranker.excluded_statistics),
-        "history_variant": history_variant,
         "ranker_training": {
             "epoch": ranker_ckpt.get("epoch"),
             "new_positive_weight": ranker_ckpt.get("config", {}).get("new_positive_weight", 1.0),
@@ -637,13 +570,7 @@ def run_full_evaluation(
             "seed": ranker_ckpt.get("config", {}).get("seed", 42),
         },
         "rolling_candidate_pool": rolling,
-        "ranker_pairwise_features": list(SHARED_SKU_STATISTICS) if shared_version is not None else [
-            *PAIRWISE_FEATURE_NAMES,
-            *(["category_overdue"] if category_overdue else []),
-            *([SKU_COMPLEMENTARITY_FEATURE] if include_complementarity else []),
-            *(TIMING_FEATURE_NAMES if candidate_timing else ()),
-            *([CATEGORY_PEER_AFFINITY] if candidate_peer_affinity else []),
-        ],
+        "ranker_pairwise_features": list(PAIRWISE_FEATURE_NAMES),
         "validation_gate": {
             "passed": validation_gate_passed,
             "stage1_val_ndcg@10": s1_val_ndcg,
@@ -653,14 +580,6 @@ def run_full_evaluation(
         },
         "validation": val_report,
     }
-    if candidate_timing:
-        report["candidate_timing_version"] = TIMING_FEATURE_VERSION
-        report["category_gap_fallback"] = category_gap_fallback
-        new_features = val_slates["pairwise_features"][..., -len(TIMING_FEATURE_NAMES):]
-        report["validation_candidate_timing_coverage"] = {
-            name: float((new_features[..., i] > 0).float().mean().item())
-            for i, name in enumerate(TIMING_FEATURE_NAMES)
-        }
 
     if validation_gate_passed and all_purchases is not None:
         _, _, test_transitions = build_retriever_transitions(all_purchases)
@@ -674,37 +593,18 @@ def run_full_evaluation(
             include_subcategory=test_retriever.model.product_tower.subcat_embedding is not None,
             heuristic_fraction=heuristic_fraction,
             company_cache_name=test_retriever.company_cache_name,
-            category_overdue=category_overdue,
             rolling=rolling,
-            include_complementarity=include_complementarity,
         )
-        test_path = slate_cache_path("test", heuristic_fraction, **slate_options)
+        test_path = slate_cache_path("test", heuristic_fraction, rolling=rolling)
         test_slates = load_slate_cache(test_path, f"{test_identity}:test")
         if test_slates is None:
             slate_inputs = prepare_slate_inputs(
                 test_retriever, retriever_checkpoint_path, all_purchases, catalogue_df,
                 test_companies, train_transitions, test_vocabs,
-                include_complementarity=include_complementarity,
             )
             slate_inputs["heuristic_fraction"] = heuristic_fraction
-            slate_inputs["category_overdue"] = category_overdue
             test_slates = build_slate_cache(
                 test_path, f"{test_identity}:test", test_transitions, slate_inputs,
-            )
-        if candidate_timing:
-            timing = PurchaseTiming(all_purchases, catalogue_df, category_gap_fallback=category_gap_fallback)
-            test_slates = add_candidate_timing(test_slates, test_transitions, timing)
-        if shared_version is not None:
-            store = test_retriever.feature_store
-            test_slates = with_shared_sku_statistics(
-                test_slates, test_transitions, store, FavoriteCategoryAffinity(store), brand_vocab,
-            )
-        elif candidate_peer_affinity:
-            store = test_retriever.feature_store
-            test_slates = with_candidate_peer_affinity(test_slates, test_transitions, store, FavoriteCategoryAffinity(store))
-        if history_variant is not None:
-            test_slates = with_history_variant(
-                test_slates, test_transitions, test_retriever.feature_store, brand_vocab, history_variant,
             )
         test_groups = {str(cid): group for cid, group in all_purchases.groupby("customer_id")}
         test_report = evaluate_split(

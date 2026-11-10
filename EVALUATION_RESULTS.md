@@ -1,214 +1,82 @@
-# Evaluation & Training Report: Modular Two-Tower Retriever + UPS-CANR Ranker
+# Evaluation & Training Report: Stage 1 Discovery Reference + Stage 2 `UPS-CANR` Reference
 
-## Category peer scores and Stage 2 input tests
-
-The Stage 1 replay used the same frozen vectors and paid-sale candidate pool. The
-two-tower reference recovered 652 of 1,857 new targets at 25 and 921 at 50. The
-best favorite-category setting recovered 657 at 25 and 914 at 50. The category-mix
-setting with the highest mixed-slate recall recovered 765 of 1,857 in the mixed
-slate, compared with 763 for the reference. The six peer settings were compared
-on the same validation split.
-
-The Stage 2 runs reused the same 50 candidates, seed 42, and 10 epochs. Each
-checkpoint maximized new-to-customer Recall@10 with an overall Recall@10 floor
-of 75.59%. The repeat and month ablations masked those inputs while preserving
-the model dimensions.
-
-| Stage 2 run | New-to-customer Recall@10 | Overall Recall@10 |
-| --- | ---: | ---: |
-| All-statistics control | 10.99% (204) | 76.07% |
-| Shared six statistics + brand | 9.85% (183) | 76.05% |
-| Add only category peer affinity | 10.99% (204) | 76.01% |
-| Remove history month sine and cosine | 11.15% (207) | 76.07% |
-| **Remove history repeat flag (Stage 2 reference)** | **11.25% (209)** | **76.15%** |
-| Remove candidate repeat flag | 10.77% (200) | 76.29% |
-| Remove month and both repeat flags | 10.66% (198) | 76.23% |
-| Replace history subcategory with brand | 10.50% (195) | 75.72% |
-| Add popularity and industry affinity to history | 10.77% (200) | 75.92% |
-| Reorder timing with SKU fallback | 10.72% (199) | 75.98% |
-| Reorder timing with SKU and category fallback | 11.04% (205) | 75.94% |
-
-Removing the redundant history repeat flag (`excluded_statistics=("history_repeat",)` with
-`statistics_attention=True`) is promoted as the Stage 2 reference (`checkpoints/stage2-statistics-ablations/history_repeat/`).
-Note for Stage 1 vs. Stage 2 cadence features: raw `inter_purchase_gap_norm` is kept for
-Stage 1 customer sequence cadence modeling, while Stage 2 replaces raw purchase-gap
-features with relative due-ness (`gap - age`). Full results and earlier experiment
-locations are saved in `checkpoints/proposal-validation/validation_comparison.json`.
-
-## Stage 1 discovery reference
-
-The reference uses 128D towers, 32 purchase records, and a two-layer history Transformer.
-Stage 1 scores whether the customer previously bought a SKU with the candidate's brand,
-category, business line, or product family. Each flag uses the full history before the
-target date. The Product Tower uses its existing text and other inputs, with the three
-learned brand, category, and business-line embedding tables removed.
-
-| 128D discovery run | Selected epoch | New-to-customer Recall@25 | New-to-customer Recall@50 |
-| --- | ---: | ---: | ---: |
-| Previous discovery reference | 23 | 34.95% (649) | 48.25% (896) |
-| Three flags replace embeddings | 23 | 34.46% (640) | 48.73% (905) |
-| Four flags with embeddings | 23 | 34.89% (648) | 49.33% (916) |
-| **Four flags replace embeddings** | **23** | **35.00% (650)** | **49.43% (918)** |
-| Four flags replace embeddings + customer median unit price | 21 | 34.89% (648) | 49.00% (910) |
-
-Each row uses a 30-epoch run with seed 42. Checkpoints were selected by Recall@25 among
-previously unbought SKUs. The validation denominator is 1,857 first-time targets across
-6,191 baskets. The reference trained on 8,773 baskets with eligible first-time purchases.
-
-Reproduce with `python -m recommender.train_retriever --discovery-reference`. The selected
-checkpoint, training history, validation comparison, and checksums are saved locally in
-`checkpoints/retriever-discovery-reference/`. These results measure Stage 1 discovery.
-
-### Default discovery candidate pool
-
-The default replay admits merchandise with a genuine paid sale strictly before the
-query date and excludes blocks known before that date. Previously purchased SKUs are
-excluded from discovery picks and can still enter the repeat slots. On 6,191 validation
-baskets, the rolling pool had 735–771 candidates per date. It retrieved 652 of 1,857
-new-to-customer targets in its top 25 (35.11%). Its mixed 50-item slate reached
-41.09% new-to-customer recall and 87.48% overall recall. Run
-`python -m recommender.evaluate_stage1` to reproduce the replay.
-
-## Stage 1 validation with the 30-epoch schedule
-
-The retriever uses 128-dimensional output vectors, 32 purchase records, and a two-layer history
-Transformer. Training uses a 30-epoch cosine learning-rate schedule. Epoch 21 had the highest
-validation Recall@50 on 6,191 baskets from the 790-SKU catalogue.
-
-| Stage 1 run | Checkpoint epoch | Validation loss | Recall@50 | New-to-customer Recall@50 |
-| --- | ---: | ---: | ---: | ---: |
-| Previous 10-epoch schedule | 10 | 0.08235 | 79.74% | 43.19% |
-| **30-epoch schedule** | **21** | **0.07543** | **83.12%** | **44.53%** |
-| 30 epochs, 2× new-to-customer positive weight | 29 | 0.07640 | 83.73% | 44.86% |
-
-The unweighted checkpoint and full history are saved locally in
-`checkpoints/retriever-128d-30epochs/`. The 2× weighted checkpoint, full history, comparison,
-and checksums are saved in `checkpoints/retriever-128d-30epochs-new-positive-2x/`. Both runs
-selected checkpoints by overall validation Recall@50. The standard two-stage evaluation
-uses the earlier matching retriever and ranker checkpoints.
-
-## Stage 1 discovery-only regularization
-
-These runs use 8,773 training baskets with at least one first-time purchase. Each run
-uses a 30-epoch schedule and selects its checkpoint by validation Recall@25 among
-previously unbought SKUs. The denominator is all 1,857 first-time validation targets,
-including 96 outside the 790-SKU candidate catalogue.
-
-| Discovery-only run | Dropout | AdamW weight decay | Checkpoint epoch | New-to-customer Recall@25 |
-| --- | ---: | ---: | ---: | ---: |
-| 128D reference | 0.10 | 0.0001 | 23 | 34.95% (649) |
-| 256D control | 0.10 | 0.0001 | 20 | 33.93% (630) |
-| 256D with higher dropout | 0.20 | 0.0001 | 27 | 33.93% (630) |
-| 256D with stronger weight decay | 0.10 | 0.001 | 24 | 34.36% (638) |
-
-With the same unseen-only filter, the saved 128D unweighted and 2× weighted checkpoints
-retrieved 627 (33.76%) and 638 (34.36%) of the same targets, respectively. Those checkpoints
-were selected by overall validation Recall@50. Experiment outputs are under
-`checkpoints/stage1-discovery-regularization/`.
-
-The remaining sections document the original run. The input schema, quantity scaling, and slate
-construction have since changed.
-
-## 1. Architecture Overview
-**Official Architecture Name:**
-> **Modular Late-Fusion Two-Tower Retriever + Unified Profile-Sequence Candidate-Aware Neural Ranker (`UPS-CANR`)**
-
-### Implemented Pipeline Modules
-- **Enriched Sequence Tokens (`recommender/sequences.py`):** 32 historical purchase tokens $P_1 \dots P_{32}$ encoding 4 categorical indices (`product_id`, `product_category`, `product_subcategory`, `business_line`) and 9 point-in-time continuous features (`qty_norm`, `days_ago_norm`, `inter_purchase_gap_norm`, `sin_month`, `cos_month`, `user_product_prior_count_norm`, `user_product_quantity_share`, `is_repeat_purchase`, `real_event_indicator`).
-- **Stage 1 Retriever (`recommender/models.py`, `recommender/train_retriever.py`):**
-  - `CustomerTower`: Modular Late Fusion combining frozen `BAAI/bge-m3` company text (`1024-d` -> `128-d`), customer tabular/lifetime features (`128-d`), and a 2-layer Transformer over the 32 enriched purchase tokens (`128-d` via dual masked-mean + last-event pooling) into an L2-normalized `128-d` customer vector $\mathbf{u}_c$.
-  - `ProductTower`: Combines `BAAI/bge-m3` product text (`1024-d` -> `128-d`), catalog hierarchy embeddings (`brand`, `product_category`, `product_subcategory`, `business_line`), and 6 point-in-time demand velocity features into an L2-normalized `128-d` product vector $\mathbf{v}_p$.
-- **Candidate Generation & Pairwise Features (`recommender/candidates.py`):** Retrieves top-$C=50$ candidates per transition and computes 12 point-in-time customer-candidate pairwise features strictly bounded in $[0.0, 1.0]$.
-- **Stage 2 Ranker (`recommender/ranker.py`, `recommender/train_ranker.py`):**
-  - `UPSCANRRanker`: Builds a unified 33-token Customer Memory $[\mathbf{z}_{\text{customer\_profile}}, P_1, \dots, P_{32}] \in \mathbb{R}^{B \times 33 \times 128}$, applies 4-head candidate-aware cross-attention for all $C=50$ candidates simultaneously, and scores each candidate via a `396-d` Residual Fusion MLP trained with Multi-Label BCE + Listwise Softmax Cross-Entropy loss.
-- **Evaluation & Baselines (`recommender/evaluate.py`):** Compares Global Popularity, Personal Repeat-Purchase Heuristic, Stage 1 Retriever, and Stage 2 `UPS-CANR` Ranker across overall, Cold/Light ($\le 2$ prior baskets), and Warm ($> 2$ prior baskets) segments.
+This document contains only verified results on the chronological **Validation Split (`2025-10-01` to `2026-02-18`, `6,191` transitions, `1,857` new-to-customer targets)**. The held-out Test Split (`>= 2026-02-19`, `6,327` transitions) remains untouched.
 
 ---
 
-## 2. Saved Artifacts & Data Locations
+## 1. End-to-End Validation Comparison (`checkpoints/evaluation_report.json`)
 
-- **Validation Evaluation Report (JSON):** `checkpoints/evaluation_report.json`
-- **Stage 1 Retriever Training History (JSON):** `checkpoints/retriever/training_history.json`
-- **Stage 1 Best Model Checkpoint:** `checkpoints/retriever/best_retriever.pt`
-- **Stage 2 `UPS-CANR` Training History (JSON):** `checkpoints/ranker/training_history.json`
-- **Stage 2 Best Model Checkpoint:** `checkpoints/ranker/best_ranker.pt`
-- **Cached BGE-M3 Text Embeddings:**
-  - `data/interim/embeddings/bge_m3_catalogue.parquet`
-  - `checkpoints/retriever/bge_m3_company.parquet`
-- **Precomputed Candidate Slates:**
-  - `data/interim/ranker_train_slates.pt` (`26,264` train transitions)
-  - `data/interim/ranker_val_slates.pt` (`6,191` validation transitions)
+Evaluated across all `6,191` validation baskets using the rolling prior-sale candidate pool (`735–771` eligible SKUs per date):
 
----
+| System | Recall@5 | Recall@10 | Recall@20 | Recall@50 | Recall@100 | HitRate@10 | NDCG@10 | MRR | New-to-Customer Recall@10 |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1. Global Popularity Baseline** | 8.21% | 17.56% | 29.02% | 46.12% | 62.74% | 23.94% | 0.0910 | 0.0956 | — |
+| **2. Personal Repeat + Popularity Heuristic** | 62.57% | 73.54% | 80.69% | 85.13% | 88.45% | 79.45% | 0.5666 | 0.5469 | 8.78% (`163 / 1,857`) |
+| **3. Stage 1 Discovery Reference (Pure Unseen Ranking)** | 7.36% | 12.11% | 18.88% | 29.10% | 37.98% | 16.59% | 0.0566 | 0.0528 | — |
+| **4. Stage 1 Mixed 50-Item Slate (25 Repeat + 25 Unseen)** | 62.38% | 72.64% | 78.79% | 87.48% | 87.48% | 78.60% | 0.5624 | 0.5446 | — |
+| **5. Stage 2 `UPS-CANR` Reference (`best_ranker.pt`)** | **64.79%** | **76.15%** | **83.24%** | **87.48%** | **89.38%** | **81.88%** | **0.5924** | **0.5707** | **11.25% (`209 / 1,857`)** |
 
-## 3. Epoch-by-Epoch Training Curves
+### Candidate Coverage & Discovery Breakdown on Validation (`6,191` Baskets)
 
-### A. Stage 1: Modular Two-Tower Retriever (`checkpoints/retriever/training_history.json`)
+| Target Subset | Total Target Instances | Stage 1 Slate Recall@50 (Mixed 50-Item Slate) | Stage 2 `UPS-CANR` Reranked Recall@10 |
+| :--- | ---: | ---: | ---: |
+| **Repeat Targets** (previously bought by customer) | `8,579` | **97.96%** (`8,404 / 8,579`) | **91.50%** (`7,850 / 8,579`) |
+| **New-to-Customer Targets** (never bought before) | `1,857` | **41.09%** (`763 / 1,857`) | **11.25%** (`209 / 1,857`) |
 
-| Epoch | Train Loss | Val Loss | Val Recall@10 | Val Recall@50 | Val Recall@100 | Val NDCG@10 | Val MRR |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **1** | 0.1339 | 0.1043 | 25.76% | 57.70% | 73.60% | 0.1388 | 0.1373 |
-| **2** | 0.0975 | 0.0945 | 33.85% | 65.62% | 78.61% | 0.1927 | 0.1876 |
-| **3** | 0.0889 | 0.0895 | 37.44% | 68.73% | 80.91% | 0.2162 | 0.2044 |
-| **4** | 0.0839 | 0.0874 | 40.74% | 70.88% | 82.08% | 0.2505 | 0.2409 |
-| **5** | 0.0807 | 0.0834 | 43.46% | 72.25% | 83.09% | 0.2658 | 0.2534 |
-| **6** | 0.0777 | 0.0819 | 44.71% | 73.51% | 83.59% | 0.2786 | 0.2656 |
-| **7** | 0.0754 | 0.0810 | 46.14% | 74.65% | 84.38% | 0.2850 | 0.2683 |
-| **8** | 0.0739 | 0.0798 | 46.91% | 75.30% | 84.58% | 0.2969 | 0.2825 |
-| **9** | 0.0728 | 0.0795 | 47.33% | 75.54% | **85.05%** | 0.2973 | 0.2811 |
-| **10** | **0.0722** | **0.0792** | **47.61%** | **75.67%** | 85.03% | **0.3005** | **0.2847** |
-
-### B. Stage 2: `UPS-CANR` Neural Ranker (`checkpoints/ranker/training_history.json`)
-
-| Epoch | Train Loss | Val Loss | Val Recall@5 | Val Recall@10 | Val Recall@20 | Val NDCG@10 | Val MRR | Token 0 Profile Attn | Tokens 1..32 History Attn |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **1** | 3.0658 | 2.5044 | 57.47% | 66.49% | 71.41% | 0.5216 | 0.5083 | 20.83% | 79.17% |
-| **2** | 2.7796 | 2.4335 | 57.66% | 66.36% | 71.21% | 0.5257 | 0.5148 | 24.97% | 75.03% |
-| **3** | 2.6637 | 2.4107 | 57.86% | 66.35% | 71.28% | 0.5287 | 0.5188 | 30.48% | 69.52% |
-| **4** | 2.6004 | 2.3991 | 58.11% | 66.58% | 71.45% | 0.5339 | 0.5256 | 27.17% | 72.83% |
-| **5** | 2.5606 | 2.4215 | 57.79% | 66.20% | 71.35% | 0.5284 | 0.5203 | 29.16% | 70.84% |
-| **6** | 2.5151 | 2.4772 | 57.11% | 66.15% | 71.37% | 0.5201 | 0.5092 | 24.17% | 75.83% |
-| **7** | 2.4755 | 2.4002 | 57.92% | 66.61% | 71.44% | 0.5325 | 0.5240 | 32.34% | 67.66% |
-| **8** | 2.4419 | 2.4469 | 57.29% | 66.24% | 71.42% | 0.5245 | 0.5142 | 30.87% | 69.13% |
-| **9 (Best)** | 2.4078 | **2.3816** | 58.09% | **66.69%** | 71.49% | **0.5347** | **0.5278** | **31.12%** | **68.88%** |
-| **10** | **2.3846** | 2.3877 | **58.13%** | 66.69% | **71.56%** | 0.5337 | 0.5262 | 30.87% | 69.13% |
-
----
-
-## 4. Validation Split Comparison (`2025-10-01` to `2026-02-18`, 6,191 Transitions)
-
-### A. Overall Metrics
-
-| Model / Baseline | Recall@5 | Recall@10 | Recall@20 | Recall@50 | Recall@100 | HitRate@10 | NDCG@10 | MRR |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **1. Global Popularity Baseline** | 8.35% | 17.88% | 28.98% | 46.01% | 63.17% | 24.28% | 0.0925 | 0.0970 |
-| **2. Stage 1: Modular Two-Tower Retriever** | 34.44% | 47.60% | 60.47% | 75.74% | 85.04% | 56.39% | 0.3007 | 0.2855 |
-| **3. Stage 2: `UPS-CANR` Neural Ranker (Top-50 Rerank)** | **58.09%** | **66.69%** | **71.49%** | 75.74% | 85.04% | **73.41%** | **0.5347** | **0.5289** |
-| **4. Personal Repeat + Pop Fallback Heuristic** | 62.60% | 73.60% | 80.69% | 85.11% | 88.49% | 79.52% | 0.5669 | 0.5471 |
-
-### B. Stratified by Customer History Depth (`Cold/Light <= 2` vs `Warm > 2` Prior Baskets)
+### Stratified Performance: Cold/Light ($\le 2$ Prior Baskets) vs. Warm ($> 2$ Prior Baskets)
 
 | Segment | Model | Recall@5 | Recall@10 | Recall@20 | Recall@50 | HitRate@10 | NDCG@10 | MRR | Token 0 Attn | History Attn |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Cold / Light ($\le 2$ baskets, $N=444$)** | Global Popularity | 8.89% | 18.90% | 30.21% | 44.37% | 22.30% | 0.0919 | 0.0858 | — | — |
-| | Stage 1 Two-Tower | 21.71% | 31.52% | 41.87% | 60.80% | 35.81% | 0.1788 | 0.1611 | — | — |
-| | **Stage 2 `UPS-CANR`** | **40.81%** | **45.81%** | **52.64%** | **60.80%** | **50.23%** | **0.3740** | **0.3711** | **70.84%** | **29.16%** |
-| | Personal Repeat Heuristic | 50.51% | 55.33% | 60.45% | 68.02% | 59.23% | 0.4750 | 0.4723 | — | — |
-| **Warm ($> 2$ baskets, $N=5,747$)** | Global Popularity | 8.30% | 17.80% | 28.89% | 46.14% | 24.43% | 0.0925 | 0.0979 | — | — |
-| | Stage 1 Two-Tower | 35.43% | 48.84% | 61.91% | 76.89% | 57.98% | 0.3101 | 0.2951 | — | — |
-| | **Stage 2 `UPS-CANR`** | **59.43%** | **68.31%** | **72.94%** | **76.89%** | **75.20%** | **0.5471** | **0.5411** | **28.04%** | **71.96%** |
-| | Personal Repeat Heuristic | 63.54% | 75.01% | 82.25% | 86.44% | 81.09% | 0.5741 | 0.5528 | — | — |
+| **Cold / Light ($\le 2$ baskets, $N=444$)** | Personal Repeat Heuristic | 50.34% | 55.02% | 60.69% | 68.10% | 58.78% | 0.4731 | 0.4706 | — | — |
+| | Stage 1 Mixed Slate | 50.34% | 55.73% | 64.96% | 74.16% | 59.46% | 0.4754 | 0.4713 | — | — |
+| | **Stage 2 `UPS-CANR` Reference** | **51.55%** | **60.27%** | **68.02%** | **74.16%** | **63.74%** | **0.4932** | **0.4832** | **5.05%** | **94.95%** |
+| **Warm ($> 2$ baskets, $N=5,747$)** | Personal Repeat Heuristic | 63.51% | 74.98% | 82.24% | 86.44% | 81.05% | 0.5738 | 0.5528 | — | — |
+| | Stage 1 Mixed Slate | 63.31% | 73.95% | 79.86% | 88.50% | 80.08% | 0.5691 | 0.5503 | — | — |
+| | **Stage 2 `UPS-CANR` Reference** | **65.81%** | **77.38%** | **84.41%** | **88.50%** | **83.28%** | **0.6001** | **0.5774** | **3.51%** | **96.49%** |
 
 ---
 
-## 5. Underfitting & Overfitting Diagnostics
+## 2. Stage 1 Discovery Reference (`checkpoints/retriever-discovery-reference/`)
 
-1. **Stage 1 Retrieval Bottleneck (`Recall@50 = 75.74%` vs `85.11%` Personal Repeat):**
-   - Stage 1 shows smooth, monotonic loss decrease (`0.1339 -> 0.0722` train, `0.1043 -> 0.0792` val) without overfitting, but **underfits exact SKU identity**: `ProductTower` currently encodes text (`BAAI/bge-m3`), `brand`, `category`, `subcategory`, `business_line`, and 6 demand numbers, without a dedicated learnable `product_id` embedding table.
-   - Because Stage 2 (`UPS-CANR`) only reranks the top 50 candidates from Stage 1, any repeat SKU ranked $>50$ by Stage 1 is unreachable by Stage 2 (`24.26%` of true items missed before Stage 2 runs).
-2. **Stage 2 Rapid Convergence & Mild Overfitting After Epoch 4–9:**
-   - Stage 2 achieves massive gains over Stage 1 (`Recall@10` `47.60% -> 66.69%`, `NDCG@10` `0.3007 -> 0.5347`), packing `88.1%` of Stage 1's top-50 recall into the top 10.
-   - Training loss continues falling (`3.0658 -> 2.3846`) while validation loss plateaus around `2.38–2.40` after Epoch 4–9 due to the hard `75.74%` Stage 1 candidate ceiling and positive-injection distribution shift between training and inference slates.
-3. **Recommended Next Steps (Pending User Approval):**
-   - **Hybrid Candidate Slate Generation:** Construct the 50-candidate slate for Stage 2 by taking the union of the customer's previously purchased SKUs and the top Stage 1 Two-Tower semantic candidates (raising candidate slate recall from `75.74%` to `>90%`).
-   - **Learnable `product_id` Embedding in `ProductTower`:** Add `nn.Embedding(num_products, 64)` to `ProductTower` so Stage 1 directly captures exact SKU-level collaborative signals alongside text and category hierarchy.
+- Trained with `python -m recommender.train_retriever --discovery-reference` (`30` epochs, `seed=42`, `discovery_only=True` over `8,773` training baskets containing at least one first-time purchase).
+- Uses 128D towers, 2-layer Transformer over 32 purchase tokens with shared catalogue product vectors and inter-purchase gaps (`history_gap_reference_days = 74.0`), one-hot `container_type` with explicit `none`, no learned brand/category/line ID embeddings in `ProductTower` (`remove_product_attribute_embeddings = True`), and 4 binary familiarity flags (`brand`, `product_category`, `business_line`, `product_family`).
+- Selected at **Epoch 23**:
+  - **Rolling Pool New-to-Customer Recall@25:** **`35.11%` (`652 / 1,857`)**
+  - **Rolling Pool New-to-Customer Recall@50:** **`49.60%` (`921 / 1,857`)**
+  - **Mixed 50-Item Slate New-to-Customer Recall@50:** **`41.09%` (`763 / 1,857`)**
+
+---
+
+## 3. Stage 2 `UPS-CANR` Reference Training Curve (`checkpoints/ranker/training_history.json`)
+
+Trained for 10 epochs (`seed=42`, `heuristic_fraction=0.5`, `statistics_attention=True`, `excluded_statistics=("history_repeat",)`):
+
+| Epoch | Train Loss | Val Loss | Val Recall@5 | Val Recall@10 | Val Recall@20 | Val NDCG@10 | Val MRR | Val New Recall@10 (`Hits / 1,857`) |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1** | 2.6626 | 2.0942 | 63.56% | 75.59% | 82.97% | 0.5819 | 0.5582 | 10.77% (`200 / 1,857`) |
+| **2** | 2.4191 | 2.0637 | 63.93% | 75.95% | 83.20% | 0.5877 | 0.5653 | 10.61% (`197 / 1,857`) |
+| **3** | 2.3422 | 2.0548 | 64.59% | 75.87% | 83.21% | 0.5917 | 0.5712 | 10.29% (`191 / 1,857`) |
+| **4** | 2.2995 | 2.0537 | 64.26% | 75.97% | 83.22% | 0.5902 | 0.5687 | 10.82% (`201 / 1,857`) |
+| **5** | 2.2644 | 2.0446 | 64.68% | 76.02% | 83.26% | 0.5929 | 0.5718 | 10.29% (`191 / 1,857`) |
+| **6** | 2.2400 | 2.0489 | 64.55% | 76.00% | 83.20% | 0.5913 | 0.5698 | 10.50% (`195 / 1,857`) |
+| **7 (Best NDCG)** | 2.2124 | 2.0422 | **64.86%** | 76.09% | 83.24% | **0.5934** | **0.5721** | 10.93% (`203 / 1,857`) |
+| **8** | 2.1890 | 2.0468 | 64.71% | 75.99% | **83.28%** | 0.5922 | 0.5707 | 10.39% (`193 / 1,857`) |
+| **9** | 2.1695 | 2.0472 | 64.79% | 76.08% | 83.22% | 0.5924 | 0.5705 | 10.72% (`199 / 1,857`) |
+| **10 (Best Discovery / Reference)** | **2.1563** | 2.0484 | 64.79% | **76.15%** | 83.24% | 0.5924 | 0.5707 | **11.25% (`209 / 1,857`)** |
+
+---
+
+## 4. Archive of Tested & Rejected Experimental Hypotheses (Code Removed)
+
+To keep the codebase clean, all experimental code paths that failed to beat the reference models above have been deleted. Their empirical results and post-mortem lessons are recorded here so agents never re-implement them:
+
+| Experiment (Removed from Codebase) | New-to-Customer Hits@10 (`/ 1,857`) | Overall Recall@10 | Peak Val NDCG@10 | Why It Failed / Post-Mortem |
+| :--- | :---: | :---: | :---: | :--- |
+| **Stage 2 Reference (`excluded_statistics=("history_repeat",)` )** | **`209` (`11.25%`)** | **`76.15%`** | `0.5934` | Active reference baseline (`checkpoints/ranker/`). |
+| Remove `history_month` + `history_repeat` + `company_distinct_orders` | `203` (`10.93%`) | `76.09%` | `0.5934` | Slightly reduced discovery hits without improving overall recall. |
+| Introduce reorder `due_score = gap_norm - age_norm` | `203` (`10.93%`) | `76.05%` | `0.5945` | Entered only through attention bias while memory token values zeroed out `tabular_features` and `sequence`, so due-ness could not propagate into attended values `h_attended`. |
+| Frozen Precompiled Stage 1 Vectors for Token 0 & History (`1..32`) | `189` (`10.18%`) | `75.82%` | `0.5947` (`0.5880` at discovery ckpt) | Freezing Stage 1 retrieval vectors prevented history tokens from adapting to Stage 2 ranking and passed them through trainable Transformer/QKV layers that destroyed direct coordinate alignment. |
+| Aligned 11-D Statistics (Diagonal Attention) | `187` (`10.07%`) | `75.82%` | `0.5922` | Restricted the existing $14 \times 17$ learned interaction matrix $s_c^\top W s_m$ and forced artificial pairings (e.g. customer `distinct_products` paired with both `popularity` and `industry_affinity`). |
+| Aligned 11-D Statistics (Full $11 \times 11$ Interactions) | `184` (`9.91%`) | `75.84%` | `0.5930` | Compressed the $14 \times 17$ statistics representation into $11 \times 11$ without adding new information. |
+| Combined Precompiled Vectors + Aligned 11-D + Shared Favorite Attributes | `181` (`9.75%`) | `75.81%` | `0.5928` | Compounded the representational restrictions of frozen history vectors and compressed attention statistics (`-13.4%` relative drop in new-product discovery). |
+| Stage 1 Price / Turnover / Co-Purchase Complementarity | Below reference | Below reference | — | Inferred invoice prices, turnover weights, and monthly co-purchase complementarity lowered Stage 1 unseen discovery recall below the 4-flag reference. |

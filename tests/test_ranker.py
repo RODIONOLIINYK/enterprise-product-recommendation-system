@@ -106,24 +106,6 @@ class TestRankerArchitectureShapes(unittest.TestCase):
             self.assertEqual(out.logits.shape, (self.B, c))
             self.assertEqual(out.attention_weights.shape, (self.B, c, 33))
 
-    def test_stored_vectors_are_frozen_and_candidate_stats_reach_attention(self):
-        model = UPSCANRRanker(history_gap_reference_days=30, adapt_candidate_query=True).eval()
-        inputs = self._generate_synthetic_inputs(1, 2)
-        catalogue = torch.randn(100, OUTPUT_DIM, requires_grad=True)
-        inputs["catalog_product_vectors"] = catalogue
-        inputs["seq_purchase_dates"] = torch.arange(32).float().unsqueeze(0) / 365.25
-        with torch.no_grad():
-            model.candidate_query_adjustment.weight[:, OUTPUT_DIM].copy_(torch.arange(OUTPUT_DIM) / OUTPUT_DIM)
-        first = model(**inputs)
-        inputs["pairwise_features"] = inputs["pairwise_features"].clone()
-        inputs["pairwise_features"][0, 0, 0] += 1
-        second = model(**inputs)
-        torch.testing.assert_close(first.memory, second.memory)
-        self.assertFalse(torch.allclose(first.attention_weights[0, 0], second.attention_weights[0, 0]))
-        torch.testing.assert_close(first.attention_weights[0, 1], second.attention_weights[0, 1])
-        second.logits.sum().backward()
-        self.assertIsNone(catalogue.grad)
-
     def test_variable_batch_sizes(self):
         """Batch sizes B=1, 4, 32 execute cleanly and preserve tensor dimensions."""
         for b in (1, 4, 32):
@@ -489,41 +471,6 @@ class TestDevicePortabilityAndPrecision(unittest.TestCase):
         self.assertFalse(torch.isnan(out_mps.logits).any())
 
         out_mps.logits.sum().backward()
-
-
-def test_prediction_age_bias_changes_attention_without_changing_history_tokens():
-    ranker = UPSCANRRanker(history_age_attention=True, dropout=0).eval()
-    with torch.no_grad():
-        # Isolate the age effect from the learned query/key dot product.
-        ranker.cross_attention.in_proj_weight[:2 * OUTPUT_DIM].zero_()
-        ranker.cross_attention.in_proj_bias[:2 * OUTPUT_DIM].zero_()
-        ranker.history_age_weight.fill_(-2)
-
-    mask = torch.zeros(1, 32, dtype=torch.long)
-    mask[:, :2] = 1
-    dates = torch.zeros(1, 32)
-    dates[0, :2] = torch.tensor([-400.0, -800.0]) / 365.25
-    sequence = torch.zeros(1, 32, 9)
-    inputs = dict(
-        text_embedding=torch.zeros(1, TEXT_DIM),
-        city_id=torch.zeros(1, dtype=torch.long),
-        region_id=torch.zeros(1, dtype=torch.long),
-        industry_id=torch.zeros(1, dtype=torch.long),
-        tabular_features=torch.zeros(1, 8),
-        attention_mask=mask,
-        seq_purchase_dates=dates,
-        candidate_vectors=torch.zeros(1, 2, OUTPUT_DIM),
-    )
-    first = ranker(**inputs, sequence=sequence, prediction_day=torch.tensor([0.0]))
-    sequence[..., 1] = 1
-    later = ranker(**inputs, sequence=sequence, prediction_day=torch.tensor([90.0]))
-    torch.testing.assert_close(first.memory, later.memory)
-    for output, ages in [(first, (400, 800)), (later, (490, 890))]:
-        expected = torch.softmax(torch.tensor([0.0, *(-2 * a / (a + 90) for a in ages)]), dim=0)
-        torch.testing.assert_close(output.attention_weights[0, :, :3], expected.expand(2, -1))
-        assert torch.count_nonzero(output.attention_weights[..., 3:]) == 0
-    later.attention_weights[..., 1].sum().backward()
-    assert torch.count_nonzero(ranker.history_age_weight.grad) == ranker.num_heads
 
 
 def test_statistics_bias_combines_candidate_and_token_inputs():

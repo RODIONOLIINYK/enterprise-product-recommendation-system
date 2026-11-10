@@ -12,7 +12,7 @@ from recommender.catalogue import ITEM_COLUMN_MAPPING
 
 from recommender.data import (
     COLUMN_MAPPING, aggregate_purchases, load_purchases,
-    select_paid_purchases, sku_median_prices_uah, validate_purchases,
+    select_paid_purchases, validate_purchases,
 )
 
 
@@ -43,20 +43,6 @@ def write_item_catalogue(path: Path, sales: pd.DataFrame) -> None:
 
 
 class PurchasePreparationTests(unittest.TestCase):
-    def test_price_is_median_of_unified_purchase_record_unit_prices(self):
-        paid = pd.DataFrame(
-            [
-                ("C1", "A", "2025-01-01 10:00", 2, 60),
-                ("C1", "A", "2025-01-01 15:00", 8, 80),
-                ("C2", "A", "2025-01-01", 2, 40),
-                ("C3", "A", "2025-01-01", 1, None),
-                ("C3", "A", "2025-01-01", 1, 100),
-                ("C1", "A", "2025-01-02", 1, 1000),
-            ],
-            columns=["customer_id", "product_id", "purchase_date", "quantity", "turnover_uah"],
-        )
-        self.assertEqual(sku_median_prices_uah(paid, ["A"], pd.Timestamp("2025-01-02")), {"A": 17.0})
-
     def test_package_variants_and_event_quantities_survive(self):
         paid = sales_frame()
         cleaned = aggregate_purchases(paid)

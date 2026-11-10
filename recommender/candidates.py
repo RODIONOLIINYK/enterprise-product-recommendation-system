@@ -29,7 +29,6 @@ import pandas as pd
 import torch
 
 from recommender.catalogue import RollingCandidatePool
-from recommender.complementarity import ProductComplementarity, group_snapshot_rows, product_snapshot_date
 from recommender.features import LEGACY_PROFILE_FEATURES, PointInTimeNormalizer
 from recommender.familiarity import FamiliarityStore
 from recommender.models import (
@@ -40,9 +39,6 @@ from recommender.models import (
     CustomerTower,
     ProductTower,
     TwoTowerModel,
-)
-from recommender.price_features import (
-    CustomerMedianUnitPrice, PricePreferenceStore, load_price_preference_store, load_reconciled_prices,
 )
 from recommender.scope import actual_purchase_mask
 from recommender.split import TRAIN_CUTOFF
@@ -622,35 +618,15 @@ class PointInTimeFeatureStore:
         customer_id: str,
         as_of_date: Union[str, pd.Timestamp],
         product_ids: Sequence[str],
-        *,
-        category_overdue: bool = False,
     ) -> torch.Tensor:
         """Fast batch extraction of pairwise features for a candidate slate (shape C x 13).
 
         Executes in ~0.03 milliseconds for 50 candidates.
         """
         c = len(product_ids)
-        mat = np.zeros((c, NUM_PAIRWISE_FEATURES + int(category_overdue)), dtype=np.float32)
-        pairwise = mat[:, :NUM_PAIRWISE_FEATURES] if category_overdue else mat
-        if category_overdue:
-            cid = str(customer_id).strip()
-            as_of = pd.Timestamp(as_of_date)
-            cutoff = bisect_left(self.customer_event_dates.get(cid, ()), as_of)
-            dates_by_category: Dict[str, List[pd.Timestamp]] = {}
-            for date, _, _, category, _, _, _ in self.customer_events.get(cid, ())[:cutoff]:
-                if category:
-                    days = dates_by_category.setdefault(category, [])
-                    if not days or days[-1] != date:
-                        days.append(date)
-            overdue_categories = {
-                category for category, days in dates_by_category.items()
-                if len(days) >= 3 and (as_of - days[-1]).days > np.median([
-                    (later - earlier).days for earlier, later in zip(days, days[1:])
-                ])
-            }
-            mat[:, -1] = [self.get_product_category(sku) in overdue_categories for sku in product_ids]
+        mat = np.zeros((c, NUM_PAIRWISE_FEATURES), dtype=np.float32)
         for i in range(c):
-            pairwise[i] = self.compute_pairwise_features(
+            mat[i] = self.compute_pairwise_features(
                 customer_id=customer_id,
                 as_of_date=as_of_date,
                 product_id=product_ids[i],
@@ -772,7 +748,7 @@ def load_retriever_from_checkpoint(
         max_seq_len=config.get("max_seq_len", DEFAULT_SEQUENCE_LENGTH),
         history_gap_reference_days=config.get("history_gap_reference_days"),
         num_products=sku_embeddings.shape[0] if sku_embeddings is not None else None,
-        num_tabular_features=len(profile_features) + int(config.get("customer_price_reference") is not None),
+        num_tabular_features=len(profile_features),
     )
     product_tower = ProductTower(
         text_dim=config.get("text_dim", TEXT_DIM),
@@ -793,7 +769,6 @@ def load_retriever_from_checkpoint(
         product_tower=product_tower,
         num_catalog_products=num_products,
         temperature=config.get("temperature", DEFAULT_TEMPERATURE),
-        include_price_preference=config.get("include_price_preference", False),
         num_familiarity_features=len(config.get("familiarity_fields", ())),
     )
 
@@ -824,11 +799,8 @@ class CandidateRetriever:
         quantity_reference: Optional[float] = None,
         customer_vocabs: Optional[Dict[str, Dict[str, int]]] = None,
         company_cache_name: str = "bge_m3_company.parquet",
-        price_preference: Optional[PricePreferenceStore] = None,
-        customer_median_price: Optional[CustomerMedianUnitPrice] = None,
         familiarity: Optional[FamiliarityStore] = None,
         rolling_pool: Optional[RollingCandidatePool] = None,
-        product_complementarity: Optional[ProductComplementarity] = None,
     ):
         self.device = torch.device(device) if device is not None else torch.device("cpu")
         self.model = model
@@ -846,14 +818,10 @@ class CandidateRetriever:
         self.quantity_reference = quantity_reference
         self.customer_vocabs = customer_vocabs or {}
         self.company_cache_name = company_cache_name
-        self.price_preference = price_preference
-        self.customer_median_price = customer_median_price
         self.familiarity = familiarity
         self.rolling_pool = rolling_pool
-        self.product_complementarity = product_complementarity
 
         self._cached_product_vectors: Optional[torch.Tensor] = None
-        self._dated_product_vectors: dict[pd.Timestamp, torch.Tensor] = {}
 
     @classmethod
     def from_checkpoint(
@@ -867,7 +835,6 @@ class CandidateRetriever:
         *,
         candidate_product_ids: Optional[Sequence[str]] = None,
         rolling_pool: Optional[RollingCandidatePool] = None,
-        product_complementarity: Optional[ProductComplementarity] = None,
     ) -> "CandidateRetriever":
         """Load the checkpoint, optionally appending cold candidates in input order."""
         model, ckpt = load_retriever_from_checkpoint(checkpoint_path, device=device)
@@ -896,16 +863,6 @@ class CandidateRetriever:
                 rolling_pool = RollingCandidatePool(catalogue_df, purchases_df)
         normalizer_state = config.get("profile_normalizer")
         vocabs = ckpt.get("vocabs", {})
-        price_preference = None
-        if model.price_weights is not None:
-            if catalogue_df is None:
-                raise ValueError("Price-aware retrieval requires catalogue units and categories.")
-            price_preference = load_price_preference_store(purchases_df, catalogue_df, eligible_pids)
-        price_reference = config.get("customer_price_reference")
-        customer_median_price = (
-            CustomerMedianUnitPrice(load_reconciled_prices(purchases_df), price_reference)
-            if price_reference is not None else None
-        )
         familiarity = None
         if model.familiarity_weights is not None:
             if catalogue_df is None:
@@ -930,30 +887,16 @@ class CandidateRetriever:
             ),
             quantity_reference=config.get("quantity_reference"),
             company_cache_name=config.get("company_cache_name", "bge_m3_company.parquet"),
-            price_preference=price_preference,
-            customer_median_price=customer_median_price,
             familiarity=familiarity,
             rolling_pool=rolling_pool,
-            product_complementarity=product_complementarity,
             customer_vocabs={
                 key: vocabs[key] for key in ("city_vocab", "region_vocab", "industry_vocab") if key in vocabs
             },
         )
 
-    def customer_profile_inputs(
-        self, profiles: torch.Tensor, customer_ids: Sequence[str], as_of_dates: Sequence[object],
-    ) -> torch.Tensor:
-        """Append the optional point-in-time price scalar to the company profile."""
-        if self.customer_median_price is not None:
-            return self.customer_median_price.append_to(profiles, customer_ids, as_of_dates)
-        return profiles
-
-    def get_product_vectors(self, as_of: Optional[pd.Timestamp] = None) -> torch.Tensor:
+    def get_product_vectors(self) -> torch.Tensor:
         """Compute or retrieve cached L2-normalized product catalog vectors v_p (P, 128)."""
-        snapshot = product_snapshot_date(as_of) if as_of is not None and self.product_complementarity is not None else TRAIN_CUTOFF
-        if snapshot in self._dated_product_vectors:
-            return self._dated_product_vectors[snapshot]
-        if snapshot == TRAIN_CUTOFF and self._cached_product_vectors is not None:
+        if self._cached_product_vectors is not None:
             return self._cached_product_vectors
 
         if self.model is None or self.product_inputs is None:
@@ -964,23 +907,16 @@ class CandidateRetriever:
                 k: v.to(self.device) if isinstance(v, torch.Tensor) else v
                 for k, v in self.product_inputs.items()
             }
-            demand = p_inputs["demand_features"]
-            if snapshot < TRAIN_CUTOFF:
-                share = torch.from_numpy(self.product_complementarity.shares(self.eligible_product_ids, snapshot))
-                demand = torch.cat((demand[:, :-1], share[:, None].to(demand.device)), dim=1)
             v_p = self.model.product_tower(
                 p_inputs["text_embedding"],
                 p_inputs["brand_id"],
                 p_inputs["category_id"],
                 p_inputs.get("subcategory_id"),
                 p_inputs["business_line_id"],
-                demand,
+                p_inputs["demand_features"],
                 container_id=p_inputs.get("container_id"),
             )
-            if snapshot == TRAIN_CUTOFF:
-                self._cached_product_vectors = v_p
-            else:
-                self._dated_product_vectors[snapshot] = v_p
+            self._cached_product_vectors = v_p
             return v_p
 
     def compute_logits(
@@ -992,43 +928,18 @@ class CandidateRetriever:
         as_of_dates: Optional[Sequence[Union[str, pd.Timestamp]]] = None,
     ) -> torch.Tensor:
         """Score products, using query dates and customer IDs for contextual features."""
-        if (
-            product_vectors is None and self.product_complementarity is not None
-            and as_of_dates is not None and len(as_of_dates)
-        ):
-            dates = [product_snapshot_date(date) for date in as_of_dates]
-            groups = group_snapshot_rows(dates)
-            if len(groups) == 1:
-                product_vectors = self.get_product_vectors(dates[0])
-            else:
-                scores = [
-                    self.compute_logits(
-                        customer_vectors[rows],
-                        self.get_product_vectors(dates[rows[0]]),
-                        customer_ids=[customer_ids[i] for i in rows] if customer_ids is not None else None,
-                        as_of_dates=[as_of_dates[i] for i in rows],
-                    )
-                    for rows in groups
-                ]
-                order = torch.tensor([i for rows in groups for i in rows], device=self.device).argsort()
-                return torch.cat(scores)[order]
         u_c = customer_vectors.to(self.device)
         v_p = product_vectors.to(self.device) if product_vectors is not None else self.get_product_vectors()
 
         if self.model is not None:
             prod_idx = torch.arange(v_p.size(0), device=self.device)
-            price_features = None
-            if self.model.price_weights is not None:
-                if self.price_preference is None or customer_ids is None or as_of_dates is None:
-                    raise ValueError("Price-aware retrieval requires customer IDs and scoring dates.")
-                price_features = self.price_preference.batch_features(customer_ids, as_of_dates)
             familiarity_features = None
             if self.model.familiarity_weights is not None:
                 if self.familiarity is None or customer_ids is None or as_of_dates is None:
                     raise ValueError("Familiarity-aware retrieval requires customer IDs and scoring dates.")
                 familiarity_features = self.familiarity.batch_features(customer_ids, as_of_dates)
             return self.model.compute_logits(
-                u_c, v_p, product_indices=prod_idx, price_features=price_features,
+                u_c, v_p, product_indices=prod_idx,
                 familiarity_features=familiarity_features,
             )
 
@@ -1072,7 +983,6 @@ class CandidateRetriever:
         top_c: int = DEFAULT_TOP_C,
         *,
         heuristic_fraction: float = 0.0,
-        category_overdue: bool = False,
     ) -> CandidateBatch:
         """Construct CandidateBatch with 13 pairwise features for a batch of transitions.
 
@@ -1095,8 +1005,8 @@ class CandidateRetriever:
         if not 0.0 <= heuristic_fraction <= 1.0:
             raise ValueError("heuristic_fraction must be between 0 and 1.")
         heuristic_count = int(c_slate * heuristic_fraction)
-        if (heuristic_count or category_overdue) and self.feature_store is None:
-            raise ValueError("Heuristic candidates and category cadence require a point-in-time feature store.")
+        if heuristic_count and self.feature_store is None:
+            raise ValueError("Heuristic candidates require a point-in-time feature store.")
 
         if not self.eligible_product_ids:
             current_pids = [str(i) for i in range(p_total)]
@@ -1185,7 +1095,6 @@ class CandidateRetriever:
                     customer_id=cid,
                     as_of_date=as_of,
                     product_ids=slate_dict["candidate_pids"],
-                    category_overdue=category_overdue,
                 )
             else:
                 feat_matrix = torch.zeros((len(slate_dict["candidate_pids"]), NUM_PAIRWISE_FEATURES))
@@ -1198,7 +1107,7 @@ class CandidateRetriever:
         pairwise_features_t = (
             torch.stack(all_pairwise_features, dim=0)
             if all_pairwise_features
-            else torch.zeros((0, c_slate, NUM_PAIRWISE_FEATURES + int(category_overdue)), dtype=torch.float32)
+            else torch.zeros((0, c_slate, NUM_PAIRWISE_FEATURES), dtype=torch.float32)
         )
         labels_t = (
             torch.tensor(all_labels, dtype=torch.float32)

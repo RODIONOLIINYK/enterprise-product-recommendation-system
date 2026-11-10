@@ -430,7 +430,6 @@ class TwoTowerModel(nn.Module):
         product_tower: ProductTower,
         num_catalog_products: int = 1000,
         temperature: float = DEFAULT_TEMPERATURE,
-        include_price_preference: bool = False,
         num_familiarity_features: int = 0,
     ):
         super().__init__()
@@ -440,7 +439,6 @@ class TwoTowerModel(nn.Module):
 
         # Learnable product bias term
         self.product_bias = nn.Parameter(torch.zeros(num_catalog_products))
-        self.price_weights = nn.Parameter(torch.zeros(3)) if include_price_preference else None
         self.familiarity_weights = (
             nn.Parameter(torch.zeros(num_familiarity_features)) if num_familiarity_features else None
         )
@@ -451,16 +449,14 @@ class TwoTowerModel(nn.Module):
         product_vectors: torch.Tensor,
         product_indices: Optional[torch.Tensor] = None,
         *,
-        price_features: Optional[torch.Tensor] = None,
         familiarity_features: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """Compute scaled dot-product similarity scores with optional price preference.
+        """Compute scaled dot-product similarity scores with optional familiarity weights.
 
         Args:
             customer_vectors: FloatTensor of shape (B, 128)
             product_vectors: FloatTensor of shape (P, 128)
             product_indices: Optional LongTensor of shape (P,) for product bias lookup.
-            price_features: Point-in-time FloatTensor of shape (B, P, 3) when enabled.
             familiarity_features: Point-in-time attribute matches of shape (B, P, F) when enabled.
 
         Returns:
@@ -470,10 +466,6 @@ class TwoTowerModel(nn.Module):
         if product_indices is not None:
             bias = self.product_bias[product_indices]  # (P,)
             scores = scores + bias.unsqueeze(0)
-        if self.price_weights is not None:
-            if price_features is None or price_features.shape != (*scores.shape, 3):
-                raise ValueError("Price-aware retrieval requires price features for each customer and candidate.")
-            scores = scores + price_features.to(scores) @ self.price_weights
         if self.familiarity_weights is not None:
             expected = (*scores.shape, self.familiarity_weights.numel())
             if familiarity_features is None or familiarity_features.shape != expected:

@@ -397,7 +397,6 @@ class TestTrainRetriever(unittest.TestCase):
                 self.assertEqual(retriever.quantity_reference, 3.0)
                 self.assertEqual(retriever.profile_features, (*RETRIEVER_PROFILE_FEATURES, MEDIAN_PURCHASE_QUANTITY))
                 self.assertEqual(ckpt["config"]["container_encoding"], "one_hot_none")
-                self.assertIsNone(ckpt["config"]["sku_prices_uah"])
                 tower = retriever.model.customer_tower
                 self.assertEqual(tower.num_tabular_features, 6)
                 self.assertEqual(tower.hidden_dim, 64)
