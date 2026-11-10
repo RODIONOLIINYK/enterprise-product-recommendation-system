@@ -1,6 +1,6 @@
 # Agent Guide & Reference Architecture (`AGENTS.md`)
 
-This document is the authoritative source of truth for coding agents working in this repository. It describes **only the active, verified code and reference checkpoints** currently in the repository. See [`EVALUATION_RESULTS.md`](EVALUATION_RESULTS.md) for validation metrics and [`plan.md`](plan.md) for current project goals and next experiments.
+This document guides coding agents working in this repository. Source behavior and checkpoint metadata were audited on 2026-11-10; **local artifacts differ from the historical validation reference**. See [`AUDIT_REPORT.md`](AUDIT_REPORT.md) and [`audit/artifacts.json`](audit/artifacts.json) before selecting a baseline. Validation numbers below are historical records, not reproduced by this audit. See [`EVALUATION_RESULTS.md`](EVALUATION_RESULTS.md) for validation metrics and [`plan.md`](plan.md) for current project goals and next experiments.
 
 ---
 
@@ -26,12 +26,12 @@ This document is the authoritative source of truth for coding agents working in 
   - **Output dimension:** `128D` L2-normalized customer vectors $\mathbf{u}_c$ and product vectors $\mathbf{v}_p$.
   - **`CustomerTower`:**
     - Projects `1024D` `BAAI/bge-m3` company text $\to 128\text{D}$.
-    - Embeds `city_id`, `region_id`, `industry_id` (`16D` each) + **7 point-in-time profile features** (`total_purchases`, `total_quantity`, `distinct_products`, `distinct_categories`, `days_since_first_order`, `days_since_last_order`, `median_purchase_quantity`) $\to 128\text{D}$.
-    - Encodes the last 32 purchase events using `catalog_history_encoder = "attention"`: each historical token combines its frozen `128D` catalogue product vector, normalized event quantity (`quantity_reference = 12.0`), and normalized inter-purchase gap (`history_gap_reference_days = 74.0`) through a 2-layer Transformer (`4` heads) and learned attention pooling $\to 128\text{D}$.
+    - Embeds `city_id`, `region_id`, `industry_id` (`16D` each) + **6 explicit profile features in the local checkpoint** (`distinct_orders`, `total_quantity`, `distinct_products`, `distinct_categories`, `median_order_gap`, `median_purchase_quantity`) $\to 128\text{D}$.
+    - Encodes the last 32 purchase events using `catalog_history_encoder = "attention"`: each historical token combines its shared `128D` catalogue product vector, normalized event quantity (`quantity_reference = 60.0` in the local checkpoint), and normalized inter-purchase gap (`history_gap_reference_days = 74.0`) through a 2-layer Transformer (`4` heads) and masked-mean plus last-valid-event pooling followed by a learned projection $\to 128\text{D}$.
     - Late-fusion MLP combines `[text (128), tabular (128), history (128)]` $\to 128\text{D}$.
   - **`ProductTower`:**
     - Uses `remove_product_attribute_embeddings = True` (no learned brand/category/subcategory/line ID embeddings inside `ProductTower`).
-    - Combines `1024D` `BAAI/bge-m3` product text (without subcategory), one-hot `container_type` with an explicit `none` bucket (`14` buckets), and **7 point-in-time product demand features** (`total_volume`, `orders_30d`, `orders_90d`, `unique_buyers`, `category_market_share`, `days_since_last_sold`, `sku_median_quantity`) $\to 128\text{D}$.
+    - Combines `1024D` `BAAI/bge-m3` product text (without subcategory), one-hot `container_type` with an explicit `none` bucket (`12` buckets in the local checkpoint), and **6 demand features** (`total_volume`, `orders_30d`, `orders_90d`, `unique_buyers`, `category_market_share`, `days_since_last_sold`); optional `sku_median_quantity` is disabled in the local checkpoint. Demand uses a fixed training-cutoff snapshot, which is not point-in-time for earlier training predictions (see audit) $\to 128\text{D}$.
   - **4 Familiarity Flags (`recommender/familiarity.py`):**
     - Adds learned weights for whether the customer has ever purchased the candidate's `brand`, `product_category`, `business_line`, or `product_family` strictly prior to `as_of_date`.
   - **Rolling Candidate Pool (`recommender/stage1_catalogue.py`):**
@@ -53,15 +53,15 @@ This document is the authoritative source of truth for coding agents working in 
   6. `user_cat_order_share`
   7. `user_subcat_order_share`
   8. `user_brand_order_share`
-  9. `user_business_line_order_share`
-  10. `global_sku_popularity_norm`
-  11. `industry_sku_affinity`
-  12. `stage1_score` (sigmoid retrieval logit)
-  13. `stage1_rank_inv` ($1 / (1 + \text{rank})$)
+  9. `global_sku_popularity_norm`
+  10. `industry_sku_affinity`
+  11. `is_repeat_category`
+  12. `is_repeat_brand`
+  13. `is_repeat_business_line`
 
 ### Stage 2: Unified Profile-Sequence Candidate-Aware Neural Ranker (`UPS-CANR`)
 - **Code:** [`recommender/ranker.py`](recommender/ranker.py), [`recommender/train_ranker.py`](recommender/train_ranker.py), [`recommender/evaluate.py`](recommender/evaluate.py)
-- **Reference Checkpoint:** `checkpoints/ranker/best_ranker.pt` (promoted from the best ablation `excluded_statistics = ("history_repeat",)` with `statistics_attention = True`).
+- **Default Checkpoint Path:** `checkpoints/ranker/best_ranker.pt` (`statistics_attention=True`, `excluded_statistics=("history_repeat",)`). The local alias is epoch 7, NDCG-selected (`201 / 1,857` discovery hits; stored NDCG `0.593815`). The local discovery checkpoint is epoch 4 (`209 / 1,857`; stored NDCG `0.591893`). Preserve both; neither establishes the historical epoch-10 reference below.
 - **Architecture (`UPSCANRRanker`):**
   1. **Unified 33-Token Customer Memory (`B, 33, 128`):**
      - **Token 0 (Customer Profile):** Combines `1024D` company text projection, `city`/`region`/`industry` embeddings, and 8 profile features (zeroed in the token value builder when `statistics_attention=True`), plus `type_embedding[0]`.
@@ -72,10 +72,10 @@ This document is the authoritative source of truth for coding agents working in 
      - With `statistics_attention = True` and `excluded_statistics = ("history_repeat",)`, each head adds a learned bilinear attention bias $B_h(c, m) = [1, \mathbf{s}_c]^\top W_h \mathbf{s}_m$ (`W_h` shape `4 x 14 x 17`) between the 13 candidate pairwise features (+ intercept) and the 9 history statistics / 8 company profile statistics (with `history_repeat` masked to `0`).
   3. **Scoring Head (`397D` MLP):**
      - Concatenates `[\mathbf{z}_{\text{cand}} (128), \mathbf{h}_{\text{attended}} (128), \mathbf{z}_{\text{cand}} \odot \mathbf{h}_{\text{attended}} (128), \text{pairwise\_features} (13)]` (`397D`) $\to$ MLP (`397 -> 256 -> 128 -> 64 -> 1`).
-  4. **Validation Performance (`6,191` baskets):**
+  4. **Historical Documented Validation Performance (`6,191` baskets):**
      - **New-to-Customer Recall@10:** **`11.25%` (`209 / 1,857`)**
      - **Overall Recall@10:** **`76.15%`**
-     - **Overall NDCG@10:** **`0.5924`** (discovery-selected checkpoint Epoch 10; peak NDCG checkpoint achieves `0.5945`).
+     - **Overall NDCG@10:** **`0.5924`** (discovery-selected checkpoint Epoch 10; historical reference peak NDCG checkpoint achieves `0.5934`; `0.5945` belongs to the rejected due-score experiment).
 
 ---
 
@@ -84,7 +84,7 @@ This document is the authoritative source of truth for coding agents working in 
 | Module | Purpose |
 | :--- | :--- |
 | [`recommender/data.py`](recommender/data.py), [`merging.py`](recommender/merging.py), [`scope.py`](recommender/scope.py), [`preparation.py`](recommender/preparation.py) | Raw workbook/CSV parsing, paid-sale filtering (`ПРОДАЖА` + `ТОВАР`), quantity-summing record deduplication, and `cleaned_purchases.csv` generation. |
-| [`recommender/company.py`](recommender/company.py), [`catalogue.py`](recommender/catalogue.py), [`metadata.py`](recommender/metadata.py) | Company metadata (`city`, `region_code`, `industry_branch`) and product catalogue metadata (`brand`, `product_category`, `product_subcategory`, `business_line`, `container_type`, `product_family`). |
+| [`recommender/company.py`](recommender/company.py), [`catalogue.py`](recommender/catalogue.py) | Company metadata (`city`, `region_code`, `industry_branch`) and product catalogue metadata (`brand`, `product_category`, `product_subcategory`, `business_line`, `container_type`, `product_family`). |
 | [`recommender/split.py`](recommender/split.py) | Chronological split (`TRAIN_CUTOFF = 2025-10-01`, `TEST_START = 2026-02-19`) and leakage validation. |
 | [`recommender/features.py`](recommender/features.py) | `Log1pScaler`, `PointInTimeNormalizer`, and customer lifetime feature extraction. |
 | [`recommender/sequences.py`](recommender/sequences.py) | 32-event chronological purchase sequence builder (`ENRICHED_FEATURE_DIM = 9`). |
@@ -109,9 +109,17 @@ This document is the authoritative source of truth for coding agents working in 
 | `checkpoints/retriever/best_retriever.pt` | Standard 10-epoch Stage 1 checkpoint used by unit/integration tests. |
 | `checkpoints/stage1-full-catalogue/text_embeddings/` | Cached `BAAI/bge-m3` text embeddings for the full merchandise catalogue used by `load_stage1_discovery`. |
 | `checkpoints/stage1-rolling-discovery/` | Stage 1 rolling candidate pool evaluation outputs. |
-| `checkpoints/ranker/best_ranker.pt` | Active Stage 2 `UPS-CANR` reference checkpoint (`statistics_attention=True`, `excluded_statistics=("history_repeat",)`). |
-| `checkpoints/ranker/best_discovery_ranker.pt` | Discovery-selected Stage 2 reference checkpoint (`209 / 1,857` new-to-customer hits). |
-| `checkpoints/ranker/best_ndcg_ranker.pt` | Peak-NDCG Stage 2 reference checkpoint (`0.5934` Val NDCG@10). |
-| `checkpoints/evaluation_report.json` | Full validation evaluation report for the Stage 1 + Stage 2 reference pipeline. |
-| `data/interim/ranker_train_slates_v3_repeat_0.5_rolling_v1.pt` | Cached 50-candidate training slates (`26,184` transitions) for the reference Stage 1 retriever. |
+| `checkpoints/ranker/best_ranker.pt` | Local NDCG-selected alias, epoch 7: `201 / 1,857`, stored NDCG `0.593815`; audit provenance applies. |
+| `checkpoints/ranker/best_discovery_ranker.pt` | Local discovery selection, epoch 4: `209 / 1,857`, stored NDCG `0.591893`. |
+| `checkpoints/ranker/best_ndcg_ranker.pt` | Local NDCG selection, epoch 7: stored NDCG `0.593815`, `201 / 1,857` discovery hits. |
+| `checkpoints/evaluation_report.json` | Saved epoch-4 validation report; does not certify the current epoch-7 default alias. |
+| `data/interim/ranker_train_slates_v3_repeat_0.5_rolling_v1.pt` | Cached 50-candidate training slates (`26,263` rows locally; historical documentation said `26,184`) for the Stage 1 retriever. |
 | `data/interim/ranker_val_slates_v3_repeat_0.5_rolling_v1.pt` | Cached 50-candidate validation slates (`6,191` transitions) for the reference Stage 1 retriever. |
+
+## 5. Audit and future experiment prerequisites
+
+- Ordinary `PYTHONPATH=. ./venv/bin/pytest tests/` skips six unsplit real-purchase readers. `--allow-heldout-data` requires explicit final-test authorization; never use it for debugging or architecture selection.
+- Slate identity now binds ordered feature names, scope policy and resolved product inputs. Old cache identities intentionally miss; the v3 payload format and saved checkpoint state remain compatible. No caches were regenerated by the audit.
+- Enriched history has **nine** features; index 8 is `real_event_indicator`. See `ENRICHED_FEATURE_NAMES` in `recommender/sequences.py`.
+- Historical product-text input is zero in the normal Stage 2 path; its projection bias still contributes. Numerical memory inputs are zero in bias-only mode. The attached ProductTower is bypassed by direct candidate vectors; retain these checkpoint-compatible branches until a separately versioned change.
+- Resolve artifact provenance and the training-cutoff demand snapshot before implementing shared Stage 1 representations. No 176D/192D/224D architecture was added by the audit.

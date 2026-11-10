@@ -1,0 +1,37 @@
+{
+  "tools": "ruff 0.17.4 and vulture 2.16 installed only in /tmp/recommender-audit-tools; requirements and project venv unchanged",
+  "ruff_full": {
+    "total_findings": 651,
+    "counts_by_rule": {
+      "B017": 2,
+      "B023": 3,
+      "C401": 4,
+      "C405": 1,
+      "C408": 3,
+      "F401": 49,
+      "F841": 4,
+      "I001": 42,
+      "PLR0402": 3,
+      "PYI041": 2,
+      "RUF012": 1,
+      "RUF059": 2,
+      "SIM102": 1,
+      "TRY004": 1,
+      "UP006": 317,
+      "UP007": 45,
+      "UP033": 1,
+      "UP035": 31,
+      "UP045": 139
+    },
+    "note": "Existing repository/parent lint policy includes style and typing modernization; no mass rewrite performed."
+  },
+  "ruff_production_F": "passed",
+  "ruff_new_files": "passed under inherited policy",
+  "vulture_min_confidence_80": [
+    "tests/test_e2e_recommender.py:79: unused variable 'show_progress_bar' (100% confidence)",
+    "tests/test_ranker.py:26: unused import 'compute_ranker_loss' (90% confidence)",
+    "tests/test_text.py:26: unused variable 'show_progress_bar' (100% confidence)",
+    "tests/test_train_retriever.py:32: unused variable 'show_progress_bar' (100% confidence)"
+  ],
+  "vulture_interpretation": "Mock show_progress_bar parameters match the encoder interface; unused test import is harmless. No high-confidence unused production function found."
+}

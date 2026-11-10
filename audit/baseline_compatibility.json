@@ -1,0 +1,12 @@
+{
+  "original_commit": "4cbe764",
+  "probe": "seeded synthetic canonical 32-event input, one warm and one cold customer; current saved ranker state",
+  "state_keys_identical": true,
+  "exact_tensor_equality": {
+    "scores": true,
+    "memory": true,
+    "attn_weights": true,
+    "h_attended": true,
+    "z_candidate": true
+  }
+}

@@ -4,6 +4,8 @@ This document tracks the current project state, root-cause findings from our lat
 
 ---
 
+Audit prerequisite (2026-11-10): resolve the artifact mismatch and fixed train-cutoff demand issue in [AUDIT_REPORT.md](AUDIT_REPORT.md) before treating the historical baseline below as locally reproducible. The audit preserved all checkpoints and implemented no new architecture. Future shared-vector layouts must include enriched history index 8, `real_event_indicator`; use the ordered schema constants, not older prose feature lists.
+
 ## 1. Current Baseline & Core Objective
 
 ### Active Reference Baseline (Verified on Validation: `6,191` Baskets, `1,857` New-to-Customer Targets)
@@ -24,7 +26,7 @@ This document tracks the current project state, root-cause findings from our lat
 
 ## 2. Key Architectural Diagnosis (Why Recent Stage 2 Changes Did Not Improve Discovery)
 
-Before designing any new Stage 2 experiment, agents must understand the five structural findings identified in our review of [`recommender/ranker.py`](recommender/ranker.py):
+The behavioral observations below are verified in source; explanations for why past experiments lost discovery hits remain hypotheses, not isolated causal evidence. Before designing any new Stage 2 experiment, agents must understand the five structural findings identified in our review of [`recommender/ranker.py`](recommender/ranker.py):
 
 1. **Statistics-Attention Zeros Out Memory Token Values (`ranker.py` lines 513–514):**
    - In `UPSCANRRanker.forward()`, when `statistics_attention=True` (`statistics_in_scores=True`), `tabular_features` and `sequence` are replaced with `torch.zeros_like(...)` before being passed into `_compute_customer_memory()`.
@@ -38,9 +40,9 @@ Before designing any new Stage 2 experiment, agents must understand the five str
 4. **Default `RankerLoss` Does Not Prioritize New-to-Customer Positives (`new_positive_weight = 1.0`):**
    - In a 50-item slate with 25 repeat SKUs and 25 unseen SKUs, repeat targets (`8,404` in validation slates) are ~11× more numerous and much easier to predict from direct SKU history than unseen targets (`763` in validation slates).
    - With `new_positive_weight = 1.0`, the network optimizes overall BCE + listwise loss primarily by ranking repeat items accurately.
-5. **Candidate Pairwise Features Lack Explicit Co-Purchase / Transition Signals for Unseen SKUs:**
+5. **Candidate Pairwise Features Lack Explicit Co-Purchase / Transition Signals and Family Familiarity:**
    - For an unseen candidate SKU (`is_repeat_sku = 0`), its SKU-specific repeat features (`user_sku_order_count_norm`, `user_sku_qty_share`, `days_since_last_sku_buy_norm`, `sku_urgency`) are all constant (`0.0` or `1.0`).
-   - To rank which of the 25 unseen candidates in the slate a customer will actually buy first, the final scoring MLP needs **new predictive information** about sequential product transitions (e.g., *customers who bought historical SKU $A$ frequently buy candidate SKU $B$ next*) and explicit category/brand/family familiarity signals in the scoring head.
+   - To rank which of the 25 unseen candidates in the slate a customer will actually buy first, the final scoring MLP needs **new predictive information** about sequential product transitions (e.g., *customers who bought historical SKU $A$ frequently buy candidate SKU $B$ next*) and the missing product-family familiarity signal in the scoring head. Category, brand and business-line repeat flags are already present at candidate indices 10–12.
 
 ---
 
@@ -68,7 +70,7 @@ Future experiments must be run **one controlled change at a time** against the c
 ### Priority 4: Add True New-Information Signals for Unseen Candidates in Stage 2
 - **Hypothesis:** Changing how the network routes existing features has diminishing returns; improving unseen SKU discovery requires **new predictive features** for unseen candidates (`is_repeat_sku == 0`):
   1. **Point-in-time sequential co-purchase / transition affinity ($P(p_{\text{cand}} \mid \text{history}_{<t})$):** Empirical conditional probability or PMI that candidate SKU $p$ is bought in the same or next basket after the customer's recent historical SKUs, computed strictly from training baskets (`< 2025-10-01`).
-  2. **Explicit 4 familiarity flags in candidate pairwise features:** Pass the 4 binary familiarity flags (`brand`, `category`, `business_line`, `product_family`) directly into the candidate pairwise features so the Stage 2 scoring MLP sees the exact same family/brand/category familiarity signals that helped Stage 1.
+  2. **Add the missing family familiarity flag:** Candidate indices 10–12 already carry category, brand and business-line repeat flags. Test adding product-family familiarity as a new feature with explicit cache/checkpoint schema versioning; do not duplicate the three existing flags.
 
 ---
 

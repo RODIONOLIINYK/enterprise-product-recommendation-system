@@ -1,0 +1,17 @@
+2026-11-10; main; starting commit 4cbe764
+
+Initial safe suite: 258 passed, 6 deselected, 70 subtests passed.
+Final command: PYTHONPATH=. ./venv/bin/pytest tests/
+Result: 269 passed, 6 skipped; skips are marked unsplit-real-data readers.
+
+./venv/bin/python -m compileall -q recommender tests audit: passed
+git diff --check: passed
+Production Ruff F checks: passed
+New Python files, inherited Ruff policy: passed
+Full lint baseline: 655 findings; final: 651 (see static_analysis.json).
+Vulture confidence 80: four test-only findings (see static_analysis.json).
+
+Gradient probe: CPU; cached train features with synthetic candidate vectors/date; no optimizer step.
+Canonical 32-event ranker forward: bitwise equal to original 4cbe764 source with saved weights.
+All 7 checkpoint/cache hashes unchanged. No raw purchases or held-out cache opened.
+No retraining, cache regeneration, validation-quality evaluation or architecture experiment.

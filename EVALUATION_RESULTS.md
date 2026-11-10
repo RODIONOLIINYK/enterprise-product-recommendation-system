@@ -1,6 +1,18 @@
 # Evaluation & Training Report: Stage 1 Discovery Reference + Stage 2 `UPS-CANR` Reference
 
-This document contains only verified results on the chronological **Validation Split (`2025-10-01` to `2026-02-18`, `6,191` transitions, `1,857` new-to-customer targets)**. The held-out Test Split (`>= 2026-02-19`, `6,327` transitions) remains untouched.
+The historical sections record previously documented results on the chronological **Validation Split (`2025-10-01` to `2026-02-18`, `6,191` transitions, `1,857` new-to-customer targets)**. The held-out Test Split (`>= 2026-02-19`, `6,327` transitions) remains untouched.
+
+## Audit provenance note (2026-11-10)
+
+The sections below preserve the **historical documented reference**. The audit did not rerun validation. Local files currently contain different selections, and the saved epoch-4 evaluation report cannot certify the epoch-7 default alias:
+
+| Local checkpoint | Epoch / selection | Stored Recall@10 | Stored NDCG@10 | Stored new hits@10 |
+|---|---|---:|---:|---:|
+| `ranker/best_ranker.pt` | 7 / NDCG | 76.0417% | 0.593815 | 201 / 1,857 |
+| `ranker/best_ndcg_ranker.pt` | 7 / NDCG | 76.0417% | 0.593815 | 201 / 1,857 |
+| `ranker/best_discovery_ranker.pt` | 4 / discovery | 76.1505% | 0.591893 | 209 / 1,857 |
+
+These are checkpoint metadata, not new measurements. Full hashes, configuration and caveats are in [audit/artifacts.json](audit/artifacts.json) and [AUDIT_REPORT.md](AUDIT_REPORT.md). No checkpoints were promoted, rewritten or removed. The historical reference peak is **0.5934**; **0.5945** is the rejected due-score ablation, not the same selected checkpoint as 209 hits.
 
 ---
 

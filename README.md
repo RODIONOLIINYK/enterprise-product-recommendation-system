@@ -8,6 +8,8 @@ Next-basket recommendations for B2B enterprise customers using **Stage 1 Two-Tow
 - **[EVALUATION_RESULTS.md](EVALUATION_RESULTS.md):** Verified validation metrics for the active Stage 1 and Stage 2 reference models, plus a summary of tested-and-rejected experimental hypotheses.
 - **[plan.md](plan.md):** Current project goals, diagnostic findings, and the prioritized experimental roadmap for improving new-to-customer product discovery in Stage 2.
 
+The 2026-11-10 [audit](AUDIT_REPORT.md) found that local checkpoint selections differ from the historical reference metrics. Check [artifact metadata](audit/artifacts.json) before training or evaluation. Saved models and caches were preserved.
+
 ## Active Pipeline
 
 ```text
@@ -20,8 +22,8 @@ Raw sales + company profiles + product catalogue
 
 - **Stage 1 (`recommender/models.py`, `recommender/stage1_catalogue.py`, `recommender/familiarity.py`):**
   - 128-dimensional `CustomerTower` and `ProductTower`.
-  - `CustomerTower` encodes each historical purchase using its shared 128D product vector, normalized quantity, and normalized inter-purchase gap (`history_gap_reference_days = 74.0`), processed by a 2-layer Transformer with attention pooling, fused with 1024D `BAAI/bge-m3` company text and 7 normalized customer profile features.
-  - `ProductTower` encodes 1024D `BAAI/bge-m3` product text (without subcategory), one-hot `container_type` (with explicit `none`), and 7 point-in-time product demand features (`remove_product_attribute_embeddings = True`).
+  - `CustomerTower` encodes each historical purchase using its shared 128D product vector, normalized quantity, and normalized inter-purchase gap (`history_gap_reference_days = 74.0`), processed by a 2-layer Transformer with masked-mean plus last-valid-event pooling and a learned projection, fused with 1024D `BAAI/bge-m3` company text and 6 normalized customer profile features in the local checkpoint.
+  - `ProductTower` encodes 1024D `BAAI/bge-m3` product text (without subcategory), one-hot `container_type` (with explicit `none`), and 6 demand features from a fixed training-cutoff snapshot in the local checkpoint (`remove_product_attribute_embeddings = True`).
   - Scoring adds 4 point-in-time binary familiarity flags (`brand`, `product_category`, `business_line`, `product_family`) with learned weights over a rolling candidate pool of merchandise with at least one prior paid sale and no active block.
 - **Stage 2 (`recommender/ranker.py`, `recommender/train_ranker.py`):**
   - `UPSCANRRanker` with `statistics_attention = True` and `excluded_statistics = ("history_repeat",)`.
@@ -47,7 +49,7 @@ data/raw/customers.csv
 data/raw/items.csv
 ```
 
-Run `notebooks/01_clean_purchases.ipynb` or use the Python preparation API to produce `data/interim/cleaned_purchases.csv`:
+The preparation API returns tables; the CLI runs the configured stages and prints their row counts. It does not write `cleaned_purchases.csv`:
 
 ```bash
 ./venv/bin/python -m recommender
@@ -56,7 +58,7 @@ Run `notebooks/01_clean_purchases.ipynb` or use the Python preparation API to pr
 - **Paid-sale eligibility (`configs/product_scope.toml`):** Only positive finite `ПРОДАЖА` records with `Gen_ Prod_ Posting Group = ТОВАР` and item-master classification `ТОВАР` count as purchases. Gifts (`ПОДАРОК`), returns, and accounting rows are excluded.
 - **Record merging (`recommender/merging.py`):** Same-company, same-calendar-date, same-`product_id` lines are merged and their quantities summed. Package variants remain distinct product IDs.
 - **Chronological splits (`recommender/split.py`):**
-  - **Train:** `< 2025-10-01` (`26,264` next-basket transitions; `26,184` with $\ge 50$ rolling candidates)
+  - **Train:** `< 2025-10-01` (historically documented `26,264` transitions and `26,184` full rolling slates; local cache has `26,263` rows—see audit)
   - **Validation:** `2025-10-01` to `2026-02-18` (`6,191` next-basket transitions, `1,857` new-to-customer target instances)
   - **Test:** `>= 2026-02-19` (`6,327` transitions — **strictly held out**)
 
@@ -80,6 +82,8 @@ PYTHONPATH=. ./venv/bin/python -m recommender.evaluate
 # Run the unit and integration test suite
 PYTHONPATH=. ./venv/bin/pytest tests/
 ```
+
+Six legacy tests read the unsplit real purchase CSV and are skipped by default. Run them with `--allow-heldout-data` only after explicit authorization for final held-out testing. Synthetic split-boundary tests remain enabled. See [AUDIT_REPORT.md](AUDIT_REPORT.md) for remaining temporal and cache limitations.
 
 ## Data Handling
 

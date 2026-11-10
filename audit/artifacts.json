@@ -1,0 +1,507 @@
+{
+  "checkpoints/retriever-discovery-reference/best_retriever.pt": {
+    "sha256": "2dcfbc7eab6795ded6f25a6cb0ffe1f9e606f13c9885d4ee020b724d0a2b5ab7",
+    "bytes": 10043881,
+    "epoch": 23,
+    "config": {
+      "output_dim": 128,
+      "training_epochs": 30,
+      "text_dim": 1024,
+      "num_catalog_products": 790,
+      "temperature": 0.1,
+      "pos_weight": 20.0,
+      "novel_positive_multiplier": 1.0,
+      "discovery_only": true,
+      "include_price_preference": false,
+      "customer_price_reference": null,
+      "familiarity_fields": [
+        "brand",
+        "category",
+        "business_line",
+        "family"
+      ],
+      "profile_features": [
+        "distinct_orders",
+        "total_quantity",
+        "distinct_products",
+        "distinct_categories",
+        "median_order_gap",
+        "median_purchase_quantity"
+      ],
+      "company_cache_name": "bge_m3_company.parquet",
+      "include_sku_median_quantity": false,
+      "num_product_features": 18,
+      "product_embedding_sizes": {
+        "brand": 0,
+        "category": 0,
+        "business_line": 0
+      },
+      "product_one_hot_sizes": {},
+      "tower_hidden_dim": 128,
+      "history_layers": 2,
+      "extra_tower_mlp_layer": false,
+      "dropout": 0.1,
+      "container_encoding": "one_hot_none",
+      "sku_prices_uah": null,
+      "catalog_history_encoder": "attention",
+      "max_seq_len": 32,
+      "history_gap_reference_days": 74.0,
+      "profile_normalizer": {
+        "maxima": {
+          "total_purchases": 1679.0,
+          "total_quantity": 1321229.9549999998,
+          "distinct_products": 79.0,
+          "distinct_orders": 437.0,
+          "distinct_categories": 6.0,
+          "days_since_first_order": 636.0,
+          "days_since_last_order": 609.0,
+          "median_order_gap": 536.0,
+          "median_purchase_quantity": 40128.0
+        },
+        "urgency_min": -470.0,
+        "urgency_max": 595.0
+      },
+      "quantity_reference": 60.0
+    },
+    "best_metric_name": null,
+    "best_metric_value": null,
+    "val_metrics": {
+      "recall@10": 0.3883823354981615,
+      "Recall@10": 0.3883823354981615,
+      "recall@50": 0.7184373382004282,
+      "Recall@50": 0.7184373382004282,
+      "recall@100": 0.8463666893314343,
+      "Recall@100": 0.8463666893314343,
+      "ndcg@10": 0.24133446330672062,
+      "NDCG@10": 0.24133446330672062,
+      "mrr": 0.24086449050878048,
+      "MRR": 0.24086449050878048,
+      "new_to_customer_recall@50": 0.4458804523424879,
+      "discovery_loss": 0.10508360138502904,
+      "discovery_targets": 1761,
+      "discovery_hits@25": 650,
+      "discovery_hits@50": 918,
+      "discovery_recall@25": 0.3500269251480883,
+      "discovery_recall@50": 0.49434571890145396
+    },
+    "retriever_digest": null,
+    "statistics_attention": null,
+    "excluded_statistics": null,
+    "slate_schema_version": null,
+    "catalogue_size": 790,
+    "vocab_sizes": {
+      "city_vocab": 822,
+      "region_vocab": 44,
+      "industry_vocab": 45,
+      "brand_vocab": 25,
+      "category_vocab": 16,
+      "subcategory_vocab": 67,
+      "business_line_vocab": 20,
+      "product_vocab": 790,
+      "container_vocab": 11
+    }
+  },
+  "checkpoints/retriever/best_retriever.pt": {
+    "sha256": "863cb700afc7e8d4284b20d34f5f4f5345538146557375f1141cf9d5d77fae79",
+    "bytes": 10217809,
+    "epoch": 10,
+    "config": {
+      "output_dim": 128,
+      "text_dim": 1024,
+      "num_catalog_products": 790,
+      "temperature": 0.1,
+      "pos_weight": 20.0,
+      "profile_features": [
+        "distinct_orders",
+        "total_quantity",
+        "distinct_products",
+        "distinct_categories",
+        "median_order_gap",
+        "median_purchase_quantity"
+      ],
+      "company_cache_name": "bge_m3_company.parquet",
+      "include_sku_median_quantity": false,
+      "num_product_features": 18,
+      "container_encoding": "one_hot_none",
+      "sku_prices_uah": null,
+      "catalog_history_encoder": "attention",
+      "max_seq_len": 32,
+      "history_gap_reference_days": 74.0,
+      "profile_normalizer": {
+        "maxima": {
+          "total_purchases": 1679.0,
+          "total_quantity": 1321229.9549999998,
+          "distinct_products": 79.0,
+          "distinct_orders": 437.0,
+          "distinct_categories": 6.0,
+          "days_since_first_order": 636.0,
+          "days_since_last_order": 609.0,
+          "median_order_gap": 536.0,
+          "median_purchase_quantity": 40128.0
+        },
+        "urgency_min": -470.0,
+        "urgency_max": 595.0
+      },
+      "quantity_reference": 60.0
+    },
+    "best_metric_name": null,
+    "best_metric_value": null,
+    "val_metrics": {
+      "recall@10": 0.5405162717604803,
+      "Recall@10": 0.5405162717604803,
+      "recall@50": 0.7973773653049171,
+      "Recall@50": 0.7973773653049171,
+      "recall@100": 0.8808953348276134,
+      "Recall@100": 0.8808953348276134,
+      "ndcg@10": 0.36217836287234134,
+      "NDCG@10": 0.36217836287234134,
+      "mrr": 0.3474054426745094,
+      "MRR": 0.3474054426745094
+    },
+    "retriever_digest": null,
+    "statistics_attention": null,
+    "excluded_statistics": null,
+    "slate_schema_version": null,
+    "catalogue_size": 790,
+    "vocab_sizes": {
+      "city_vocab": 822,
+      "region_vocab": 44,
+      "industry_vocab": 45,
+      "brand_vocab": 25,
+      "category_vocab": 16,
+      "subcategory_vocab": 67,
+      "business_line_vocab": 20,
+      "product_vocab": 790,
+      "container_vocab": 11
+    }
+  },
+  "checkpoints/ranker/best_ranker.pt": {
+    "sha256": "1701becf092e38e71a06152b124a832cabfa58172d6d497f305fe499757b0b17",
+    "bytes": 9239719,
+    "epoch": 7,
+    "config": {
+      "hidden_dim": 128,
+      "num_heads": 4,
+      "dropout": 0.1,
+      "pos_weight": 10.0,
+      "listwise_weight": 1.0,
+      "new_positive_weight": 1.0,
+      "seed": 42,
+      "selection_metric": "ndcg@10"
+    },
+    "best_metric_name": "ndcg@10",
+    "best_metric_value": 0.5938154481431467,
+    "val_metrics": {
+      "val_loss": 2.5265909052386726,
+      "Val Loss": 2.5265909052386726,
+      "val_loss_unweighted": 2.5265909052386726,
+      "Val Loss Unweighted": 2.5265909052386726,
+      "avg_token0_weight": 0.2520007896669132,
+      "avg_history_weight": 0.7479992269240704,
+      "val_recall@5": 0.6508445396414138,
+      "Val Recall@5": 0.6508445396414138,
+      "val_recall@10": 0.7604165983762001,
+      "Val Recall@10": 0.7604165983762001,
+      "val_recall@20": 0.8311560882350185,
+      "Val Recall@20": 0.8311560882350185,
+      "val_ndcg@10": 0.5938154481431467,
+      "Val NDCG@10": 0.5938154481431467,
+      "val_mrr": 0.5734504022691913,
+      "Val MRR": 0.5734504022691913,
+      "new_target_count": 1857,
+      "new_hits@5": 75,
+      "new_recall@5": 0.04038772213247173,
+      "Val New Recall@5": 0.04038772213247173,
+      "new_hits@10": 201,
+      "new_recall@10": 0.10823909531502424,
+      "Val New Recall@10": 0.10823909531502424,
+      "new_hits@20": 376,
+      "new_recall@20": 0.20247711362412493,
+      "Val New Recall@20": 0.20247711362412493
+    },
+    "retriever_digest": "2dcfbc7eab6795ded6f25a6cb0ffe1f9e606f13c9885d4ee020b724d0a2b5ab7",
+    "statistics_attention": true,
+    "excluded_statistics": [
+      "history_repeat"
+    ],
+    "slate_schema_version": 3,
+    "catalogue_size": 13729,
+    "vocab_sizes": {
+      "city_vocab": 822,
+      "region_vocab": 44,
+      "industry_vocab": 45,
+      "brand_vocab": 25,
+      "category_vocab": 16,
+      "subcategory_vocab": 67,
+      "business_line_vocab": 20,
+      "product_vocab": 790,
+      "container_vocab": 11
+    }
+  },
+  "checkpoints/ranker/best_discovery_ranker.pt": {
+    "sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+    "bytes": 9242419,
+    "epoch": 4,
+    "config": {
+      "hidden_dim": 128,
+      "num_heads": 4,
+      "dropout": 0.1,
+      "pos_weight": 10.0,
+      "listwise_weight": 1.0,
+      "new_positive_weight": 1.0,
+      "seed": 42,
+      "selection_metric": "new_recall@10"
+    },
+    "best_metric_name": "new_recall@10",
+    "best_metric_value": 0.11254711900915455,
+    "val_metrics": {
+      "val_loss": 2.5520243743031297,
+      "Val Loss": 2.5520243743031297,
+      "val_loss_unweighted": 2.5520243743031297,
+      "Val Loss Unweighted": 2.5520243743031297,
+      "avg_token0_weight": 0.2607522210509507,
+      "avg_history_weight": 0.7392477921603882,
+      "val_recall@5": 0.6515225089916492,
+      "Val Recall@5": 0.6515225089916492,
+      "val_recall@10": 0.7615051078117159,
+      "Val Recall@10": 0.7615051078117159,
+      "val_recall@20": 0.8308527569514442,
+      "Val Recall@20": 0.8308527569514442,
+      "val_ndcg@10": 0.5918928743676547,
+      "Val NDCG@10": 0.5918928743676547,
+      "val_mrr": 0.5700267221143897,
+      "Val MRR": 0.5700267221143897,
+      "new_target_count": 1857,
+      "new_hits@5": 71,
+      "new_recall@5": 0.03823371028540657,
+      "Val New Recall@5": 0.03823371028540657,
+      "new_hits@10": 209,
+      "new_recall@10": 0.11254711900915455,
+      "Val New Recall@10": 0.11254711900915455,
+      "new_hits@20": 377,
+      "new_recall@20": 0.20301561658589123,
+      "Val New Recall@20": 0.20301561658589123
+    },
+    "retriever_digest": "2dcfbc7eab6795ded6f25a6cb0ffe1f9e606f13c9885d4ee020b724d0a2b5ab7",
+    "statistics_attention": true,
+    "excluded_statistics": [
+      "history_repeat"
+    ],
+    "slate_schema_version": 3,
+    "catalogue_size": 13729,
+    "vocab_sizes": {
+      "city_vocab": 822,
+      "region_vocab": 44,
+      "industry_vocab": 45,
+      "brand_vocab": 25,
+      "category_vocab": 16,
+      "subcategory_vocab": 67,
+      "business_line_vocab": 20,
+      "product_vocab": 790,
+      "container_vocab": 11
+    }
+  },
+  "checkpoints/ranker/best_ndcg_ranker.pt": {
+    "sha256": "2ff3e43dcd531d6604c536d93be1bbfce140f118e8f48fad88dbe99e1616701e",
+    "bytes": 9241069,
+    "epoch": 7,
+    "config": {
+      "hidden_dim": 128,
+      "num_heads": 4,
+      "dropout": 0.1,
+      "pos_weight": 10.0,
+      "listwise_weight": 1.0,
+      "new_positive_weight": 1.0,
+      "seed": 42,
+      "selection_metric": "ndcg@10"
+    },
+    "best_metric_name": "ndcg@10",
+    "best_metric_value": 0.5938154481431467,
+    "val_metrics": {
+      "val_loss": 2.5265909052386726,
+      "Val Loss": 2.5265909052386726,
+      "val_loss_unweighted": 2.5265909052386726,
+      "Val Loss Unweighted": 2.5265909052386726,
+      "avg_token0_weight": 0.2520007896669132,
+      "avg_history_weight": 0.7479992269240704,
+      "val_recall@5": 0.6508445396414138,
+      "Val Recall@5": 0.6508445396414138,
+      "val_recall@10": 0.7604165983762001,
+      "Val Recall@10": 0.7604165983762001,
+      "val_recall@20": 0.8311560882350185,
+      "Val Recall@20": 0.8311560882350185,
+      "val_ndcg@10": 0.5938154481431467,
+      "Val NDCG@10": 0.5938154481431467,
+      "val_mrr": 0.5734504022691913,
+      "Val MRR": 0.5734504022691913,
+      "new_target_count": 1857,
+      "new_hits@5": 75,
+      "new_recall@5": 0.04038772213247173,
+      "Val New Recall@5": 0.04038772213247173,
+      "new_hits@10": 201,
+      "new_recall@10": 0.10823909531502424,
+      "Val New Recall@10": 0.10823909531502424,
+      "new_hits@20": 376,
+      "new_recall@20": 0.20247711362412493,
+      "Val New Recall@20": 0.20247711362412493
+    },
+    "retriever_digest": "2dcfbc7eab6795ded6f25a6cb0ffe1f9e606f13c9885d4ee020b724d0a2b5ab7",
+    "statistics_attention": true,
+    "excluded_statistics": [
+      "history_repeat"
+    ],
+    "slate_schema_version": 3,
+    "catalogue_size": 13729,
+    "vocab_sizes": {
+      "city_vocab": 822,
+      "region_vocab": 44,
+      "industry_vocab": 45,
+      "brand_vocab": 25,
+      "category_vocab": 16,
+      "subcategory_vocab": 67,
+      "business_line_vocab": 20,
+      "product_vocab": 790,
+      "container_vocab": 11
+    }
+  },
+  "data/interim/ranker_train_slates_v3_repeat_0.5_rolling_v1.pt": {
+    "sha256": "aaf0153b53d7dac35459562cbb87226fb0af6a7e5cbd103e198a0e108864c663",
+    "bytes": 266421235,
+    "cache_identity": "3e1f3a722d6814bb9a24d75f6d6b5e4efb6238e04f9e4626405340156bb2e6bb:train",
+    "tensors": {
+      "text_embedding": [
+        26263,
+        1024
+      ],
+      "city_id": [
+        26263
+      ],
+      "region_id": [
+        26263
+      ],
+      "industry_id": [
+        26263
+      ],
+      "tabular_features": [
+        26263,
+        8
+      ],
+      "retriever_tabular_features": [
+        26263,
+        6
+      ],
+      "sequence": [
+        26263,
+        32,
+        9
+      ],
+      "attention_mask": [
+        26263,
+        32
+      ],
+      "seq_product_ids": [
+        26263,
+        32
+      ],
+      "seq_purchase_dates": [
+        26263,
+        32
+      ],
+      "seq_category_ids": [
+        26263,
+        32
+      ],
+      "seq_subcategory_ids": [
+        26263,
+        32
+      ],
+      "seq_business_line_ids": [
+        26263,
+        32
+      ],
+      "candidate_indices": [
+        26263,
+        50
+      ],
+      "pairwise_features": [
+        26263,
+        50,
+        13
+      ],
+      "labels": [
+        26263,
+        50
+      ]
+    }
+  },
+  "data/interim/ranker_val_slates_v3_repeat_0.5_rolling_v1.pt": {
+    "sha256": "43aa986ed5c0ead13b1f4f3b321e28444fd846074b6a1192bd00b712789cad27",
+    "bytes": 62820851,
+    "cache_identity": "3e1f3a722d6814bb9a24d75f6d6b5e4efb6238e04f9e4626405340156bb2e6bb:val",
+    "tensors": {
+      "text_embedding": [
+        6191,
+        1024
+      ],
+      "city_id": [
+        6191
+      ],
+      "region_id": [
+        6191
+      ],
+      "industry_id": [
+        6191
+      ],
+      "tabular_features": [
+        6191,
+        8
+      ],
+      "retriever_tabular_features": [
+        6191,
+        6
+      ],
+      "sequence": [
+        6191,
+        32,
+        9
+      ],
+      "attention_mask": [
+        6191,
+        32
+      ],
+      "seq_product_ids": [
+        6191,
+        32
+      ],
+      "seq_purchase_dates": [
+        6191,
+        32
+      ],
+      "seq_category_ids": [
+        6191,
+        32
+      ],
+      "seq_subcategory_ids": [
+        6191,
+        32
+      ],
+      "seq_business_line_ids": [
+        6191,
+        32
+      ],
+      "candidate_indices": [
+        6191,
+        50
+      ],
+      "pairwise_features": [
+        6191,
+        50,
+        13
+      ],
+      "labels": [
+        6191,
+        50
+      ]
+    }
+  }
+}

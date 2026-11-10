@@ -1,0 +1,1329 @@
+{
+  "probe": "64 cached training rows; seeded synthetic normalized candidate vectors; synthetic prediction day 2025-09-30; no optimizer step",
+  "seed": 42,
+  "device": "cpu",
+  "torch_version": "2.14.1",
+  "runs": {
+    "train": {
+      "loss": 3.0325663089752197,
+      "parameters": [
+        {
+          "name": "pos_embedding",
+          "count": 4096,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.01839497499167919,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "statistics_attention_weights",
+          "count": 952,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.14367511868476868,
+          "zero_gradient_elements": 56
+        },
+        {
+          "name": "text_proj.0.weight",
+          "count": 131072,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.18062078952789307,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "text_proj.0.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.19130544364452362,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "text_proj.1.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.025071199983358383,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "text_proj.1.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.019991904497146606,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "city_embedding.weight",
+          "count": 13184,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.01573333702981472,
+          "zero_gradient_elements": 13120
+        },
+        {
+          "name": "region_embedding.weight",
+          "count": 800,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.01780063286423683,
+          "zero_gradient_elements": 736
+        },
+        {
+          "name": "industry_embedding.weight",
+          "count": 1600,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.01173645630478859,
+          "zero_gradient_elements": 1552
+        },
+        {
+          "name": "tabular_proj.0.weight",
+          "count": 7168,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.1776190549135208,
+          "zero_gradient_elements": 1024
+        },
+        {
+          "name": "tabular_proj.0.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.029306715354323387,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.1.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.021521396934986115,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.1.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.02072294056415558,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.4.weight",
+          "count": 16384,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.10092248022556305,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.4.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.016363125294446945,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.5.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.012710245326161385,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.5.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.014202611520886421,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "profile_fusion.0.weight",
+          "count": 32768,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.1800505369901657,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "profile_fusion.0.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.01534392312169075,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "profile_fusion.1.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.03147771209478378,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "profile_fusion.1.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.02606326900422573,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "type_embedding.weight",
+          "count": 256,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.05719675496220589,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "product_embedding.weight",
+          "count": 50624,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.012546250596642494,
+          "zero_gradient_elements": 48128
+        },
+        {
+          "name": "cat_embedding.weight",
+          "count": 544,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.005545686464756727,
+          "zero_gradient_elements": 448
+        },
+        {
+          "name": "subcat_embedding.weight",
+          "count": 2400,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.006826997734606266,
+          "zero_gradient_elements": 2176
+        },
+        {
+          "name": "line_embedding.weight",
+          "count": 336,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.005799158476293087,
+          "zero_gradient_elements": 176
+        },
+        {
+          "name": "habit_proj.weight",
+          "count": 288,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": true,
+          "grad_norm": 0.0,
+          "zero_gradient_elements": 288
+        },
+        {
+          "name": "habit_proj.bias",
+          "count": 32,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.005232776515185833,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "product_text_proj.weight",
+          "count": 32768,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": true,
+          "grad_norm": 0.0,
+          "zero_gradient_elements": 32768
+        },
+        {
+          "name": "product_text_proj.bias",
+          "count": 32,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.003321152413263917,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "token_proj.0.weight",
+          "count": 24576,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.17590764164924622,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "token_proj.0.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.023020731285214424,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "token_proj.1.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.022265968844294548,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "token_proj.1.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.018216295167803764,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.self_attn.in_proj_weight",
+          "count": 49152,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.3154538869857788,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.self_attn.in_proj_bias",
+          "count": 384,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.03435259684920311,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.self_attn.out_proj.weight",
+          "count": 16384,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.22493480145931244,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.self_attn.out_proj.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.039640504866838455,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.linear1.weight",
+          "count": 32768,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.10159046202898026,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.linear1.bias",
+          "count": 256,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.010782433673739433,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.linear2.weight",
+          "count": 32768,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.11439003050327301,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.linear2.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.06546185910701752,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.norm1.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.034612663090229034,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.norm1.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.06796745955944061,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.norm2.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.049346573650836945,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.norm2.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.14932215213775635,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "product_tower.text_proj.0.weight",
+          "count": 131072,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.text_proj.0.bias",
+          "count": 128,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.text_proj.2.weight",
+          "count": 128,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.text_proj.2.bias",
+          "count": 128,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.mlp.0.weight",
+          "count": 37376,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.mlp.0.bias",
+          "count": 256,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.mlp.3.weight",
+          "count": 32768,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.mlp.3.bias",
+          "count": 128,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "cross_attention.in_proj_weight",
+          "count": 49152,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.5752387046813965,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "cross_attention.in_proj_bias",
+          "count": 384,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.17289145290851593,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "cross_attention.out_proj.weight",
+          "count": 16384,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.4953653812408447,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "cross_attention.out_proj.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.287632554769516,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.0.weight",
+          "count": 101632,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 1.324187159538269,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.0.bias",
+          "count": 256,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.5396478772163391,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.1.weight",
+          "count": 256,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.07982669025659561,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.1.bias",
+          "count": 256,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.08038895577192307,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.4.weight",
+          "count": 32768,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.42087963223457336,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.4.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.04610781371593475,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.5.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.08879759162664413,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.5.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.1116839200258255,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.8.weight",
+          "count": 8192,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.35568180680274963,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.8.bias",
+          "count": 64,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.046954330056905746,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.9.weight",
+          "count": 64,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.13121140003204346,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.9.bias",
+          "count": 64,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.08332300931215286,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.12.weight",
+          "count": 64,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.7948626279830933,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.12.bias",
+          "count": 1,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.02952392026782036,
+          "zero_gradient_elements": 0
+        }
+      ],
+      "total_parameters": 866313,
+      "parameters_without_gradient": 201984,
+      "parameters_in_all_zero_gradient_tensors": 33056,
+      "historical_text_input_nonzero": 0,
+      "tabular_numerical_zero": true,
+      "tabular_categorical_norm": 0.17761899530887604,
+      "padded_attention_max": 0.0
+    },
+    "eval_with_grad": {
+      "loss": 2.9990477561950684,
+      "parameters": [
+        {
+          "name": "pos_embedding",
+          "count": 4096,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.017282593995332718,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "statistics_attention_weights",
+          "count": 952,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.16151466965675354,
+          "zero_gradient_elements": 56
+        },
+        {
+          "name": "text_proj.0.weight",
+          "count": 131072,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.16392509639263153,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "text_proj.0.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.1770944446325302,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "text_proj.1.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.022782782092690468,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "text_proj.1.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.01856534369289875,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "city_embedding.weight",
+          "count": 13184,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.015798039734363556,
+          "zero_gradient_elements": 13120
+        },
+        {
+          "name": "region_embedding.weight",
+          "count": 800,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.016062458977103233,
+          "zero_gradient_elements": 736
+        },
+        {
+          "name": "industry_embedding.weight",
+          "count": 1600,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.012372835539281368,
+          "zero_gradient_elements": 1552
+        },
+        {
+          "name": "tabular_proj.0.weight",
+          "count": 7168,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.17152844369411469,
+          "zero_gradient_elements": 1024
+        },
+        {
+          "name": "tabular_proj.0.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.028976941481232643,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.1.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.020967701449990273,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.1.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.020672503858804703,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.4.weight",
+          "count": 16384,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.09944310784339905,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.4.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.016783522441983223,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.5.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.01309746503829956,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "tabular_proj.5.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.014505548402667046,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "profile_fusion.0.weight",
+          "count": 32768,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.1718972623348236,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "profile_fusion.0.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.015140206553041935,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "profile_fusion.1.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.03167092800140381,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "profile_fusion.1.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.02627495862543583,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "type_embedding.weight",
+          "count": 256,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.055095646530389786,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "product_embedding.weight",
+          "count": 50624,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.011610979214310646,
+          "zero_gradient_elements": 48128
+        },
+        {
+          "name": "cat_embedding.weight",
+          "count": 544,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.005142196547240019,
+          "zero_gradient_elements": 448
+        },
+        {
+          "name": "subcat_embedding.weight",
+          "count": 2400,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.006906361319124699,
+          "zero_gradient_elements": 2176
+        },
+        {
+          "name": "line_embedding.weight",
+          "count": 336,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.005159344058483839,
+          "zero_gradient_elements": 176
+        },
+        {
+          "name": "habit_proj.weight",
+          "count": 288,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": true,
+          "grad_norm": 0.0,
+          "zero_gradient_elements": 288
+        },
+        {
+          "name": "habit_proj.bias",
+          "count": 32,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.005052200984209776,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "product_text_proj.weight",
+          "count": 32768,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": true,
+          "grad_norm": 0.0,
+          "zero_gradient_elements": 32768
+        },
+        {
+          "name": "product_text_proj.bias",
+          "count": 32,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.002797565655782819,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "token_proj.0.weight",
+          "count": 24576,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.1632755696773529,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "token_proj.0.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.021098364144563675,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "token_proj.1.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.019368654116988182,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "token_proj.1.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.016606301069259644,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.self_attn.in_proj_weight",
+          "count": 49152,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.3114686608314514,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.self_attn.in_proj_bias",
+          "count": 384,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.032876987010240555,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.self_attn.out_proj.weight",
+          "count": 16384,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.20376528799533844,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.self_attn.out_proj.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.03513377532362938,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.linear1.weight",
+          "count": 32768,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.08473273366689682,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.linear1.bias",
+          "count": 256,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.008479436859488487,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.linear2.weight",
+          "count": 32768,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.09012297540903091,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.linear2.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.0583278127014637,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.norm1.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.03194456547498703,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.norm1.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.06084783002734184,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.norm2.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.04681596904993057,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "memory_encoder.layers.0.norm2.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.1300182342529297,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "product_tower.text_proj.0.weight",
+          "count": 131072,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.text_proj.0.bias",
+          "count": 128,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.text_proj.2.weight",
+          "count": 128,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.text_proj.2.bias",
+          "count": 128,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.mlp.0.weight",
+          "count": 37376,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.mlp.0.bias",
+          "count": 256,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.mlp.3.weight",
+          "count": 32768,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "product_tower.mlp.3.bias",
+          "count": 128,
+          "participates_in_graph": false,
+          "grad_none": true,
+          "grad_zero": null,
+          "grad_norm": null,
+          "zero_gradient_elements": null
+        },
+        {
+          "name": "cross_attention.in_proj_weight",
+          "count": 49152,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.573001503944397,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "cross_attention.in_proj_bias",
+          "count": 384,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.15740403532981873,
+          "zero_gradient_elements": 1
+        },
+        {
+          "name": "cross_attention.out_proj.weight",
+          "count": 16384,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.4414779841899872,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "cross_attention.out_proj.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.2505709230899811,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.0.weight",
+          "count": 101632,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 1.093909740447998,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.0.bias",
+          "count": 256,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.4354672431945801,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.1.weight",
+          "count": 256,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.06659021228551865,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.1.bias",
+          "count": 256,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.06915472447872162,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.4.weight",
+          "count": 32768,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.34258222579956055,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.4.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.04077642783522606,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.5.weight",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.08293827623128891,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.5.bias",
+          "count": 128,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.10150032490491867,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.8.weight",
+          "count": 8192,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.3145061135292053,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.8.bias",
+          "count": 64,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.04294884204864502,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.9.weight",
+          "count": 64,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.12770681083202362,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.9.bias",
+          "count": 64,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.07831048965454102,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.12.weight",
+          "count": 64,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.7509090304374695,
+          "zero_gradient_elements": 0
+        },
+        {
+          "name": "mlp.12.bias",
+          "count": 1,
+          "participates_in_graph": true,
+          "grad_none": false,
+          "grad_zero": false,
+          "grad_norm": 0.0311460979282856,
+          "zero_gradient_elements": 0
+        }
+      ],
+      "total_parameters": 866313,
+      "parameters_without_gradient": 201984,
+      "parameters_in_all_zero_gradient_tensors": 33056,
+      "historical_text_input_nonzero": 0,
+      "tabular_numerical_zero": true,
+      "tabular_categorical_norm": 0.17152835428714752,
+      "padded_attention_max": 0.0
+    }
+  },
+  "eval_no_grad_all_none": true
+}
