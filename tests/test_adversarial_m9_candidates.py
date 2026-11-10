@@ -265,6 +265,7 @@ def test_adversarial_point_in_time_exact_millisecond_cutoff():
     assert "P_FUTURE" not in snap.sku_stats, "Future event leaked into point-in-time snapshot!"
 
 
+@pytest.mark.real_purchase_data
 def test_adversarial_real_data_retriever_stress():
     """End-to-end stress test using repository checkpoint and full cleaned_purchases.csv."""
     ckpt_path = Path("checkpoints/retriever/best_retriever.pt")

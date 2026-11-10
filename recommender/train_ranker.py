@@ -25,7 +25,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 from recommender.candidates import (
-    DEFAULT_HEURISTIC_FRACTION, NUM_PAIRWISE_FEATURES, CandidateRetriever,
+    DEFAULT_HEURISTIC_FRACTION, PAIRWISE_FEATURE_NAMES, CandidateRetriever,
 )
 from recommender.catalogue import load_product_catalogue, order_retriever_catalogue
 from recommender.company import load_companies
@@ -38,14 +38,15 @@ from recommender.features import (
 )
 from recommender.models import TEXT_DIM
 from recommender.ranker import RankerLoss, UPSCANRRanker
-from recommender.scope import get_datasets_locs
+from recommender.scope import DEFAULT_SCOPE_PATH, get_datasets_locs
 from recommender.sequences import (
     DEFAULT_SEQUENCE_LENGTH,
     ENRICHED_FEATURE_DIM,
+    ENRICHED_FEATURE_NAMES,
     PURCHASE_DATE_ORIGIN,
     build_customer_sequence,
 )
-from recommender.split import TEST_START, TRAIN_CUTOFF
+from recommender.split import TEST_START
 from recommender.stage1_catalogue import load_stage1_discovery
 from recommender.text import (
     CATALOGUE_CACHE_WITHOUT_SUBCATEGORY,
@@ -408,9 +409,29 @@ def slate_cache_identity(
     heuristic_fraction: float = 0.0,
     company_cache_name: str = "bge_m3_company.parquet",
     rolling: bool = False,
+    product_inputs: Optional[Dict[str, torch.Tensor]] = None,
 ) -> str:
-    """Bind cached model inputs and labels to their retriever and source data."""
-    digest = hashlib.sha256(f"{SLATE_SCHEMA_VERSION}:{retriever_digest}".encode())
+    """Bind slates to source data, ordered schemas and actual catalogue inputs.
+
+    Rolling retrieval includes text vectors from expanded-catalogue shards, which
+    are absent from the base embedding files. Hashing the resolved input tensors
+    covers those vectors and their order without depending on unused shard files.
+    Schema version 3 payloads/checkpoints remain readable; the identity revision
+    deliberately rejects older, incompletely fingerprinted cache identities.
+    """
+    if rolling and product_inputs is None:
+        raise ValueError("Rolling slate identity requires resolved product inputs.")
+    digest = hashlib.sha256(f"identity_v2:{SLATE_SCHEMA_VERSION}:{retriever_digest}".encode())
+    digest.update(json.dumps({
+        "pairwise": PAIRWISE_FEATURE_NAMES,
+        "profile": LEGACY_PROFILE_FEATURES,
+        "history": ENRICHED_FEATURE_NAMES,
+    }, sort_keys=True).encode())
+    digest.update(checkpoint_digest(DEFAULT_SCOPE_PATH).encode())
+    for name, tensor in sorted((product_inputs or {}).items()):
+        values = tensor.detach().cpu().contiguous()
+        digest.update(repr((name, tuple(values.shape), str(values.dtype))).encode())
+        digest.update(values.numpy().tobytes())
     if heuristic_fraction:
         digest.update(f":repeat_plus_popularity:{heuristic_fraction}".encode())
     if rolling:
@@ -567,6 +588,7 @@ def load_or_precompute_slates(
         heuristic_fraction=heuristic_fraction,
         company_cache_name=retriever.company_cache_name,
         rolling=retriever.rolling_pool is not None,
+        product_inputs=retriever.product_inputs,
     )
     train_data = load_slate_cache(train_cache_path, f"{identity}:train")
     val_data = load_slate_cache(val_cache_path, f"{identity}:val")

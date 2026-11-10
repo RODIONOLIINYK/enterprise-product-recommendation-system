@@ -19,7 +19,12 @@ import torch
 
 DEFAULT_SEQUENCE_LENGTH = 32
 DEFAULT_FEATURE_DIM = 4
-ENRICHED_FEATURE_DIM = 9
+ENRICHED_FEATURE_NAMES = (
+    "quantity_norm", "days_since_purchase_norm", "inter_purchase_gap_norm",
+    "purchase_month_sin", "purchase_month_cos", "prior_sku_purchase_count_norm",
+    "cumulative_sku_quantity_share", "is_repeat_purchase", "real_event_indicator",
+)
+ENRICHED_FEATURE_DIM = len(ENRICHED_FEATURE_NAMES)
 HISTORY_AGE_INDEX = 1
 PURCHASE_DATE_ORIGIN = pd.Timestamp("2025-01-01")
 DAYS_PER_YEAR = 365.25
@@ -227,7 +232,7 @@ def build_customer_sequence(
         }
 
     c_mask = events_df["customer_id"].astype(str) == cid_str
-    t_mask = pd.to_datetime(events_df["purchase_date"]) < as_of_ts
+    t_mask = pd.to_datetime(events_df["purchase_date"], format="mixed") < as_of_ts
     history = events_df.loc[c_mask & t_mask].copy()
 
     if history.empty:
@@ -247,7 +252,7 @@ def build_customer_sequence(
         }
 
     # Normalize dates and sort chronologically ascending
-    history["purchase_date"] = pd.to_datetime(history["purchase_date"])
+    history["purchase_date"] = pd.to_datetime(history["purchase_date"], format="mixed")
     sort_cols = ["purchase_date"]
     if "product_id" in history.columns:
         history["product_id"] = history["product_id"].astype(str)

@@ -271,6 +271,7 @@ def test_temporal_isolation_exact_boundary_instant():
 # Task 3: Performance Benchmark Across 500 Candidate Slates
 # ==============================================================================
 
+@pytest.mark.real_purchase_data
 def test_feature_extraction_throughput_500_slates():
     """Adversarial Test 3: Measure throughput across 500 candidate slates to verify sub-millisecond target."""
     purchases_path = Path("data/interim/cleaned_purchases.csv")

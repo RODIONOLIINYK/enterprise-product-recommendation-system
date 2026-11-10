@@ -6,8 +6,9 @@ Validates:
 2. Variable slate sizes (C=1, 10, 25, 50, 100) and batch sizes (B=1, 4, 32).
 3. Attention masking: Token 0 never masked; padding purchase tokens receive 0 attention weight;
    attention weights sum to 1.0 along the 33-token dimension; zero NaNs for cold customers.
-4. Gradient flow: All modules receive non-zero, finite gradients during backward pass.
-5. Residual skip connection: Additive influence of stage1_score and learnable skip weight.
+4. Gradient flow with explicit synthetic product text; reference bias-only utilization
+   and zero historical text are covered in test_audit_regressions.py.
+5. Final scores come from the MLP, without a Stage 1 score skip connection.
 6. Device portability: CPU and MPS support without dtype mismatches (float32).
 7. Downstream integration: Output format, slate stitching, and checkpoint loading.
 """

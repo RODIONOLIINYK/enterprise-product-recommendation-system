@@ -102,7 +102,7 @@ def compute_product_demand_features(
         return torch.zeros((num_products, 6), dtype=torch.float32)
 
     df = purchases_df.copy()
-    df["purchase_date"] = pd.to_datetime(df["purchase_date"])
+    df["purchase_date"] = pd.to_datetime(df["purchase_date"], format="mixed")
     df["product_id"] = df["product_id"].astype(str)
 
     history = df.loc[df["purchase_date"] < as_of_ts]
@@ -210,7 +210,7 @@ def build_retriever_transitions(
     events strictly prior to target_date (including purchases made during the train period!).
     """
     df = purchases_df.copy()
-    df["purchase_date"] = pd.to_datetime(df["purchase_date"])
+    df["purchase_date"] = pd.to_datetime(df["purchase_date"], format="mixed")
     df["customer_id"] = df["customer_id"].astype(str)
     df["product_id"] = df["product_id"].astype(str)
 

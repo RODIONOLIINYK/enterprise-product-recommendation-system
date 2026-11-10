@@ -10,6 +10,7 @@ Evaluates:
 """
 
 import unittest
+import pytest
 import numpy as np
 import pandas as pd
 import torch
@@ -487,6 +488,7 @@ class AdversarialMilestoneM7Tests(unittest.TestCase):
         self.assertTrue((seq[:, 7] >= 0.0).all() and (seq[:, 7] <= 1.0).all())
         self.assertTrue((seq[:, 8] >= 0.0).all() and (seq[:, 8] <= 1.0).all())
 
+    @pytest.mark.real_purchase_data
     def test_07_real_world_data_temporal_isolation_and_truncation(self):
         """Test sequence generation directly on real cleaned_purchases.csv dataset.
 

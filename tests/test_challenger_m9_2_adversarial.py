@@ -13,6 +13,7 @@ Evaluates:
 from pathlib import Path
 import time
 import unittest
+import pytest
 
 import numpy as np
 import pandas as pd
@@ -134,6 +135,7 @@ class TestChallengerM9AdversarialVerification(unittest.TestCase):
         self.assertIn("P_BOUNDARY", snap_after.sku_stats)
         self.assertNotIn("P_FUTURE", snap_after.sku_stats)
 
+    @pytest.mark.real_purchase_data
     def test_04_submillisecond_pairwise_latency_sla(self):
         """Verify 50-candidate slate feature extraction latency SLA strictly < 1.0 ms."""
         if not self.has_purchases:

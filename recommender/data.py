@@ -1,6 +1,5 @@
 """Adapted purchase preparation that preserves exact sellable product IDs."""
 
-from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np

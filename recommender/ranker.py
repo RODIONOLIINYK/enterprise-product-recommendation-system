@@ -279,13 +279,13 @@ class UPSCANRRanker(nn.Module):
         )
 
     def build_key_padding_mask(self, attention_mask: torch.Tensor) -> torch.Tensor:
-        """Construct key_padding_mask of shape (B, 33) where True indicates masked positions.
+        """Construct a (B, history_length + 1) mask; True indicates padding.
 
         Token 0 (Profile) is NEVER masked (strictly False), preventing all-padding NaNs.
-        Tokens 1..32 follow sequence attention_mask (True where attention_mask == 0).
+        History positions follow the supplied sequence length (32 by default).
         """
         b_size = attention_mask.size(0)
-        k_mask = torch.zeros((b_size, 33), dtype=torch.bool, device=attention_mask.device)
+        k_mask = torch.zeros((b_size, attention_mask.size(1) + 1), dtype=torch.bool, device=attention_mask.device)
         k_mask[:, 0] = False
         k_mask[:, 1:] = (attention_mask == 0)
         return k_mask
@@ -582,7 +582,12 @@ class UPSCANRRanker(nn.Module):
         device: Optional[Union[str, torch.device]] = None,
         **kwargs,
     ) -> "UPSCANRRanker":
-        """Instantiate UPSCANRRanker and load pretrained CustomerTower and ProductTower weights."""
+        """Load matching customer projections/metadata and the candidate ProductTower.
+
+        The ranker's history embeddings and attention layers are initialized separately.
+        Cached candidate vectors bypass ProductTower; its state remains available for
+        raw candidate-attribute inference and compatibility with saved checkpoints.
+        """
         dev = torch.device(device) if device is not None else torch.device("cpu")
         ckpt = torch.load(checkpoint_path, map_location=dev)
         state = ckpt.get("model_state_dict", {})
@@ -641,26 +646,21 @@ class UPSCANRRanker(nn.Module):
         # Transfer matching weights from CustomerTower
         cust_prefix = "customer_tower."
         prod_prefix = "product_tower."
-        transferred = 0
 
         with torch.no_grad():
             # City / region / industry embeddings
             if f"{cust_prefix}city_embedding.weight" in state:
                 model.city_embedding.weight.copy_(state[f"{cust_prefix}city_embedding.weight"])
-                transferred += 1
             if f"{cust_prefix}region_embedding.weight" in state:
                 model.region_embedding.weight.copy_(state[f"{cust_prefix}region_embedding.weight"])
-                transferred += 1
             if f"{cust_prefix}industry_embedding.weight" in state:
                 model.industry_embedding.weight.copy_(state[f"{cust_prefix}industry_embedding.weight"])
-                transferred += 1
 
             # Text projection
             source_text = state.get(f"{cust_prefix}text_proj.0.weight")
             if source_text is not None and source_text.shape == model.text_proj[0].weight.shape:
                 model.text_proj[0].weight.copy_(source_text)
                 model.text_proj[0].bias.copy_(state[f"{cust_prefix}text_proj.0.bias"])
-                transferred += 1
 
             # Share corresponding columns while preserving the ranker's extra inputs.
             if f"{cust_prefix}tabular_proj.0.weight" in state:
@@ -679,7 +679,6 @@ class UPSCANRRanker(nn.Module):
                             j = LEGACY_PROFILE_FEATURES.index(name)
                             target[:, cat_width + j].copy_(source[:, cat_width + i])
                     model.tabular_proj[0].bias.copy_(state[f"{cust_prefix}tabular_proj.0.bias"])
-                    transferred += 1
 
             # Product Tower weights
             prod_state = {
@@ -687,7 +686,6 @@ class UPSCANRRanker(nn.Module):
             }
             if prod_state:
                 model.product_tower.load_state_dict(prod_state, strict=False)
-                transferred += len(prod_state)
 
         model.to(dev)
         return model

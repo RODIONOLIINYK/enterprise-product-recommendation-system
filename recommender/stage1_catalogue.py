@@ -83,6 +83,7 @@ def load_stage1_discovery(
     inputs = build_retriever_product_inputs(
         purchases, pool.merchandise, embeddings, candidate_ids, ckpt["vocabs"],
         include_subcategory=False, container_encoding=config["container_encoding"],
+        include_sku_median_quantity=config.get("include_sku_median_quantity", False),
     )
     retriever = CandidateRetriever.from_checkpoint(
         checkpoint_path, purchases, catalogue, companies, inputs, device,

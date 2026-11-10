@@ -185,7 +185,7 @@ def compute_point_in_time_features(
     """Compute lifetime aggregate features strictly prior to as_of_date."""
     # Strict point-in-time filter: only events strictly before as_of_date
     customer_mask = purchases_df["customer_id"].astype(str) == str(customer_id)
-    time_mask = pd.to_datetime(purchases_df["purchase_date"]) < pd.Timestamp(as_of_date)
+    time_mask = pd.to_datetime(purchases_df["purchase_date"], format="mixed") < pd.Timestamp(as_of_date)
     history = purchases_df.loc[customer_mask & time_mask]
 
     if history.empty:
@@ -203,7 +203,7 @@ def compute_point_in_time_features(
             "has_history": 0.0,
         }
     else:
-        dates = pd.to_datetime(history["purchase_date"]).sort_values()
+        dates = pd.to_datetime(history["purchase_date"], format="mixed").sort_values()
         distinct_dates = dates.drop_duplicates()
         as_of_ts = pd.Timestamp(as_of_date)
 

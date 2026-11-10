@@ -22,7 +22,7 @@ from bisect import bisect_left
 from dataclasses import dataclass
 import math
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd

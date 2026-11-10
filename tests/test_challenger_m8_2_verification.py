@@ -15,6 +15,7 @@ from pathlib import Path
 import json
 import math
 import unittest
+import pytest
 
 import numpy as np
 import pandas as pd
@@ -184,6 +185,7 @@ class TestChallengerM8RetrieverVerification(unittest.TestCase):
         history_max_r50 = max(float(e.get("Val Recall@50", e.get("val_recall@50"))) for e in history)
         self.assertAlmostEqual(ckpt["best_recall_50"], history_max_r50, places=5)
 
+    @pytest.mark.real_purchase_data
     def test_04_chronological_partitions_and_split_isolation(self):
         """Validate chronological boundaries: Train < 2025-10-01, Val 2025-10-01..2026-02-18, Test >= 2026-02-19."""
         if not self.purchases_path.is_file():

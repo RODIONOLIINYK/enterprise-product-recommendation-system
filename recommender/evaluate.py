@@ -521,6 +521,7 @@ def run_full_evaluation(
         heuristic_fraction=heuristic_fraction,
         company_cache_name=retriever.company_cache_name,
         rolling=rolling,
+        product_inputs=retriever.product_inputs,
     )
     val_path = slate_cache_path("val", heuristic_fraction, rolling=rolling)
     val_slates = load_slate_cache(val_path, f"{val_identity}:val")
@@ -594,6 +595,7 @@ def run_full_evaluation(
             heuristic_fraction=heuristic_fraction,
             company_cache_name=test_retriever.company_cache_name,
             rolling=rolling,
+            product_inputs=test_retriever.product_inputs,
         )
         test_path = slate_cache_path("test", heuristic_fraction, rolling=rolling)
         test_slates = load_slate_cache(test_path, f"{test_identity}:test")

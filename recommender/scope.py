@@ -98,7 +98,7 @@ def actual_purchase_mask(
         identity_valid
         & sellable_product_mask(records, scope=scope)
         & records["transaction_type"].astype("string").str.strip().str.upper().eq("ПРОДАЖА")
-        & pd.to_datetime(records["purchase_date"], errors="coerce").notna()
+        & pd.to_datetime(records["purchase_date"], errors="coerce", format="mixed").notna()
         & quantity.gt(0)
         & np.isfinite(quantity).fillna(False)
     ).fillna(False)
@@ -116,7 +116,7 @@ def eligible_product_mask(
     if pd.isna(cutoff):
         raise ValueError("A valid scoring_time is required for historical product eligibility.")
     paid_mask = actual_purchase_mask(purchases, scope=scope)
-    dates = pd.to_datetime(purchases["purchase_date"], errors="coerce")
+    dates = pd.to_datetime(purchases["purchase_date"], errors="coerce", format="mixed")
     prior = merge_purchase_events(purchases.loc[paid_mask & dates.lt(cutoff)])
     counts = prior["product_id"].astype("string").str.strip().value_counts()
     product_ids = products["product_id"].astype("string").str.strip()

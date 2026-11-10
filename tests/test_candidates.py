@@ -394,6 +394,7 @@ def test_submillisecond_pairwise_feature_extraction(sample_catalog_data, sample_
     assert avg_ms < 1.0, f"Feature extraction exceeded 1ms target: {avg_ms:.4f} ms"
 
 
+@pytest.mark.real_purchase_data
 def test_checkpoint_loading_and_retrieval():
     """Integration test: loads real checkpoint checkpoints/retriever/best_retriever.pt and verifies inference."""
     ckpt_path = Path("checkpoints/retriever/best_retriever.pt")

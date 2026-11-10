@@ -47,7 +47,7 @@ def validate_no_leakage(
 
     # Validate dates
     if not train_df.empty:
-        train_dates = pd.to_datetime(train_df[date_column])
+        train_dates = pd.to_datetime(train_df[date_column], format="mixed")
         if (train_dates >= TRAIN_CUTOFF).any():
             violating = train_df.loc[train_dates >= TRAIN_CUTOFF]
             raise ValueError(
@@ -59,7 +59,7 @@ def validate_no_leakage(
         max_train = None
 
     if not val_df.empty:
-        val_dates = pd.to_datetime(val_df[date_column])
+        val_dates = pd.to_datetime(val_df[date_column], format="mixed")
         if (val_dates < VAL_START).any() or (val_dates >= TEST_START).any():
             violating = val_df.loc[(val_dates < VAL_START) | (val_dates >= TEST_START)]
             raise ValueError(
@@ -77,7 +77,7 @@ def validate_no_leakage(
         max_val = None
 
     if not test_df.empty:
-        test_dates = pd.to_datetime(test_df[date_column])
+        test_dates = pd.to_datetime(test_df[date_column], format="mixed")
         if (test_dates < TEST_START).any():
             violating = test_df.loc[test_dates < TEST_START]
             raise ValueError(
@@ -111,7 +111,7 @@ def chronological_split(
     if date_column not in purchases_df.columns:
         raise ValueError(f"Input DataFrame is missing required date column: {date_column}")
 
-    dates = pd.to_datetime(purchases_df[date_column])
+    dates = pd.to_datetime(purchases_df[date_column], format="mixed")
 
     train_mask = dates < TRAIN_CUTOFF
     val_mask = (dates >= VAL_START) & (dates < TEST_START)

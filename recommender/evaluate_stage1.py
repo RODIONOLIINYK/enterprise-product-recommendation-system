@@ -7,7 +7,6 @@ from itertools import chain, combinations
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
