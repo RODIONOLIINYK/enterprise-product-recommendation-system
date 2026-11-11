@@ -1,0 +1,266 @@
+{
+  "E4k2-seed42": {
+    "first_interest_only": {
+      "val_recall@10": 0.3443735641656647,
+      "val_ndcg@10": 0.21004386210299167,
+      "new_hits@10": 311,
+      "new_recall@10": 0.1674744211093161,
+      "new_hits@25": 699,
+      "new_hits@50": 983,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.3764135702746365,
+      "stage1_new_recall@50": 0.5293484114162628
+    },
+    "alternate_aggregation": {
+      "val_recall@10": 0.34434664336665544,
+      "val_ndcg@10": 0.21007430430941787,
+      "new_hits@10": 311,
+      "new_recall@10": 0.1674744211093161,
+      "new_hits@25": 699,
+      "new_hits@50": 983,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.3764135702746365,
+      "stage1_new_recall@50": 0.5293484114162628
+    },
+    "query_norms": [
+      0.3438996970653534,
+      0.3895692229270935
+    ],
+    "query_parameter_cosines": [
+      [
+        1.0,
+        0.3505289554595947
+      ],
+      [
+        0.3505289554595947,
+        0.9999998807907104
+      ]
+    ],
+    "original": {
+      "val_recall@10": 0.34450816816071134,
+      "val_ndcg@10": 0.21012633589533122,
+      "new_hits@10": 311,
+      "new_recall@10": 0.1674744211093161,
+      "new_hits@25": 699,
+      "new_hits@50": 983,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.3764135702746365,
+      "stage1_new_recall@50": 0.5293484114162628
+    },
+    "recorded_selected_metrics": {
+      "val_recall@10": 0.34450816816071134,
+      "val_ndcg@10": 0.21012633589533122,
+      "new_hits@10": 311,
+      "new_recall@10": 0.1674744211093161,
+      "new_hits@25": 699,
+      "new_hits@50": 983,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.3764135702746365,
+      "stage1_new_recall@50": 0.5293484114162628
+    },
+    "evaluation_device": "cpu",
+    "kind": "Fixed weights, cache-only perturbation; not a retrained control"
+  },
+  "E4k3-seed42": {
+    "first_interest_only": {
+      "val_recall@10": 0.3467726555301685,
+      "val_ndcg@10": 0.20738507156323918,
+      "new_hits@10": 302,
+      "new_recall@10": 0.1626278944534195,
+      "new_hits@25": 693,
+      "new_hits@50": 993,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.37318255250403876,
+      "stage1_new_recall@50": 0.5347334410339257
+    },
+    "alternate_aggregation": {
+      "val_recall@10": 0.34683995752769187,
+      "val_ndcg@10": 0.20741032792869976,
+      "new_hits@10": 302,
+      "new_recall@10": 0.1626278944534195,
+      "new_hits@25": 693,
+      "new_hits@50": 993,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.37318255250403876,
+      "stage1_new_recall@50": 0.5347334410339257
+    },
+    "query_norms": [
+      0.377878874540329,
+      0.4619627892971039,
+      0.3059615194797516
+    ],
+    "query_parameter_cosines": [
+      [
+        1.0,
+        0.31932464241981506,
+        0.11246445029973984
+      ],
+      [
+        0.31932464241981506,
+        1.0000001192092896,
+        0.2928556799888611
+      ],
+      [
+        0.11246445029973984,
+        0.2928556799888611,
+        1.0
+      ]
+    ],
+    "original": {
+      "val_recall@10": 0.3467457347311592,
+      "val_ndcg@10": 0.2073513475335192,
+      "new_hits@10": 302,
+      "new_recall@10": 0.1626278944534195,
+      "new_hits@25": 694,
+      "new_hits@50": 993,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.3737210554658051,
+      "stage1_new_recall@50": 0.5347334410339257
+    },
+    "recorded_selected_metrics": {
+      "val_recall@10": 0.3467457347311592,
+      "val_ndcg@10": 0.2073513475335192,
+      "new_hits@10": 302,
+      "new_recall@10": 0.1626278944534195,
+      "new_hits@25": 694,
+      "new_hits@50": 993,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.3737210554658051,
+      "stage1_new_recall@50": 0.5347334410339257
+    },
+    "evaluation_device": "cpu",
+    "kind": "Fixed weights, cache-only perturbation; not a retrained control"
+  },
+  "E5k2-seed42": {
+    "first_interest_only": {
+      "val_recall@10": 0.34594110696602426,
+      "val_ndcg@10": 0.20758793968499084,
+      "new_hits@10": 309,
+      "new_recall@10": 0.16639741518578352,
+      "new_hits@25": 704,
+      "new_hits@50": 972,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.37910608508346794,
+      "stage1_new_recall@50": 0.5234248788368336
+    },
+    "alternate_aggregation": {
+      "val_recall@10": 0.34594110696602426,
+      "val_ndcg@10": 0.20761966510012447,
+      "new_hits@10": 309,
+      "new_recall@10": 0.16639741518578352,
+      "new_hits@25": 704,
+      "new_hits@50": 972,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.37910608508346794,
+      "stage1_new_recall@50": 0.5234248788368336
+    },
+    "query_norms": [
+      0.3854011297225952,
+      0.41930532455444336
+    ],
+    "query_parameter_cosines": [
+      [
+        1.0,
+        0.7008098363876343
+      ],
+      [
+        0.7008098363876343,
+        1.0000001192092896
+      ]
+    ],
+    "original": {
+      "val_recall@10": 0.34594110696602426,
+      "val_ndcg@10": 0.2075943319881617,
+      "new_hits@10": 309,
+      "new_recall@10": 0.16639741518578352,
+      "new_hits@25": 704,
+      "new_hits@50": 972,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.37910608508346794,
+      "stage1_new_recall@50": 0.5234248788368336
+    },
+    "recorded_selected_metrics": {
+      "val_recall@10": 0.34594110696602426,
+      "val_ndcg@10": 0.2075943319881617,
+      "new_hits@10": 309,
+      "new_recall@10": 0.16639741518578352,
+      "new_hits@25": 704,
+      "new_hits@50": 972,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.37910608508346794,
+      "stage1_new_recall@50": 0.5234248788368336
+    },
+    "evaluation_device": "cpu",
+    "kind": "Fixed weights, cache-only perturbation; not a retrained control"
+  },
+  "E5k3-seed42": {
+    "first_interest_only": {
+      "val_recall@10": 0.3456914066941144,
+      "val_ndcg@10": 0.2069217107251829,
+      "new_hits@10": 298,
+      "new_recall@10": 0.16047388260635434,
+      "new_hits@25": 703,
+      "new_hits@50": 974,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.37856758212170166,
+      "stage1_new_recall@50": 0.5245018847603662
+    },
+    "alternate_aggregation": {
+      "val_recall@10": 0.34585293148817026,
+      "val_ndcg@10": 0.2070151261697717,
+      "new_hits@10": 298,
+      "new_recall@10": 0.16047388260635434,
+      "new_hits@25": 703,
+      "new_hits@50": 975,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.37856758212170166,
+      "stage1_new_recall@50": 0.5250403877221325
+    },
+    "query_norms": [
+      0.3653469979763031,
+      0.3847671151161194,
+      0.348890095949173
+    ],
+    "query_parameter_cosines": [
+      [
+        1.0,
+        0.6715981364250183,
+        0.6057817935943604
+      ],
+      [
+        0.6715981364250183,
+        1.0,
+        0.6087342500686646
+      ],
+      [
+        0.6057817935943604,
+        0.6087342500686646,
+        1.0
+      ]
+    ],
+    "original": {
+      "val_recall@10": 0.34585293148817026,
+      "val_ndcg@10": 0.20700893173522303,
+      "new_hits@10": 298,
+      "new_recall@10": 0.16047388260635434,
+      "new_hits@25": 703,
+      "new_hits@50": 974,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.37856758212170166,
+      "stage1_new_recall@50": 0.5245018847603662
+    },
+    "recorded_selected_metrics": {
+      "val_recall@10": 0.34585293148817026,
+      "val_ndcg@10": 0.20700893173522303,
+      "new_hits@10": 298,
+      "new_recall@10": 0.16047388260635434,
+      "new_hits@25": 703,
+      "new_hits@50": 974,
+      "new_targets": 1857,
+      "stage1_new_recall@25": 0.37856758212170166,
+      "stage1_new_recall@50": 0.5245018847603662
+    },
+    "evaluation_device": "cpu",
+    "kind": "Fixed weights, cache-only perturbation; not a retrained control"
+  }
+}

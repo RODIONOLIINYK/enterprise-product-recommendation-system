@@ -1,0 +1,44 @@
+{
+  "stage1_digest": "2dcfbc7eab6795ded6f25a6cb0ffe1f9e606f13c9885d4ee020b724d0a2b5ab7",
+  "mode": "frozen-weight sensitivity only; no retraining or quality evaluation",
+  "comparison": "train-cutoff demand versus strictly prior-to-date demand; same weights/text/packaging/customer inputs",
+  "limitation": "Weights still inherit Stage 1 training look-ahead. A clean rolling-demand Stage 1 training run remains separate future work.",
+  "rows": [
+    {
+      "date": "2025-02-28",
+      "eligible_trained_products": 639,
+      "customer_transitions": 64,
+      "products_with_changed_demand": 639,
+      "product_mean_cosine_distance": 0.003418568056076765,
+      "product_max_cosine_distance": 0.10954314470291138,
+      "customer_mean_cosine_distance": 0.0002284664660692215,
+      "customer_max_cosine_distance": 0.0024086833000183105,
+      "demand_snapshot_seconds_cpu": 0.34240595799928997,
+      "product_forward_seconds_cpu": 0.01812545899883844
+    },
+    {
+      "date": "2025-06-02",
+      "eligible_trained_products": 683,
+      "customer_transitions": 40,
+      "products_with_changed_demand": 683,
+      "product_mean_cosine_distance": 0.0026250402443110943,
+      "product_max_cosine_distance": 0.10284590721130371,
+      "customer_mean_cosine_distance": 0.00021851062774658203,
+      "customer_max_cosine_distance": 0.002368748188018799,
+      "demand_snapshot_seconds_cpu": 0.29723454100167146,
+      "product_forward_seconds_cpu": 0.01326333299948601
+    },
+    {
+      "date": "2025-09-01",
+      "eligible_trained_products": 718,
+      "customer_transitions": 46,
+      "products_with_changed_demand": 718,
+      "product_mean_cosine_distance": 0.0012825734447687864,
+      "product_max_cosine_distance": 0.021524488925933838,
+      "customer_mean_cosine_distance": 7.12975233909674e-05,
+      "customer_max_cosine_distance": 0.0005222558975219727,
+      "demand_snapshot_seconds_cpu": 0.3011880830017617,
+      "product_forward_seconds_cpu": 0.010017625005275477
+    }
+  ]
+}

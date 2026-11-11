@@ -2,6 +2,8 @@
 
 The historical sections record previously documented results on the chronological **Validation Split (`2025-10-01` to `2026-02-18`, `6,191` transitions, `1,857` new-to-customer targets)**. The held-out Test Split (`>= 2026-02-19`, `6,327` transitions) remains untouched.
 
+The 2026-11-11 [shared-representation report](SHARED_STAGE1_EXPERIMENTS.md) independently reproduces both local selections below and records new controlled experiments. The later historical tables remain unchanged; their epoch-10/0.5924 reference is not the current local alias.
+
 ## Audit provenance note (2026-11-10)
 
 The sections below preserve the **historical documented reference**. The audit did not rerun validation. Local files currently contain different selections, and the saved epoch-4 evaluation report cannot certify the epoch-7 default alias:
@@ -92,3 +94,13 @@ To keep the codebase clean, all experimental code paths that failed to beat the 
 | Aligned 11-D Statistics (Full $11 \times 11$ Interactions) | `184` (`9.91%`) | `75.84%` | `0.5930` | Compressed the $14 \times 17$ statistics representation into $11 \times 11$ without adding new information. |
 | Combined Precompiled Vectors + Aligned 11-D + Shared Favorite Attributes | `181` (`9.75%`) | `75.81%` | `0.5928` | Compounded the representational restrictions of frozen history vectors and compressed attention statistics (`-13.4%` relative drop in new-product discovery). |
 | Stage 1 Price / Turnover / Co-Purchase Complementarity | Below reference | Below reference | — | Inferred invoice prices, turnover weights, and monthly co-purchase complementarity lowered Stage 1 unseen discovery recall below the 4-flag reference. |
+
+## 5. Shared Stage 1 representations (2026-11-11)
+
+Sixteen controlled 10-epoch model/seed runs are documented in [SHARED_STAGE1_EXPERIMENTS.md](SHARED_STAGE1_EXPERIMENTS.md). Three-seed mean new-target hits@10 are 196.67 for fresh R0, 196.33 for shared R3, 195.67 for reduced-bias R4 and 200.00 without customer-token information. Paired customer-bootstrap intervals do not establish a discovery benefit for sharing or indicator removal. The preserved discovery checkpoint replays 209/1,857, 76.1505% overall Recall@10 and 0.591893 NDCG@10 at the same epoch-4 checkpoint.
+
+Default architecture, bias and checkpoint aliases are unchanged. Wider/edge/scoring experiments were deferred; all results retain the known frozen Stage 1 training-demand look-ahead limitation. The held-out Test split was not evaluated.
+
+## E1–E5 campaign — 2026-11-11–12
+
+Full evidence: [E1_E5_EXPERIMENTS.md](E1_E5_EXPERIMENTS.md), [aggregate metrics](experiments/e1_e5/summary.json), and [commands](experiments/e1_e5/README.md). Thirty-two controlled fits were completed without held-out access or default promotion. Three-seed frozen-retriever discovery hits: fresh control 196.33 ± 5.69; E1 202.33 ± 0.58; E2 residual 201.67 ± 6.11; E2 MLP 203.67 ± 1.53. The separately trained demand-disabled single-vector control averages 719/1,857 at Stage 1 Top-25 unseen and 980/1,857 at Top-50, with downstream 194.67 ± 11.24 discovery hits. E3–E5 extensions failed the screen; all tested multi-interest outputs collapsed. These comparisons do not replace the independently replayed local discovery checkpoint (209 hits) or NDCG alias (201 hits).

@@ -4,7 +4,7 @@ This document tracks the current project state, root-cause findings from our lat
 
 ---
 
-Audit prerequisite (2026-11-10): resolve the artifact mismatch and fixed train-cutoff demand issue in [AUDIT_REPORT.md](AUDIT_REPORT.md) before treating the historical baseline below as locally reproducible. The audit preserved all checkpoints and implemented no new architecture. Future shared-vector layouts must include enriched history index 8, `real_event_indicator`; use the ordered schema constants, not older prose feature lists.
+Audit prerequisite (2026-11-10): resolve the artifact mismatch and fixed train-cutoff demand issue in [AUDIT_REPORT.md](AUDIT_REPORT.md) before treating the historical baseline below as locally reproducible. The audit preserved all checkpoints and implemented no new architecture. The shared-vector experiment now excludes source index 8 from tokens, uses three type dimensions, and preserves its effect only in the default mask-derived legacy bias. The nine-feature source format remains unchanged; use the ordered schema constants.
 
 ## 1. Current Baseline & Core Objective
 
@@ -81,3 +81,13 @@ Future experiments must be run **one controlled change at a time** against the c
    - Validation Overall Recall@10 and NDCG@10 at the **same checkpoint** (as well as peak NDCG@10 if different)
 2. **Never leave dead experimental flags or unused modules in the repo:** If an experiment fails to beat the reference, log its numbers in Section 4 of [`EVALUATION_RESULTS.md`](EVALUATION_RESULTS.md) and revert the code changes immediately.
 3. **Never touch the Test split (`>= 2026-02-19`)** until the user explicitly signs off on the final validation model.
+
+## 5. Completed shared-representation experiment (2026-11-11)
+
+See [SHARED_STAGE1_EXPERIMENTS.md](SHARED_STAGE1_EXPERIMENTS.md) and `experiments/shared_stage1/`. Three-seed mean discovery hits: R0 196.67, full shared R3 196.33, reduced-bias R4 195.67, no-customer-token R3P0 200.00. The preserved discovery checkpoint independently replays 209 hits, 76.1505% Recall@10 and 0.591893 NDCG@10. These are distinct selected checkpoints, not mixed historical peaks.
+
+Keep the existing ranker/bias defaults. Larger-width training and edge/scorer experiments remain deferred. Establish a separately versioned rolling-demand Stage 1 control before claiming a temporally clean shared-vector comparison; do not mix that retraining into these frozen-retriever ablations. Input losslessness and working gradients alone did not produce a discovery improvement.
+
+## 6. Completed E1–E5 campaign (2026-11-11–12)
+
+See [E1_E5_EXPERIMENTS.md](E1_E5_EXPERIMENTS.md) for 32 fits and the architecture decision. Keep the original single-vector/32-event Transformer and 13-feature UPS-CANR shape. E1 and E2 showed small conditional fresh-control gains without evidence sufficient for promotion; E3 failed the screen and E4/E5 produced duplicate interests. The demand-disabled scratch control improved Stage 1 coverage but not reproducible downstream discovery. Default checkpoints and all historical/reference caches remain unchanged; no test evaluation was performed. Reproduction and cache-serving contracts are in [experiments/e1_e5/README.md](experiments/e1_e5/README.md).

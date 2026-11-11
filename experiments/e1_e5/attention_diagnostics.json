@@ -1,0 +1,11 @@
+{
+  "E3attention-seed42": {
+    "validation_rows_with_older_history": 3211,
+    "query_norm": 0.322752982378006,
+    "key_weight_norm": 6.529367446899414,
+    "mean_total_variation_from_frequency_pooling": 0.0013111798325553536,
+    "max_total_variation_from_frequency_pooling": 0.004382364451885223,
+    "mean_kl_to_frequency_pooling_nats": 6.595172635570634e-06,
+    "global_sku_attention_logit_std": 0.0052188243716955185
+  }
+}

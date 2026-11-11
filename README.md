@@ -30,6 +30,10 @@ Raw sales + company profiles + product catalogue
   - Builds a 33-token Customer Memory (Token 0 = Customer Profile, Tokens 1..32 = Historical Purchases contextualized by a 1-layer TransformerEncoder).
   - Scores 50 candidates per transition using 4-head cross-attention biased by candidate-to-memory bilinear statistics interactions ($14 \times 17$ per head) and a `397 -> 256 -> 128 -> 64 -> 1` MLP over `[z_candidate (128), h_attended (128), z_candidate * h_attended (128), pairwise_features (13)]`.
 
+## Shared-representation experiment
+
+[SHARED_STAGE1_EXPERIMENTS.md](SHARED_STAGE1_EXPERIMENTS.md) documents the separate 176D model, its eight-feature history input, original/reduced bias comparison, three-seed results and reproduction commands. The existing ranker remains the default: the new model did not show a reproducible discovery gain. Optional 192D/224D layouts are tested but their training is deferred. All original checkpoints and caches are preserved.
+
 ## Setup
 
 Use Python 3.12 (`./venv/bin/python`).
@@ -88,3 +92,7 @@ Six legacy tests read the unsplit real purchase CSV and are skipped by default. 
 ## Data Handling
 
 Raw data, generated tables, cached embeddings, precomputed slates, and model checkpoints remain local and are ignored by Git. Clear notebook outputs before committing.
+
+### E1–E5 controlled experiments
+
+The [E1–E5 report](E1_E5_EXPERIMENTS.md) records 32 validation-only fits: trainable unseen/transition signals, older-history pooling, and hard/smooth multi-interest retrieval, with downstream rankers, seed variation, ablations and latency/cache costs. [Reproduction commands](experiments/e1_e5/README.md) use isolated artifacts and purchase-triggered versioned caches. No experiment was promoted to the default system.

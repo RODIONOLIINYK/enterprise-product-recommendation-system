@@ -1,0 +1,876 @@
+{
+  "R0W-seed42_minus_R0-seed42": {
+    "recall": {
+      "delta": 0.0003822309709888455,
+      "customer_bootstrap_95_interval": [
+        -0.0022574955976859316,
+        0.003097728591755058
+      ]
+    },
+    "ndcg": {
+      "delta": -0.000613009282624587,
+      "customer_bootstrap_95_interval": [
+        -0.0024237370813211955,
+        0.001161420479184658
+      ]
+    },
+    "new_hits": {
+      "delta": 0.0026925148088314485,
+      "customer_bootstrap_95_interval": [
+        -0.003919924613863584,
+        0.00938838199895695
+      ]
+    }
+  },
+  "R1-seed42_minus_R0-seed42": {
+    "recall": {
+      "delta": 0.0023072343115657264,
+      "customer_bootstrap_95_interval": [
+        -0.0015257841299285146,
+        0.006036709611782118
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0019142805498358368,
+      "customer_bootstrap_95_interval": [
+        -0.0007621794969669723,
+        0.004492587101841151
+      ]
+    },
+    "new_hits": {
+      "delta": 0.0032310177705977385,
+      "customer_bootstrap_95_interval": [
+        -0.0073703807390817465,
+        0.013999929025440425
+      ]
+    }
+  },
+  "R2-seed42_minus_R0-seed42": {
+    "recall": {
+      "delta": 0.0011670161062530288,
+      "customer_bootstrap_95_interval": [
+        -0.0023017464962525446,
+        0.004819681834656903
+      ]
+    },
+    "ndcg": {
+      "delta": -0.0004653173260091623,
+      "customer_bootstrap_95_interval": [
+        -0.002722146687989101,
+        0.0017158515498281687
+      ]
+    },
+    "new_hits": {
+      "delta": 0.0032310177705977385,
+      "customer_bootstrap_95_interval": [
+        -0.006069154992342358,
+        0.0117713157734101
+      ]
+    }
+  },
+  "R3-seed42_minus_R0-seed42": {
+    "recall": {
+      "delta": 0.00142038224154454,
+      "customer_bootstrap_95_interval": [
+        -0.0023415551402572754,
+        0.005355497181213882
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0015618012581024652,
+      "customer_bootstrap_95_interval": [
+        -0.0007813612917096081,
+        0.0038965558513026706
+      ]
+    },
+    "new_hits": {
+      "delta": 0.003769520732364028,
+      "customer_bootstrap_95_interval": [
+        -0.007502687534508441,
+        0.01486047856326636
+      ]
+    }
+  },
+  "R4-seed42_minus_R0-seed42": {
+    "recall": {
+      "delta": 0.0019445785176387322,
+      "customer_bootstrap_95_interval": [
+        -0.0017740177214824878,
+        0.0057275392223975615
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0008656924108781973,
+      "customer_bootstrap_95_interval": [
+        -0.001783839248664395,
+        0.00336574351890065
+      ]
+    },
+    "new_hits": {
+      "delta": 0.004846526655896607,
+      "customer_bootstrap_95_interval": [
+        -0.005701505888927963,
+        0.015418977478156383
+      ]
+    }
+  },
+  "R1-seed42_minus_R0W-seed42": {
+    "recall": {
+      "delta": 0.0019250033405768812,
+      "customer_bootstrap_95_interval": [
+        -0.001702841734315878,
+        0.005431789554971972
+      ]
+    },
+    "ndcg": {
+      "delta": 0.002527289832460424,
+      "customer_bootstrap_95_interval": [
+        -3.842044457804865e-05,
+        0.0051512521245772585
+      ]
+    },
+    "new_hits": {
+      "delta": 0.0005385029617662897,
+      "customer_bootstrap_95_interval": [
+        -0.010372996169062903,
+        0.011518324607329843
+      ]
+    }
+  },
+  "R2-seed42_minus_R1-seed42": {
+    "recall": {
+      "delta": -0.0011402182053126975,
+      "customer_bootstrap_95_interval": [
+        -0.004476107907281867,
+        0.002224368427482198
+      ]
+    },
+    "ndcg": {
+      "delta": -0.0023795978758449987,
+      "customer_bootstrap_95_interval": [
+        -0.005127083128987276,
+        0.00037837226142667987
+      ]
+    },
+    "new_hits": {
+      "delta": 0.0,
+      "customer_bootstrap_95_interval": [
+        -0.009928519213859918,
+        0.00950393224797892
+      ]
+    }
+  },
+  "R3-seed42_minus_R2-seed42": {
+    "recall": {
+      "delta": 0.0002533661352915108,
+      "customer_bootstrap_95_interval": [
+        -0.003079948363102518,
+        0.0034038161506699523
+      ]
+    },
+    "ndcg": {
+      "delta": 0.002027118584111627,
+      "customer_bootstrap_95_interval": [
+        -0.0002383661445650329,
+        0.004156568258860374
+      ]
+    },
+    "new_hits": {
+      "delta": 0.0005385029617662897,
+      "customer_bootstrap_95_interval": [
+        -0.008450942541884129,
+        0.010554167085786798
+      ]
+    }
+  },
+  "R3P0-seed42_minus_R3-seed42": {
+    "recall": {
+      "delta": 0.002442790433421995,
+      "customer_bootstrap_95_interval": [
+        -0.0007320395930164167,
+        0.005545061033776783
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0003798485871921236,
+      "customer_bootstrap_95_interval": [
+        -0.0014897841226320192,
+        0.0022196585378253322
+      ]
+    },
+    "new_hits": {
+      "delta": 0.004308023694130318,
+      "customer_bootstrap_95_interval": [
+        -0.005260458484454165,
+        0.014105044656659606
+      ]
+    }
+  },
+  "R3H0-seed42_minus_R3-seed42": {
+    "recall": {
+      "delta": -0.0007436928996450885,
+      "customer_bootstrap_95_interval": [
+        -0.0036376351521276136,
+        0.0022867520927262346
+      ]
+    },
+    "ndcg": {
+      "delta": -0.0005016152529850335,
+      "customer_bootstrap_95_interval": [
+        -0.002567821913816628,
+        0.0015988414914643327
+      ]
+    },
+    "new_hits": {
+      "delta": -0.0032310177705977385,
+      "customer_bootstrap_95_interval": [
+        -0.011312889086520136,
+        0.00475413477148177
+      ]
+    }
+  },
+  "R4-seed42_minus_R3-seed42": {
+    "recall": {
+      "delta": 0.0005241962760941924,
+      "customer_bootstrap_95_interval": [
+        -0.0024848402137994307,
+        0.0034158810766312764
+      ]
+    },
+    "ndcg": {
+      "delta": -0.0006961088472242677,
+      "customer_bootstrap_95_interval": [
+        -0.002821810439881639,
+        0.0013513802671132615
+      ]
+    },
+    "new_hits": {
+      "delta": 0.0010770059235325794,
+      "customer_bootstrap_95_interval": [
+        -0.006462734517457369,
+        0.008116405734226161
+      ]
+    }
+  },
+  "R3P0-seed42_minus_R0-seed42": {
+    "recall": {
+      "delta": 0.0038631726749665356,
+      "customer_bootstrap_95_interval": [
+        0.00024538288146290195,
+        0.007519767186363663
+      ]
+    },
+    "ndcg": {
+      "delta": 0.001941649845294589,
+      "customer_bootstrap_95_interval": [
+        -0.00043753605633890547,
+        0.004175734970789578
+      ]
+    },
+    "new_hits": {
+      "delta": 0.008077544426494346,
+      "customer_bootstrap_95_interval": [
+        -0.0010679058019157554,
+        0.01676377796408242
+      ]
+    }
+  },
+  "R4-seed17_minus_R3-seed17": {
+    "recall": {
+      "delta": -0.000766729994641479,
+      "customer_bootstrap_95_interval": [
+        -0.0026890130151394688,
+        0.0011303348481945185
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0003652488549593338,
+      "customer_bootstrap_95_interval": [
+        -0.0007079369517656723,
+        0.001423352505874442
+      ]
+    },
+    "new_hits": {
+      "delta": -0.0016155088852988692,
+      "customer_bootstrap_95_interval": [
+        -0.006001439769636858,
+        0.0027674796096270587
+      ]
+    }
+  },
+  "R3P0-seed17_minus_R0-seed17": {
+    "recall": {
+      "delta": -0.0012435308350856385,
+      "customer_bootstrap_95_interval": [
+        -0.004447256426901602,
+        0.0020169799835868096
+      ]
+    },
+    "ndcg": {
+      "delta": -0.0005395476098557361,
+      "customer_bootstrap_95_interval": [
+        -0.0028340595543911913,
+        0.0016936225009167643
+      ]
+    },
+    "new_hits": {
+      "delta": -0.004308023694130318,
+      "customer_bootstrap_95_interval": [
+        -0.014030013678451178,
+        0.00534090721855703
+      ]
+    }
+  },
+  "R3-seed17_minus_R0-seed17": {
+    "recall": {
+      "delta": -0.0005254324166964754,
+      "customer_bootstrap_95_interval": [
+        -0.004311177967471593,
+        0.0031190000688464323
+      ]
+    },
+    "ndcg": {
+      "delta": -0.0042098279573468955,
+      "customer_bootstrap_95_interval": [
+        -0.00711578115339462,
+        -0.001468390908372803
+      ]
+    },
+    "new_hits": {
+      "delta": -0.0026925148088314485,
+      "customer_bootstrap_95_interval": [
+        -0.013031242707376368,
+        0.007786472681657362
+      ]
+    }
+  },
+  "R4-seed17_minus_R0-seed17": {
+    "recall": {
+      "delta": -0.0012921624113379545,
+      "customer_bootstrap_95_interval": [
+        -0.0048766073058168526,
+        0.002371662065997421
+      ]
+    },
+    "ndcg": {
+      "delta": -0.003844579102387562,
+      "customer_bootstrap_95_interval": [
+        -0.0065928249812495215,
+        -0.0010994011264746988
+      ]
+    },
+    "new_hits": {
+      "delta": -0.004308023694130318,
+      "customer_bootstrap_95_interval": [
+        -0.014397555680823248,
+        0.005476751833198474
+      ]
+    }
+  },
+  "R3P0-seed17_minus_R3-seed17": {
+    "recall": {
+      "delta": -0.0007180984183891631,
+      "customer_bootstrap_95_interval": [
+        -0.004386721220290154,
+        0.0031887772666992944
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0036702803474911597,
+      "customer_bootstrap_95_interval": [
+        0.0010852545720838253,
+        0.006283846731138727
+      ]
+    },
+    "new_hits": {
+      "delta": -0.0016155088852988692,
+      "customer_bootstrap_95_interval": [
+        -0.011053631374609569,
+        0.008223903243277684
+      ]
+    }
+  },
+  "R4-seed2026_minus_R3-seed2026": {
+    "recall": {
+      "delta": -0.00015323460626064556,
+      "customer_bootstrap_95_interval": [
+        -0.003990438462114254,
+        0.0037549813649701514
+      ]
+    },
+    "ndcg": {
+      "delta": -0.005252605679910721,
+      "customer_bootstrap_95_interval": [
+        -0.007879113522136522,
+        -0.002769691608550728
+      ]
+    },
+    "new_hits": {
+      "delta": -0.0005385029617662897,
+      "customer_bootstrap_95_interval": [
+        -0.009176197705007685,
+        0.008443718265523816
+      ]
+    }
+  },
+  "R3P0-seed2026_minus_R0-seed2026": {
+    "recall": {
+      "delta": 0.0016241366828807005,
+      "customer_bootstrap_95_interval": [
+        -0.001935810305586534,
+        0.005108130218011116
+      ]
+    },
+    "ndcg": {
+      "delta": -0.0008264072551976217,
+      "customer_bootstrap_95_interval": [
+        -0.003618243572034142,
+        0.0018092228441557484
+      ]
+    },
+    "new_hits": {
+      "delta": 0.0016155088852988692,
+      "customer_bootstrap_95_interval": [
+        -0.007420508723792965,
+        0.010869565217391304
+      ]
+    }
+  },
+  "R3-seed2026_minus_R0-seed2026": {
+    "recall": {
+      "delta": -0.0010528640295747048,
+      "customer_bootstrap_95_interval": [
+        -0.004842489595307392,
+        0.0024378083107348078
+      ]
+    },
+    "ndcg": {
+      "delta": -0.003917258270682876,
+      "customer_bootstrap_95_interval": [
+        -0.006625582772392154,
+        -0.0013776942117396055
+      ]
+    },
+    "new_hits": {
+      "delta": -0.0016155088852988692,
+      "customer_bootstrap_95_interval": [
+        -0.011145963049747947,
+        0.007852280510949269
+      ]
+    }
+  },
+  "R4-seed2026_minus_R0-seed2026": {
+    "recall": {
+      "delta": -0.0012060986358353508,
+      "customer_bootstrap_95_interval": [
+        -0.005076772433235621,
+        0.0028206917304439832
+      ]
+    },
+    "ndcg": {
+      "delta": -0.009169863950593597,
+      "customer_bootstrap_95_interval": [
+        -0.012790258973146097,
+        -0.005705422049705223
+      ]
+    },
+    "new_hits": {
+      "delta": -0.002154011847065159,
+      "customer_bootstrap_95_interval": [
+        -0.010560147153242098,
+        0.006853490568370342
+      ]
+    }
+  },
+  "R3P0-seed2026_minus_R3-seed2026": {
+    "recall": {
+      "delta": 0.002677000712455405,
+      "customer_bootstrap_95_interval": [
+        -0.0009364586365483268,
+        0.0065146126219874975
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0030908510154852554,
+      "customer_bootstrap_95_interval": [
+        0.00043959607658872733,
+        0.0056297383634152515
+      ]
+    },
+    "new_hits": {
+      "delta": 0.0032310177705977385,
+      "customer_bootstrap_95_interval": [
+        -0.0058074800692257495,
+        0.012486937030286603
+      ]
+    }
+  },
+  "R0-seed17_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.0012431378184083726,
+      "customer_bootstrap_95_interval": [
+        -0.004525046869562601,
+        0.001972993197657379
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0013632764592416472,
+      "customer_bootstrap_95_interval": [
+        -0.0011805588466178814,
+        0.003932146631199778
+      ]
+    },
+    "new_hits": {
+      "delta": -0.004308023694130318,
+      "customer_bootstrap_95_interval": [
+        -0.013234778554124787,
+        0.0048253219381015665
+      ]
+    }
+  },
+  "R0-seed2026_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.0007786011884703534,
+      "customer_bootstrap_95_interval": [
+        -0.004802297680718225,
+        0.003321235917478173
+      ]
+    },
+    "ndcg": {
+      "delta": 0.003330831091749952,
+      "customer_bootstrap_95_interval": [
+        0.00033280028796883564,
+        0.006366112567574438
+      ]
+    },
+    "new_hits": {
+      "delta": -0.0059235325794291865,
+      "customer_bootstrap_95_interval": [
+        -0.0144076840981857,
+        0.0020836609014675033
+      ]
+    }
+  },
+  "R0-seed42_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.00346012918316517,
+      "customer_bootstrap_95_interval": [
+        -0.007491990247956517,
+        0.0002316428650043495
+      ]
+    },
+    "ndcg": {
+      "delta": -0.00039627066589726886,
+      "customer_bootstrap_95_interval": [
+        -0.002854268216675555,
+        0.002065605468453359
+      ]
+    },
+    "new_hits": {
+      "delta": -0.009693053311793215,
+      "customer_bootstrap_95_interval": [
+        -0.018340146482711633,
+        -0.0016552444248114468
+      ]
+    }
+  },
+  "R0W-seed42_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.0030778982121763237,
+      "customer_bootstrap_95_interval": [
+        -0.006371927706845312,
+        0.0002448251824730522
+      ]
+    },
+    "ndcg": {
+      "delta": -0.001009279948521856,
+      "customer_bootstrap_95_interval": [
+        -0.00339886655624031,
+        0.0015552165174691308
+      ]
+    },
+    "new_hits": {
+      "delta": -0.007000538502961767,
+      "customer_bootstrap_95_interval": [
+        -0.014552480155487444,
+        0.0
+      ]
+    }
+  },
+  "R1-seed42_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.0011528948715994428,
+      "customer_bootstrap_95_interval": [
+        -0.004911964069127467,
+        0.002682785172840198
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0015180098839385678,
+      "customer_bootstrap_95_interval": [
+        -0.0014396368334464807,
+        0.004229468620032967
+      ]
+    },
+    "new_hits": {
+      "delta": -0.006462035541195477,
+      "customer_bootstrap_95_interval": [
+        -0.01727976790785318,
+        0.0037950031097709626
+      ]
+    }
+  },
+  "R2-seed42_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.00229311307691214,
+      "customer_bootstrap_95_interval": [
+        -0.005840381867822334,
+        0.0011263247927737665
+      ]
+    },
+    "ndcg": {
+      "delta": -0.0008615879919064309,
+      "customer_bootstrap_95_interval": [
+        -0.0029736189507454905,
+        0.001332196272555572
+      ]
+    },
+    "new_hits": {
+      "delta": -0.006462035541195477,
+      "customer_bootstrap_95_interval": [
+        -0.015616866215512754,
+        0.0016077601672577727
+      ]
+    }
+  },
+  "R3-seed17_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.001768570235104848,
+      "customer_bootstrap_95_interval": [
+        -0.005552460512396579,
+        0.0018489827816429172
+      ]
+    },
+    "ndcg": {
+      "delta": -0.002846551498105248,
+      "customer_bootstrap_95_interval": [
+        -0.005439309660689725,
+        -0.00044530864626775025
+      ]
+    },
+    "new_hits": {
+      "delta": -0.007000538502961767,
+      "customer_bootstrap_95_interval": [
+        -0.016412052014369523,
+        0.00224736111539173
+      ]
+    }
+  },
+  "R3-seed2026_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.001831465218045058,
+      "customer_bootstrap_95_interval": [
+        -0.00545612450198629,
+        0.0016635921970847654
+      ]
+    },
+    "ndcg": {
+      "delta": -0.0005864271789329245,
+      "customer_bootstrap_95_interval": [
+        -0.0027601107749778532,
+        0.001640892056686007
+      ]
+    },
+    "new_hits": {
+      "delta": -0.007539041464728056,
+      "customer_bootstrap_95_interval": [
+        -0.016155911370567367,
+        0.0005584890045262968
+      ]
+    }
+  },
+  "R3-seed42_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.0020397469416206294,
+      "customer_bootstrap_95_interval": [
+        -0.005702743188073235,
+        0.0015040535187180344
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0011655305922051965,
+      "customer_bootstrap_95_interval": [
+        -0.0013470716881061127,
+        0.003595721535173989
+      ]
+    },
+    "new_hits": {
+      "delta": -0.0059235325794291865,
+      "customer_bootstrap_95_interval": [
+        -0.015787685744033962,
+        0.0035992995077621997
+      ]
+    }
+  },
+  "R3H0-seed42_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.002783439841265717,
+      "customer_bootstrap_95_interval": [
+        -0.006477169975871488,
+        0.0006795074625521287
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0006639153392201629,
+      "customer_bootstrap_95_interval": [
+        -0.0018326571252629108,
+        0.0032464603486234054
+      ]
+    },
+    "new_hits": {
+      "delta": -0.009154550350026925,
+      "customer_bootstrap_95_interval": [
+        -0.019991376069381745,
+        0.000582781153045954
+      ]
+    }
+  },
+  "R3P0-seed17_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.0024866686534940115,
+      "customer_bootstrap_95_interval": [
+        -0.006093962352696706,
+        0.0009335348555169103
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0008237288493859112,
+      "customer_bootstrap_95_interval": [
+        -0.0017945426104745569,
+        0.0033340270419571516
+      ]
+    },
+    "new_hits": {
+      "delta": -0.008616047388260635,
+      "customer_bootstrap_95_interval": [
+        -0.018211223487419468,
+        0.0005153121555749061
+      ]
+    }
+  },
+  "R3P0-seed2026_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": 0.0008455354944103466,
+      "customer_bootstrap_95_interval": [
+        -0.002826851526963702,
+        0.0044831359460289835
+      ]
+    },
+    "ndcg": {
+      "delta": 0.0025044238365523304,
+      "customer_bootstrap_95_interval": [
+        -0.0006098081423858811,
+        0.005450966574504624
+      ]
+    },
+    "new_hits": {
+      "delta": -0.004308023694130318,
+      "customer_bootstrap_95_interval": [
+        -0.01331854974375834,
+        0.0040415704387990765
+      ]
+    }
+  },
+  "R3P0-seed42_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": 0.00040304349180136597,
+      "customer_bootstrap_95_interval": [
+        -0.0032367302634467372,
+        0.003883862727346341
+      ]
+    },
+    "ndcg": {
+      "delta": 0.00154537917939732,
+      "customer_bootstrap_95_interval": [
+        -0.0010805393464200432,
+        0.0042169842557436684
+      ]
+    },
+    "new_hits": {
+      "delta": -0.0016155088852988692,
+      "customer_bootstrap_95_interval": [
+        -0.010487004508381298,
+        0.006900303926178242
+      ]
+    }
+  },
+  "R4-seed17_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.0025353002297463273,
+      "customer_bootstrap_95_interval": [
+        -0.006348268896421725,
+        0.0011336543432015572
+      ]
+    },
+    "ndcg": {
+      "delta": -0.002481302643145915,
+      "customer_bootstrap_95_interval": [
+        -0.005026276604627894,
+        -0.00010771741015734606
+      ]
+    },
+    "new_hits": {
+      "delta": -0.008616047388260635,
+      "customer_bootstrap_95_interval": [
+        -0.017949735449735448,
+        0.0004966993382675742
+      ]
+    }
+  },
+  "R4-seed2026_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.001984699824305704,
+      "customer_bootstrap_95_interval": [
+        -0.0053338023418722435,
+        0.0013077374129922374
+      ]
+    },
+    "ndcg": {
+      "delta": -0.005839032858843646,
+      "customer_bootstrap_95_interval": [
+        -0.008377184417117213,
+        -0.0033759921704415666
+      ]
+    },
+    "new_hits": {
+      "delta": -0.008077544426494346,
+      "customer_bootstrap_95_interval": [
+        -0.01702250679538851,
+        0.0005196237585943461
+      ]
+    }
+  },
+  "R4-seed42_minus_preserved_discovery_reference": {
+    "recall": {
+      "delta": -0.0015155506655264368,
+      "customer_bootstrap_95_interval": [
+        -0.0053478420591285296,
+        0.0023286446151764774
+      ]
+    },
+    "ndcg": {
+      "delta": 0.00046942174498092794,
+      "customer_bootstrap_95_interval": [
+        -0.002377730305751042,
+        0.003272090580970866
+      ]
+    },
+    "new_hits": {
+      "delta": -0.004846526655896607,
+      "customer_bootstrap_95_interval": [
+        -0.014421830461295516,
+        0.004555365677250987
+      ]
+    }
+  }
+}

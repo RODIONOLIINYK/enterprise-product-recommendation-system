@@ -1,0 +1,102 @@
+{
+  "E3attention-seed42": {
+    "device": "mps",
+    "batch_size": 1,
+    "samples": 32,
+    "median_ms": 8.657063001010101,
+    "p95_ms": 16.530195644008927,
+    "includes": "cached customer lookup, similarities/bias/familiarity, rolling eligibility, production mixed slate/pairwise builder, transfer, Stage2 forward, Top10",
+    "excludes": "network/serialization/storage I/O, global refresh and purchase encoding; all model and feature-store state warm",
+    "purchase_tower_calls_per_request": 0
+  },
+  "E3mean-seed42": {
+    "device": "mps",
+    "batch_size": 1,
+    "samples": 32,
+    "median_ms": 7.968291502038483,
+    "p95_ms": 8.736456106998958,
+    "includes": "cached customer lookup, similarities/bias/familiarity, rolling eligibility, production mixed slate/pairwise builder, transfer, Stage2 forward, Top10",
+    "excludes": "network/serialization/storage I/O, global refresh and purchase encoding; all model and feature-store state warm",
+    "purchase_tower_calls_per_request": 0
+  },
+  "E4k1-seed42": {
+    "device": "mps",
+    "batch_size": 1,
+    "samples": 32,
+    "median_ms": 7.637583512405399,
+    "p95_ms": 8.674857857113238,
+    "includes": "cached customer lookup, similarities/bias/familiarity, rolling eligibility, production mixed slate/pairwise builder, transfer, Stage2 forward, Top10",
+    "excludes": "network/serialization/storage I/O, global refresh and purchase encoding; all model and feature-store state warm",
+    "purchase_tower_calls_per_request": 0
+  },
+  "E4k2-seed42": {
+    "device": "mps",
+    "batch_size": 1,
+    "samples": 32,
+    "median_ms": 7.639499999640975,
+    "p95_ms": 7.912008696439443,
+    "includes": "cached customer lookup, similarities/bias/familiarity, rolling eligibility, production mixed slate/pairwise builder, transfer, Stage2 forward, Top10",
+    "excludes": "network/serialization/storage I/O, global refresh and purchase encoding; all model and feature-store state warm",
+    "purchase_tower_calls_per_request": 0
+  },
+  "E4k3-seed42": {
+    "device": "mps",
+    "batch_size": 1,
+    "samples": 32,
+    "median_ms": 7.594479502586182,
+    "p95_ms": 8.128464251785772,
+    "includes": "cached customer lookup, similarities/bias/familiarity, rolling eligibility, production mixed slate/pairwise builder, transfer, Stage2 forward, Top10",
+    "excludes": "network/serialization/storage I/O, global refresh and purchase encoding; all model and feature-store state warm",
+    "purchase_tower_calls_per_request": 0
+  },
+  "E5k2-seed42": {
+    "device": "mps",
+    "batch_size": 1,
+    "samples": 32,
+    "median_ms": 11.053645997890271,
+    "p95_ms": 13.469823088234989,
+    "includes": "cached customer lookup, similarities/bias/familiarity, rolling eligibility, production mixed slate/pairwise builder, transfer, Stage2 forward, Top10",
+    "excludes": "network/serialization/storage I/O, global refresh and purchase encoding; all model and feature-store state warm",
+    "purchase_tower_calls_per_request": 0
+  },
+  "E5k3-seed42": {
+    "device": "mps",
+    "batch_size": 1,
+    "samples": 32,
+    "median_ms": 8.9161454961868,
+    "p95_ms": 9.960543755732942,
+    "includes": "cached customer lookup, similarities/bias/familiarity, rolling eligibility, production mixed slate/pairwise builder, transfer, Stage2 forward, Top10",
+    "excludes": "network/serialization/storage I/O, global refresh and purchase encoding; all model and feature-store state warm",
+    "purchase_tower_calls_per_request": 0
+  },
+  "S0-seed17": {
+    "device": "mps",
+    "batch_size": 1,
+    "samples": 32,
+    "median_ms": 7.581208003102802,
+    "p95_ms": 10.123432999534998,
+    "includes": "cached customer lookup, similarities/bias/familiarity, rolling eligibility, production mixed slate/pairwise builder, transfer, Stage2 forward, Top10",
+    "excludes": "network/serialization/storage I/O, global refresh and purchase encoding; all model and feature-store state warm",
+    "purchase_tower_calls_per_request": 0
+  },
+  "S0-seed2026": {
+    "device": "mps",
+    "batch_size": 1,
+    "samples": 32,
+    "median_ms": 8.014895996893756,
+    "p95_ms": 8.81549215191626,
+    "includes": "cached customer lookup, similarities/bias/familiarity, rolling eligibility, production mixed slate/pairwise builder, transfer, Stage2 forward, Top10",
+    "excludes": "network/serialization/storage I/O, global refresh and purchase encoding; all model and feature-store state warm",
+    "purchase_tower_calls_per_request": 0
+  },
+  "S0-seed42": {
+    "device": "mps",
+    "batch_size": 1,
+    "samples": 32,
+    "median_ms": 8.536749999620952,
+    "p95_ms": 9.80601684859721,
+    "includes": "cached customer lookup, similarities/bias/familiarity, rolling eligibility, production mixed slate/pairwise builder, transfer, Stage2 forward, Top10",
+    "excludes": "network/serialization/storage I/O, global refresh and purchase encoding; all model and feature-store state warm",
+    "purchase_tower_calls_per_request": 0
+  }
+}

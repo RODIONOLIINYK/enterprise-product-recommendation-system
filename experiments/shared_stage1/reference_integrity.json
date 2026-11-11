@@ -1,0 +1,30 @@
+{
+  "checkpoints/retriever-discovery-reference/best_retriever.pt": {
+    "sha256": "2dcfbc7eab6795ded6f25a6cb0ffe1f9e606f13c9885d4ee020b724d0a2b5ab7",
+    "unchanged": true
+  },
+  "checkpoints/retriever/best_retriever.pt": {
+    "sha256": "863cb700afc7e8d4284b20d34f5f4f5345538146557375f1141cf9d5d77fae79",
+    "unchanged": true
+  },
+  "checkpoints/ranker/best_ranker.pt": {
+    "sha256": "1701becf092e38e71a06152b124a832cabfa58172d6d497f305fe499757b0b17",
+    "unchanged": true
+  },
+  "checkpoints/ranker/best_discovery_ranker.pt": {
+    "sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+    "unchanged": true
+  },
+  "checkpoints/ranker/best_ndcg_ranker.pt": {
+    "sha256": "2ff3e43dcd531d6604c536d93be1bbfce140f118e8f48fad88dbe99e1616701e",
+    "unchanged": true
+  },
+  "data/interim/ranker_train_slates_v3_repeat_0.5_rolling_v1.pt": {
+    "sha256": "aaf0153b53d7dac35459562cbb87226fb0af6a7e5cbd103e198a0e108864c663",
+    "unchanged": true
+  },
+  "data/interim/ranker_val_slates_v3_repeat_0.5_rolling_v1.pt": {
+    "sha256": "43aa986ed5c0ead13b1f4f3b321e28444fd846074b6a1192bd00b712789cad27",
+    "unchanged": true
+  }
+}

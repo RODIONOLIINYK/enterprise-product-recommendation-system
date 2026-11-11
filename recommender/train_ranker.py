@@ -97,6 +97,9 @@ class RankerDataset(Dataset):
         self.positive_pids = data["positive_pids"]            # List of length N (list of strings)
         self.new_positive_pids = data.get("new_positive_pids")
         self.customer_ids = data["customer_ids"]              # List of length N (strings)
+        self.stage1_customer_vectors = data.get("stage1_customer_vectors")
+        self.seq_catalog_indices = data.get("seq_catalog_indices")
+        self.seq_canonical_skus = data.get("seq_canonical_skus")
 
     def __len__(self) -> int:
         return len(self.text_embedding)
@@ -127,6 +130,9 @@ class RankerDataset(Dataset):
             "positive_pids": self.positive_pids[idx],
             "new_positive_pids": self.new_positive_pids[idx] if self.new_positive_pids is not None else None,
             "customer_id": self.customer_ids[idx],
+            "stage1_customer_vectors": self.stage1_customer_vectors[idx] if self.stage1_customer_vectors is not None else None,
+            "seq_catalog_indices": self.seq_catalog_indices[idx] if self.seq_catalog_indices is not None else None,
+            "seq_canonical_skus": self.seq_canonical_skus[idx] if self.seq_canonical_skus is not None else None,
         }
 
 
@@ -168,6 +174,11 @@ def collate_ranker_batch(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
             if batch[0].get("new_positive_pids") is not None else None
         ),
         "customer_ids": [x["customer_id"] for x in batch],
+        **{
+            name: torch.stack([x[name] for x in batch]) if batch[0].get(name) is not None else None
+            for name in ("stage1_customer_vectors", "seq_catalog_indices")
+        },
+        "seq_canonical_skus": [x.get("seq_canonical_skus") for x in batch],
     }
 
 
@@ -185,10 +196,16 @@ def precompute_candidate_slates_for_transitions(
     batch_size: int = 128,
     *,
     heuristic_fraction: float = 0.0,
+    capture_stage1_vectors: bool = False,
+    stage1_checkpoint_digest: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Precompute full customer memory tensors and CandidateRetriever slates for a transition list."""
     n_transitions = len(transitions)
     device = retriever.device
+    if capture_stage1_vectors and not stage1_checkpoint_digest:
+        raise ValueError("Shared vector capture requires an exact Stage 1 checkpoint digest.")
+    canonical_history = []
+    customer_vectors = []
 
     all_text_embs: List[np.ndarray] = []
     all_city_ids: List[int] = []
@@ -214,6 +231,8 @@ def precompute_candidate_slates_for_transitions(
     for t in transitions:
         cid = str(t["customer_id"])
         as_of = t["as_of_date"]
+        if capture_stage1_vectors and pd.Timestamp(as_of) >= TEST_START:
+            raise ValueError("Experimental vector capture excludes held-out prediction dates.")
         grp = cust_groups.get(cid, pd.DataFrame())
 
         # Company text
@@ -266,6 +285,8 @@ def precompute_candidate_slates_for_transitions(
         all_seq_category_ids.append(seq_res["seq_category_ids"].numpy())
         all_seq_subcat_ids.append(seq_res["seq_subcategory_ids"].numpy())
         all_seq_line_ids.append(seq_res["seq_business_line_ids"].numpy())
+        if capture_stage1_vectors:
+            canonical_history.append(seq_res["product_ids"])
 
     t_text = torch.from_numpy(np.array(all_text_embs, dtype=np.float32))
     t_city = torch.tensor(all_city_ids, dtype=torch.long)
@@ -316,6 +337,8 @@ def precompute_candidate_slates_for_transitions(
                 catalog_product_vectors=product_vectors,
                 **{name: tensor[rows].to(device) for name, tensor in tower_inputs.items()},
             )
+            if capture_stage1_vectors:
+                customer_vectors.append(u_c.detach().cpu())
 
             b_cids_list = [str(t["customer_id"]) for t in batch_slice]
             b_dates = [t["as_of_date"] for t in batch_slice]
@@ -372,6 +395,21 @@ def precompute_candidate_slates_for_transitions(
     }
     if retriever_sequence:
         result["retriever_sequence"] = retriever_sequence
+    if capture_stage1_vectors:
+        from recommender.shared_ranker import map_history_skus, schema_digest
+
+        result.update({
+            "stage1_customer_vectors": torch.cat(customer_vectors)[order],
+            "seq_canonical_skus": canonical_history,
+            "seq_catalog_indices": map_history_skus(canonical_history, retriever.eligible_product_ids),
+            "prediction_days": prediction_day_offsets(transitions),
+            "shared_vector_provenance": {
+                "schema_digest": schema_digest(), "stage1_digest": stage1_checkpoint_digest,
+                "product_ids": list(retriever.eligible_product_ids),
+                "customer_inputs": "per-transition strictly prior customer events; frozen Stage1",
+                "stage1_demand_policy": "fixed_train_cutoff_snapshot; inherited training look-ahead",
+            },
+        })
     return result
 
 
@@ -730,6 +768,11 @@ def evaluate_ranker(
                 catalog_product_vectors=cat_vectors_dev,
                 seq_purchase_dates=batch["seq_purchase_dates"].to(device) if batch["seq_purchase_dates"] is not None else None,
                 prediction_day=batch["prediction_day"].to(device) if batch.get("prediction_day") is not None else None,
+                **({
+                    "stage1_customer_vectors": batch["stage1_customer_vectors"].to(device),
+                    "seq_catalog_indices": batch["seq_catalog_indices"].to(device),
+                    "candidate_indices": cand_idx,
+                } if getattr(model, "requires_shared_stage1_inputs", False) else {}),
             )
 
             loss_dict = loss_module(out.logits, labels, unseen_mask=unseen_mask)

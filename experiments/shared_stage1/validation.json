@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-11",
+  "tests": {
+    "command": "PYTHONPATH=. ./venv/bin/pytest tests/ -q",
+    "passed": 392,
+    "skipped": 6,
+    "subtests_passed": 70,
+    "skip_reason": "Protected unsplit-real-data tests; no held-out opt-in used."
+  },
+  "compileall": "passed",
+  "new_file_ruff": "passed under inherited policy",
+  "production_ruff_F": "passed",
+  "git_diff_check": "passed",
+  "selected_checkpoint_replays": 16,
+  "original_binary_hashes_unchanged": 7,
+  "heldout_targets_used": false,
+  "stage1_retrained": false,
+  "original_default_changed": false,
+  "epochs_per_controlled_fit": 10,
+  "controlled_fits": 16,
+  "archived_unmatched_width_control_fits": 1,
+  "higher_width_training_deferred": true
+}
