@@ -1,7 +1,5 @@
 """Isolated, validated development caches for shared Stage 1 experiments."""
 
-import csv
-import io
 import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -34,32 +32,7 @@ DEFAULT_RETRIEVER = Path("checkpoints/retriever-discovery-reference/best_retriev
 DEFAULT_CACHE = Path("data/interim/shared_stage1_v1")
 
 
-def load_development_purchases(path):
-    """Apply a date-only gate before materializing any purchase fields in pandas.
-
-    Discarded records are neither converted, returned, logged nor used for counts,
-    statistics or labels. CSV parsing supports quoted multiline fields. The only
-    field consulted for excluded records is the partition date.
-    """
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    with Path(path).open(newline="", encoding="utf-8-sig") as source:
-        reader = csv.reader(source)
-        header = next(reader)
-        date_index = header.index("purchase_date")
-        writer.writerow(header)
-        for row in reader:
-            date = pd.Timestamp(row[date_index])
-            if pd.isna(date):
-                raise ValueError("Purchase partitioning requires valid dates.")
-            if date < TEST_START:
-                writer.writerow(row)
-    buffer.seek(0)
-    frame = pd.read_csv(buffer, dtype={"customer_id": str, "product_id": str}, low_memory=False)
-    frame["purchase_date"] = pd.to_datetime(frame["purchase_date"], format="mixed")
-    if not frame["purchase_date"].lt(TEST_START).all():
-        raise ValueError("Development data must exclude held-out dates.")
-    return frame
+from recommender.development import load_development_purchases
 
 
 def atomic_torch_save(data, path):

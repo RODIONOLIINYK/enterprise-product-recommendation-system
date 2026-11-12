@@ -1,5 +1,7 @@
 # Codebase audit — 2026-11-10
 
+Follow-up: [2026-11-12 verified fixes and compatible refactors](HARDENING_REPORT.md) adds versioned demand-free new training, sealed caches, isolated run manifests and named scoring stages. This original audit and its artifact inventory remain historical evidence; existing models/caches were preserved.
+
 Repository: `RODIONOLIINYK/enterprise-product-recommendation-system`, branch `main`, starting commit `4cbe764`. The working tree was clean at audit start. Source review and runtime probes preceded implementation changes. This audit does **not** implement the shared 176D/192D/224D architecture, retrain models, or inspect held-out purchases.
 
 ## Scope and evidence

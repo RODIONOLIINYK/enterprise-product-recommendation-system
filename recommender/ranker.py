@@ -25,6 +25,7 @@ Implements the official Stage 2 neural ranking architecture for next-basket reco
 
 from dataclasses import dataclass
 import math
+import warnings
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
 import torch
@@ -73,11 +74,11 @@ class RankerOutput:
 
     scores: torch.Tensor
     raw_scores: torch.Tensor
-    attn_weights: torch.Tensor
+    attn_weights: Optional[torch.Tensor]
     h_attended: torch.Tensor
     z_candidate: torch.Tensor
-    token_0_weight: torch.Tensor
-    history_weights: torch.Tensor
+    token_0_weight: Optional[torch.Tensor]
+    history_weights: Optional[torch.Tensor]
     memory: Optional[torch.Tensor] = None
 
     @property
@@ -122,6 +123,24 @@ class RankerOutput:
         return getattr(self, key, default)
 
 
+@dataclass
+class RankerFeatures:
+    """Explicit scoring inputs; raw_scores always remains scalar logits."""
+    features: torch.Tensor
+    h_attended: torch.Tensor
+    z_candidate: torch.Tensor
+    memory: torch.Tensor
+    attn_weights: Optional[torch.Tensor] = None
+    token_0_weight: Optional[torch.Tensor] = None
+    history_weights: Optional[torch.Tensor] = None
+
+    def to_output(self, scores, raw_scores=None):
+        return RankerOutput(scores=scores, raw_scores=scores if raw_scores is None else raw_scores,
+                            attn_weights=self.attn_weights, h_attended=self.h_attended,
+                            z_candidate=self.z_candidate, token_0_weight=self.token_0_weight,
+                            history_weights=self.history_weights, memory=self.memory)
+
+
 class UPSCANRRanker(nn.Module):
     """Stage 2: Unified Profile-Sequence Candidate-Aware Neural Ranker."""
 
@@ -146,6 +165,7 @@ class UPSCANRRanker(nn.Module):
         product_tower: Optional[ProductTower] = None,
         statistics_attention: bool = False,
         excluded_statistics: tuple[str, ...] = (),
+        cached_only: bool = False,
     ):
         super().__init__()
         if excluded_statistics and (
@@ -162,6 +182,7 @@ class UPSCANRRanker(nn.Module):
         self.num_pairwise_features = num_pairwise_features
         self.seq_feature_dim = seq_feature_dim
         self.excluded_statistics = tuple(excluded_statistics)
+        self.cached_only = bool(cached_only)
 
         # -------------------------------------------------------------
         # 1. Customer Profile (Token 0) Modules
@@ -278,6 +299,8 @@ class UPSCANRRanker(nn.Module):
             nn.Linear(64, 1),
         )
 
+        self.configure_cached_training(cached_only)
+
     def build_key_padding_mask(self, attention_mask: torch.Tensor) -> torch.Tensor:
         """Construct a (B, history_length + 1) mask; True indicates padding.
 
@@ -388,7 +411,11 @@ class UPSCANRRanker(nn.Module):
             if catalog_product_vectors is not None:
                 return catalog_product_vectors[candidate_indices]
             if self.product_tower is not None and hasattr(self, "_cached_catalog_vectors") and self._cached_catalog_vectors is not None:
+                warnings.warn("_cached_catalog_vectors is deprecated; pass catalog_product_vectors", DeprecationWarning, stacklevel=2)
                 return self._cached_catalog_vectors[candidate_indices]
+
+        if self.cached_only:
+            raise ValueError("Cached-only ranker requires direct or indexed catalogue vectors")
 
         if self.product_tower is not None and candidate_text_emb is not None:
             # Flatten B * C to compute through ProductTower
@@ -413,7 +440,7 @@ class UPSCANRRanker(nn.Module):
             "or candidate attribute tensors."
         )
 
-    def forward(
+    def encode_candidate_features(
         self,
         # Customer Profile Inputs (Token 0)
         text_embedding: torch.Tensor,
@@ -443,7 +470,8 @@ class UPSCANRRanker(nn.Module):
         candidate_container_ids: Optional[torch.Tensor] = None,
         seq_purchase_dates: Optional[torch.Tensor] = None,
         prediction_day: Optional[torch.Tensor] = None,
-    ) -> RankerOutput:
+        return_diagnostics: bool = True,
+    ) -> RankerFeatures:
         """Forward pass of Stage 2 UPS-CANR ranker."""
         b_size = text_embedding.size(0)
         sequence = _fit_feature_width(sequence, self.seq_feature_dim)
@@ -469,7 +497,7 @@ class UPSCANRRanker(nn.Module):
         statistics_in_scores = self.statistics_attention_weights is not None
 
         # 1. Customer Memory Contextualization (B, 33, 128)
-        memory, key_padding_mask = self._compute_customer_memory(
+        memory, key_padding_mask = self.encode_customer_memory(
             text_embedding=text_embedding,
             city_id=city_id,
             region_id=region_id,
@@ -540,40 +568,93 @@ class UPSCANRRanker(nn.Module):
             value=memory,
             key_padding_mask=attention_padding,
             attn_mask=attention_bias,
-            need_weights=True,
+            need_weights=return_diagnostics,
             average_attn_weights=True,
         )
         h_att = torch.nan_to_num(h_att, nan=0.0)
-        attn_w = torch.nan_to_num(attn_w, nan=0.0)
-
-        # Explicitly zero out attention weights for padding tokens to ensure strict 0.0 attention
-        if key_padding_mask is not None:
-            mask_exp = key_padding_mask.unsqueeze(1).expand(-1, c_slate, -1)
-            attn_w = attn_w.masked_fill(mask_exp, 0.0)
-            w_sum = attn_w.sum(dim=-1, keepdim=True).clamp(min=1e-9)
-            attn_w = attn_w / w_sum
-
-        token_0_weight = attn_w[..., 0]
-        history_weights = attn_w[..., 1:].sum(dim=-1)
+        token_0_weight = history_weights = None
+        if return_diagnostics:
+            attn_w = torch.nan_to_num(attn_w, nan=0.0)
+            if key_padding_mask is not None:
+                mask_exp = key_padding_mask.unsqueeze(1).expand(-1, c_slate, -1)
+                attn_w = attn_w.masked_fill(mask_exp, 0.0)
+                w_sum = attn_w.sum(dim=-1, keepdim=True).clamp(min=1e-9)
+                attn_w = attn_w / w_sum
+            token_0_weight = attn_w[..., 0]
+            history_weights = attn_w[..., 1:].sum(dim=-1)
 
         # 4. Feature Fusion
         interaction = z_cand * h_att
 
         fused = torch.cat([z_cand, h_att, interaction, pairwise_features], dim=-1)  # (B, C, 397)
 
-        # 5. Deep Ranking MLP
-        mlp_raw = self.mlp(fused).squeeze(-1)  # (B, C)
+        return RankerFeatures(features=fused, h_attended=h_att, z_candidate=z_cand,
+                              memory=memory, attn_weights=attn_w,
+                              token_0_weight=token_0_weight, history_weights=history_weights)
 
-        return RankerOutput(
-            scores=mlp_raw,
-            raw_scores=mlp_raw,
-            attn_weights=attn_w,
-            h_attended=h_att,
-            z_candidate=z_cand,
-            token_0_weight=token_0_weight,
-            history_weights=history_weights,
-            memory=memory,
-        )
+    def encode_customer_memory(self, **inputs):
+        return self._compute_customer_memory(**inputs)
+
+    def score_candidates(self, candidate_features, *, scoring_head=None):
+        head = self.mlp if scoring_head is None else scoring_head
+        if head is None:
+            raise ValueError("This model requires an explicit scoring head")
+        values = candidate_features.features if isinstance(candidate_features, RankerFeatures) else candidate_features
+        scores = head(values)
+        if scores.shape == values.shape[:-1]:
+            return scores
+        if scores.shape != (*values.shape[:-1], 1):
+            raise ValueError("Scoring head must produce one logit per candidate")
+        return scores.squeeze(-1)
+
+    def forward(
+        self,
+        # Customer Profile Inputs (Token 0)
+        text_embedding: torch.Tensor,
+        city_id: torch.Tensor,
+        region_id: torch.Tensor,
+        industry_id: torch.Tensor,
+        tabular_features: torch.Tensor,
+        # Customer History Inputs (Tokens 1..32)
+        sequence: torch.Tensor,
+        attention_mask: torch.Tensor,
+        seq_product_ids: Optional[torch.Tensor] = None,
+        seq_category_ids: Optional[torch.Tensor] = None,
+        seq_subcategory_ids: Optional[torch.Tensor] = None,
+        seq_business_line_ids: Optional[torch.Tensor] = None,
+        seq_product_text: Optional[torch.Tensor] = None,
+        # Candidate Slate Inputs
+        candidate_indices: Optional[torch.Tensor] = None,
+        pairwise_features: Optional[torch.Tensor] = None,
+        candidate_vectors: Optional[torch.Tensor] = None,
+        catalog_product_vectors: Optional[torch.Tensor] = None,
+        candidate_text_emb: Optional[torch.Tensor] = None,
+        candidate_brand_ids: Optional[torch.Tensor] = None,
+        candidate_cat_ids: Optional[torch.Tensor] = None,
+        candidate_subcat_ids: Optional[torch.Tensor] = None,
+        candidate_line_ids: Optional[torch.Tensor] = None,
+        candidate_demand_feats: Optional[torch.Tensor] = None,
+        candidate_container_ids: Optional[torch.Tensor] = None,
+        seq_purchase_dates: Optional[torch.Tensor] = None,
+        prediction_day: Optional[torch.Tensor] = None,
+        return_diagnostics: bool = True,
+    ) -> RankerOutput:
+        inputs = locals().copy()
+        inputs.pop("self")
+        features = self.encode_candidate_features(**inputs)
+        return features.to_output(self.score_candidates(features))
+
+    def forward_scores(self, *args, **kwargs):
+        """Score without attention matrices or diagnostic summaries."""
+        kwargs["return_diagnostics"] = False
+        return self.score_candidates(self.encode_candidate_features(*args, **kwargs))
+
+    def configure_cached_training(self, enabled=True):
+        """Freeze the bypassed tower while retaining its checkpoint state."""
+        self.cached_only = bool(enabled)
+        if self.product_tower is not None:
+            self.product_tower.requires_grad_(not enabled)
+        return self
 
     @classmethod
     def from_retriever_checkpoint(

@@ -2,5 +2,6 @@
   "screening_seed": 42,
   "promising": [],
   "repeated": [],
-  "rule": ">=10 additional Stage1 unseen hits@25 or @50, OR >=5 downstream new hits@10 with fixed recall guardrail; repeat paired controls; no promotion"
+  "rule": ">=10 additional Stage1 unseen hits@25 or @50, OR >=5 downstream new hits@10 with fixed recall guardrail; repeat paired controls; no promotion",
+  "status": "complete"
 }

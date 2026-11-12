@@ -109,7 +109,8 @@ def test_collapse_diagnostics_identifies_identical_interests():
     assert result['fraction_winner_margin_lt1e-5'] == 1.
 
 
-def test_scratch_product_factory_and_demand_invariance():
+def test_scratch_product_factory_and_demand_invariance(monkeypatch):
+    monkeypatch.setattr("recommender.experiment_retrieval.torch.load", lambda *a, **k: {"config": {}, "model_state_dict": {name: torch.zeros(2, 16) for name in ("customer_tower.city_embedding.weight", "customer_tower.region_embedding.weight", "customer_tower.industry_embedding.weight")}})
     from recommender.experiment_retrieval import make_model
     info = {"product_ids": ["a", "b", "c"], "product_inputs": {"demand_features": torch.zeros(3, 18)}}
     model = make_model(RetrievalConfig(), info).eval()

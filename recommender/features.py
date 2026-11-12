@@ -7,6 +7,7 @@ followed by scaling and clipping strictly into [0.0, 1.0].
 """
 
 from typing import Dict, List, Optional, Tuple, Union
+import math
 import numpy as np
 import pandas as pd
 
@@ -69,9 +70,11 @@ def normalize_feature(
 
 
 class Log1pScaler:
-    """Scaler that fits train bounds and transforms non-negative values into [0.0, 1.0]."""
+    """Train-fitted nonnegative log ratio, clipped to configurable bounds (default [0, 1])."""
 
     def __init__(self, clip_min: float = 0.0, clip_max: float = 1.0):
+        if not np.isfinite([clip_min, clip_max]).all() or clip_min > clip_max:
+            raise ValueError("Clipping bounds must be finite and ordered")
         self.max_val: float = 1.0
         self.clip_min = clip_min
         self.clip_max = clip_max
@@ -93,7 +96,11 @@ class Log1pScaler:
     ) -> Union[np.ndarray, float]:
         if not self._is_fitted:
             raise RuntimeError("Log1pScaler must be fitted before transforming.")
-        return normalize_feature(values, self.max_val)
+        if self.clip_min == 0.0 and self.clip_max == 1.0:
+            return normalize_feature(values, self.max_val)
+        ratio = np.log1p(np.maximum(np.asarray(values, dtype=np.float64), 0.0)) / math.log1p(self.max_val)
+        result = np.clip(ratio, self.clip_min, self.clip_max)
+        return float(result) if np.ndim(result) == 0 else result
 
     def fit_transform(
         self,

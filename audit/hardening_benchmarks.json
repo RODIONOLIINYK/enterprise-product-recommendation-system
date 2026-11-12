@@ -1,0 +1,64 @@
+{
+  "reference_revision": "c7788ec",
+  "synthetic_only": true,
+  "heldout_access": false,
+  "environment": {
+    "torch": "2.14.1",
+    "pandas": "3.0.3",
+    "device": "mps",
+    "cpu_threads": 2
+  },
+  "prefix": {
+    "events": 1000,
+    "queries": 100,
+    "snapshots_exact": true,
+    "pairwise_features_exact": true,
+    "timings": {
+      "before": {
+        "median_ms": 43.81858301348984,
+        "samples": [
+          43.60737498791423,
+          43.40745801164303,
+          44.10850000567734,
+          44.08108300413005,
+          43.81858301348984
+        ]
+      },
+      "after": {
+        "median_ms": 4.200208990368992,
+        "samples": [
+          4.200208990368992,
+          4.36962500680238,
+          4.078375000972301,
+          4.06249999650754,
+          4.274042003089562
+        ]
+      }
+    }
+  },
+  "ranker": {
+    "default_max_abs_difference": 0.0,
+    "scores_only_max_abs_difference": 4.76837158203125e-07,
+    "historical_e2_max_abs_difference": 0.0,
+    "timings": {
+      "diagnostics": {
+        "median_ms": 1.1502499983180314,
+        "p95_ms": 1.524005953251617,
+        "repeats": 100
+      },
+      "scores_only": {
+        "median_ms": 1.039979004417546,
+        "p95_ms": 1.069974350684788,
+        "repeats": 100
+      }
+    },
+    "batch_size": 1,
+    "candidates": 50,
+    "history_events": 32
+  },
+  "source_sha256": {
+    "recommender/ranker.py": "8160b2f447936f1fde2690be8252d713fe70385af30ff71bbf029735d4374b23",
+    "recommender/candidates.py": "4b70332f1be89eeef076cfdfbda10cfd5062373949ee73d717b3f449e231acea"
+  },
+  "limitation": "Synthetic warm local measurements, not an end-to-end deployment or validation-quality benchmark."
+}

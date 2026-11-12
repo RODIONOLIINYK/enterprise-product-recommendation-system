@@ -7,14 +7,16 @@ Implements:
    Listwise Softmax Cross-Entropy loss.
 4. Validation metrics: Recall@{5, 10, 20}, NDCG@10, MRR, plus cross-attention weight tracking
    (Token 0 Profile vs Tokens 1..32 Past Purchases).
-5. Checkpointing: saves best model to checkpoints/ranker/best_ranker.pt and metrics history
-   to checkpoints/ranker/training_history.json.
+5. Checkpointing: writes a fresh checkpoints/ranker/runs/<run-id>/ directory,
+   with a manifest identifying its qualifying selection. Legacy aliases are preserved.
 """
 
 import hashlib
+import argparse
 import json
 import math
 import pickle
+import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -36,6 +38,11 @@ from recommender.features import (
     PointInTimeNormalizer,
     compute_point_in_time_features,
 )
+from recommender.artifacts import (
+    CACHE_FORMAT_VERSION, CHECKPOINT_FORMAT_VERSION, atomic_json, create_run_directory, feature_contract,
+    json_digest, ranker_provenance, seal_slates, validate_slates,
+)
+from recommender.development import load_development_purchases
 from recommender.models import TEXT_DIM
 from recommender.ranker import RankerLoss, UPSCANRRanker
 from recommender.scope import DEFAULT_SCOPE_PATH, get_datasets_locs
@@ -180,6 +187,27 @@ def collate_ranker_batch(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
         },
         "seq_canonical_skus": [x.get("seq_canonical_skus") for x in batch],
     }
+
+
+def ranker_batch_inputs(batch, product_vectors, model, device):
+    """Transfer only model inputs; prefer already cached candidate vectors.
+
+    The catalogue is needed only for the indexed fallback. Retriever profiles
+    and reporting metadata stay on the CPU, and shared inputs remain opt-in.
+    """
+    names = ("text_embedding", "city_id", "region_id", "industry_id", "tabular_features",
+             "sequence", "attention_mask", "seq_product_ids", "seq_category_ids",
+             "seq_subcategory_ids", "seq_business_line_ids", "pairwise_features",
+             "seq_purchase_dates", "prediction_day")
+    inputs = {name: batch[name].to(device) if batch.get(name) is not None else None for name in names}
+    vectors = batch.get("candidate_vectors")
+    shared = getattr(model, "requires_shared_stage1_inputs", False)
+    indices = batch["candidate_indices"].to(device) if vectors is None or shared else None
+    inputs["candidate_vectors"] = product_vectors[indices] if vectors is None else vectors.to(device)
+    if shared:
+        inputs.update(stage1_customer_vectors=batch["stage1_customer_vectors"].to(device),
+                      seq_catalog_indices=batch["seq_catalog_indices"].to(device), candidate_indices=indices)
+    return inputs
 
 
 def precompute_candidate_slates_for_transitions(
@@ -393,6 +421,7 @@ def precompute_candidate_slates_for_transitions(
         "positive_pids": [all_pos_pids[i] for i in order.tolist()],
         "customer_ids": [all_cust_ids[i] for i in order.tolist()],
     }
+    result["prediction_days"] = prediction_day_offsets(transitions)
     if retriever_sequence:
         result["retriever_sequence"] = retriever_sequence
     if capture_stage1_vectors:
@@ -414,11 +443,12 @@ def precompute_candidate_slates_for_transitions(
 
 
 def slate_cache_path(
-    split: str, heuristic_fraction: float = 0.0, *, rolling: bool = False,
+    split: str, heuristic_fraction: float = 0.0, *, rolling: bool = False, metadata_policy: str = "snapshot_unverified",
 ) -> Path:
     mix = f"_repeat_{heuristic_fraction}" if heuristic_fraction else ""
     pool = "_rolling_v1" if rolling else ""
-    return Path("data/interim") / f"ranker_{split}_slates_v{SLATE_SCHEMA_VERSION}{mix}{pool}.pt"
+    pool += "_observed_only_v1" if metadata_policy == "observed_only_v1" else ""
+    return Path("data/interim") / f"ranker_{split}_slates_v{CACHE_FORMAT_VERSION}{mix}{pool}.pt"
 
 
 def checkpoint_digest(path: Path) -> str:
@@ -448,6 +478,7 @@ def slate_cache_identity(
     company_cache_name: str = "bge_m3_company.parquet",
     rolling: bool = False,
     product_inputs: Optional[Dict[str, torch.Tensor]] = None,
+    metadata_policy: str = "snapshot_unverified",
 ) -> str:
     """Bind slates to source data, ordered schemas and actual catalogue inputs.
 
@@ -465,6 +496,8 @@ def slate_cache_identity(
         "profile": LEGACY_PROFILE_FEATURES,
         "history": ENRICHED_FEATURE_NAMES,
     }, sort_keys=True).encode())
+    if metadata_policy != "snapshot_unverified":
+        digest.update(f":pairwise_metadata:{metadata_policy}".encode())
     digest.update(checkpoint_digest(DEFAULT_SCOPE_PATH).encode())
     for name, tensor in sorted((product_inputs or {}).items()):
         values = tensor.detach().cpu().contiguous()
@@ -488,13 +521,14 @@ def load_ranker_retriever(
     catalogue: pd.DataFrame,
     companies: pd.DataFrame,
     device: torch.device,
+    *, metadata_policy: Optional[str] = None,
 ) -> Tuple[CandidateRetriever, Dict[str, Dict[str, int]]]:
     """Use the same ordered catalogue and demand inputs as retriever training."""
     ckpt = torch.load(checkpoint_path, map_location="cpu")
     if ckpt.get("config", {}).get("discovery_only"):
         retriever, ckpt = load_stage1_discovery(
             checkpoint_path, purchases, catalogue, companies,
-            Path("checkpoints/stage1-full-catalogue/text_embeddings"), device,
+            Path("checkpoints/stage1-full-catalogue/text_embeddings"), device, metadata_policy=metadata_policy,
         )
         return retriever, ckpt["vocabs"]
     product_ids = ckpt["product_ids"]
@@ -508,6 +542,7 @@ def load_ranker_retriever(
     product_inputs = build_retriever_product_inputs(
         purchases, catalogue, cat_embs, product_ids, vocabs, include_subcategory=include_subcategory,
         include_sku_median_quantity=config.get("include_sku_median_quantity", False),
+        demand_policy=config.get("demand_policy", "legacy_train_cutoff_v1"),
         container_encoding=config.get("container_encoding", "one_hot"),
     )
     retriever = CandidateRetriever.from_checkpoint(
@@ -517,6 +552,7 @@ def load_ranker_retriever(
         companies_df=companies,
         product_inputs=product_inputs,
         device=device,
+        metadata_policy=metadata_policy,
     )
     return retriever, vocabs
 
@@ -572,12 +608,24 @@ def prepare_slate_inputs(
     }
 
 
-def load_slate_cache(path: Path, identity: str) -> Optional[Dict[str, Any]]:
-    try:
-        data = torch.load(path, map_location="cpu")
-    except (OSError, RuntimeError, EOFError, pickle.UnpicklingError):
-        return None
-    return data if isinstance(data, dict) and data.get("cache_identity") == identity else None
+def versioned_cache_path(path, identity):
+    stamp = json_digest({"identity": identity, "contract": feature_contract(), "format": CACHE_FORMAT_VERSION})[:16]
+    return path.with_name(f"{path.stem}.{stamp}{path.suffix}")
+
+
+def load_slate_cache(path: Path, identity: str, *, transitions=None, product_ids=None, split=None, candidates=None) -> Optional[Dict[str, Any]]:
+    path = Path(path)
+    for source in (path, versioned_cache_path(path, identity)):
+        try:
+            data = torch.load(source, map_location="cpu")
+            if not isinstance(data, dict) or data.get("cache_identity") != identity:
+                continue
+            validate_slates(data, transitions=transitions, product_ids=product_ids, split=split, candidates=candidates)
+            data["cache_path"] = str(source)
+            return data
+        except (OSError, RuntimeError, EOFError, pickle.UnpicklingError, ValueError, TypeError, KeyError, IndexError, AttributeError):
+            continue
+    return None
 
 
 def build_slate_cache(
@@ -591,14 +639,32 @@ def build_slate_cache(
     data = precompute_candidate_slates_for_transitions(
         transitions=transitions, **slate_inputs,
     )
+    path = Path(path)
+    if path.exists():
+        path = versioned_cache_path(path, identity)
+    if path.exists():
+        raise FileExistsError(f"Refusing to overwrite an existing cache: {path}")
     data["cache_identity"] = identity
+    data["cache_path"] = str(path)
+    data["pairwise_metadata_policy"] = getattr(slate_inputs["retriever"].feature_store, "metadata_policy", "snapshot_unverified")
+    seal_slates(data, transitions, slate_inputs["retriever"].eligible_product_ids)
+    validate_slates(data, transitions=transitions, product_ids=slate_inputs["retriever"].eligible_product_ids,
+                    split=identity.rsplit(":", 1)[-1], candidates=slate_inputs.get("top_c", 50))
     path.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile(dir=path.parent, delete=False) as temporary:
         temporary_path = Path(temporary.name)
         try:
             torch.save(data, temporary)
             temporary.flush()
-            temporary_path.replace(path)
+            try:
+                os.link(temporary_path, path)
+            except FileExistsError:
+                existing = load_slate_cache(path, identity, transitions=transitions,
+                                            product_ids=slate_inputs["retriever"].eligible_product_ids,
+                                            split=identity.rsplit(":", 1)[-1], candidates=slate_inputs.get("top_c", 50))
+                if existing is None:
+                    raise
+                return existing
         finally:
             temporary_path.unlink(missing_ok=True)
     return data
@@ -614,10 +680,11 @@ def load_or_precompute_slates(
     device: torch.device,
     *,
     heuristic_fraction: float = 0.0,
+    metadata_policy: str = "snapshot_unverified",
 ) -> Tuple[Dict[str, Any], Dict[str, Any], torch.Tensor, List[str], Dict[str, Dict[str, int]]]:
     """Load or generate slates for both splits using the configured mix."""
     retriever, vocabs = load_ranker_retriever(
-        checkpoint_path, purchases_df, catalogue_df, companies_df, device,
+        checkpoint_path, purchases_df, catalogue_df, companies_df, device, metadata_policy=metadata_policy,
     )
     retriever_digest = checkpoint_digest(checkpoint_path)
     identity = slate_cache_identity(
@@ -627,9 +694,8 @@ def load_or_precompute_slates(
         company_cache_name=retriever.company_cache_name,
         rolling=retriever.rolling_pool is not None,
         product_inputs=retriever.product_inputs,
+        metadata_policy=metadata_policy,
     )
-    train_data = load_slate_cache(train_cache_path, f"{identity}:train")
-    val_data = load_slate_cache(val_cache_path, f"{identity}:val")
     train_transitions, val_transitions, _ = build_retriever_transitions(purchases_df)
     if retriever.rolling_pool is not None:
         dates = {t["as_of_date"] for t in train_transitions}
@@ -637,6 +703,10 @@ def load_or_precompute_slates(
         before = len(train_transitions)
         train_transitions = [t for t in train_transitions if t["as_of_date"] in full_slate_dates]
         print(f"Excluded {before - len(train_transitions)} training baskets with fewer than 50 eligible SKUs.")
+    train_data = load_slate_cache(train_cache_path, f"{identity}:train", transitions=train_transitions,
+                                 product_ids=retriever.eligible_product_ids, split="train", candidates=50)
+    val_data = load_slate_cache(val_cache_path, f"{identity}:val", transitions=val_transitions,
+                               product_ids=retriever.eligible_product_ids, split="val", candidates=50)
     if train_data is None or val_data is None:
         slate_inputs = prepare_slate_inputs(
             retriever, checkpoint_path, purchases_df, catalogue_df, companies_df, train_transitions, vocabs,
@@ -675,6 +745,9 @@ def attach_new_positive_metadata(
     if len(data["customer_ids"]) != len(transitions):
         raise ValueError("Cached slates and chronological transitions have different lengths.")
 
+    expected_days = prediction_day_offsets(transitions)
+    if data.get("prediction_days") is not None and not torch.equal(data["prediction_days"], expected_days):
+        raise ValueError("Cached slate prediction dates differ from source transitions.")
     history_by_customer = {
         str(cid): group[["purchase_date", "product_id"]].copy()
         for cid, group in purchases_df.groupby("customer_id", sort=False)
@@ -731,49 +804,10 @@ def evaluate_ranker(
         for batch in val_loader:
             b_size = batch["text_embedding"].size(0)
 
-            t_emb = batch["text_embedding"].to(device)
-            city_id = batch["city_id"].to(device)
-            reg_id = batch["region_id"].to(device)
-            ind_id = batch["industry_id"].to(device)
-            tab_f = batch["tabular_features"].to(device)
-            seq = batch["sequence"].to(device)
-            mask = batch["attention_mask"].to(device)
-            seq_pids = batch["seq_product_ids"].to(device)
-            seq_cids = batch["seq_category_ids"].to(device)
-            seq_sub_ids = batch["seq_subcategory_ids"].to(device)
-            seq_line_ids = batch["seq_business_line_ids"].to(device)
-
-            cand_idx = batch["candidate_indices"].to(device)
-            pw_f = batch["pairwise_features"].to(device)
+            inputs = ranker_batch_inputs(batch, cat_vectors_dev, model, device)
             labels = batch["labels"].to(device)
-            unseen_mask = pw_f[..., 0] == 0
-
-            cand_vectors = batch["candidate_vectors"]
-            cand_vectors = cat_vectors_dev[cand_idx] if cand_vectors is None else cand_vectors.to(device)
-
-            out = model(
-                text_embedding=t_emb,
-                city_id=city_id,
-                region_id=reg_id,
-                industry_id=ind_id,
-                tabular_features=tab_f,
-                sequence=seq,
-                attention_mask=mask,
-                seq_product_ids=seq_pids,
-                seq_category_ids=seq_cids,
-                seq_subcategory_ids=seq_sub_ids,
-                seq_business_line_ids=seq_line_ids,
-                candidate_vectors=cand_vectors,
-                pairwise_features=pw_f,
-                catalog_product_vectors=cat_vectors_dev,
-                seq_purchase_dates=batch["seq_purchase_dates"].to(device) if batch["seq_purchase_dates"] is not None else None,
-                prediction_day=batch["prediction_day"].to(device) if batch.get("prediction_day") is not None else None,
-                **({
-                    "stage1_customer_vectors": batch["stage1_customer_vectors"].to(device),
-                    "seq_catalog_indices": batch["seq_catalog_indices"].to(device),
-                    "candidate_indices": cand_idx,
-                } if getattr(model, "requires_shared_stage1_inputs", False) else {}),
-            )
+            unseen_mask = inputs["pairwise_features"][..., 0] == 0
+            out = model(**inputs)
 
             loss_dict = loss_module(out.logits, labels, unseen_mask=unseen_mask)
             total_val_loss += float(loss_dict["loss"].item())
@@ -872,6 +906,9 @@ def train_ranker(
     selection_metric: str = "discovery",
     discovery_min_overall_recall: Optional[float] = None,
     seed: int = 42,
+    run_id: Optional[str] = None,
+    cached_only_training: bool = True,
+    pairwise_metadata_policy: str = "snapshot_unverified",
 ) -> Dict[str, Any]:
     """Train Stage 2 UPS-CANR Ranker for 10 epochs and save checkpoints and history."""
     if not 0.0 <= heuristic_fraction <= 1.0:
@@ -880,14 +917,15 @@ def train_ranker(
         raise ValueError("selection_metric must be 'ndcg' or 'discovery'.")
     if discovery_min_overall_recall is not None and not 0.0 <= discovery_min_overall_recall <= 1.0:
         raise ValueError("discovery_min_overall_recall must be between 0 and 1.")
+    if epochs < 1 or batch_size < 1:
+        raise ValueError("epochs and batch_size must be positive")
     torch.manual_seed(seed)
     np.random.seed(seed)
 
     dev = get_device(device)
     print(f"Using compute device: {dev}")
 
-    ckpt_dir = Path(checkpoint_dir)
-    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    ckpt_dir = create_run_directory(checkpoint_dir, run_id)
     best_checkpoint_path = ckpt_dir / "best_ranker.pt"
     best_ndcg_checkpoint_path = ckpt_dir / "best_ndcg_ranker.pt"
     best_discovery_checkpoint_path = ckpt_dir / "best_discovery_ranker.pt"
@@ -895,11 +933,7 @@ def train_ranker(
 
     # 1. Load dataframes
     p_path = Path("data/interim/cleaned_purchases.csv")
-    purchases_df = pd.read_csv(
-        p_path, dtype={"customer_id": str, "product_id": str}, low_memory=False,
-    )
-    purchases_df["purchase_date"] = pd.to_datetime(purchases_df["purchase_date"], format="mixed")
-    purchases_df = purchases_df.loc[purchases_df["purchase_date"] < TEST_START]
+    purchases_df = load_development_purchases(p_path)
     catalogue_df = load_product_catalogue(get_datasets_locs("items"))
     companies_df = load_companies(purchases=purchases_df, minimum_purchases=1)
     retriever_checkpoint_path = Path(retriever_checkpoint_path)
@@ -913,10 +947,11 @@ def train_ranker(
         catalogue_df=catalogue_df,
         companies_df=companies_df,
         checkpoint_path=retriever_checkpoint_path,
-        train_cache_path=slate_cache_path("train", heuristic_fraction, rolling=rolling),
-        val_cache_path=slate_cache_path("val", heuristic_fraction, rolling=rolling),
+        train_cache_path=slate_cache_path("train", heuristic_fraction, rolling=rolling, metadata_policy=pairwise_metadata_policy),
+        val_cache_path=slate_cache_path("val", heuristic_fraction, rolling=rolling, metadata_policy=pairwise_metadata_policy),
         device=dev,
         heuristic_fraction=heuristic_fraction,
+        metadata_policy=pairwise_metadata_policy,
     )
 
     train_dataset = RankerDataset(train_data)
@@ -945,6 +980,7 @@ def train_ranker(
         num_pairwise_features=train_data["pairwise_features"].shape[-1],
         statistics_attention=statistics_attention,
         excluded_statistics=excluded_statistics,
+        cached_only=cached_only_training,
     )
     if checkpoint_digest(retriever_checkpoint_path) != retriever_digest:
         raise RuntimeError("The retriever checkpoint changed during ranker setup. Restart ranker training.")
@@ -954,7 +990,7 @@ def train_ranker(
         pos_weight=pos_weight, listwise_weight=listwise_weight,
         new_positive_weight=new_positive_weight,
     ).to(dev)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    optimizer = torch.optim.AdamW((p for p in model.parameters() if p.requires_grad), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
 
     catalog_product_vectors_dev = catalog_product_vectors.to(dev)
@@ -972,45 +1008,12 @@ def train_ranker(
         train_batches = 0
 
         for batch in train_loader:
-            t_emb = batch["text_embedding"].to(dev)
-            city_id = batch["city_id"].to(dev)
-            reg_id = batch["region_id"].to(dev)
-            ind_id = batch["industry_id"].to(dev)
-            tab_f = batch["tabular_features"].to(dev)
-            seq = batch["sequence"].to(dev)
-            mask = batch["attention_mask"].to(dev)
-            seq_pids = batch["seq_product_ids"].to(dev)
-            seq_cids = batch["seq_category_ids"].to(dev)
-            seq_sub_ids = batch["seq_subcategory_ids"].to(dev)
-            seq_line_ids = batch["seq_business_line_ids"].to(dev)
-
-            cand_idx = batch["candidate_indices"].to(dev)
-            pw_f = batch["pairwise_features"].to(dev)
+            inputs = ranker_batch_inputs(batch, catalog_product_vectors_dev, model, dev)
             labels = batch["labels"].to(dev)
-            unseen_mask = pw_f[..., 0] == 0
-
-            cand_vectors = batch["candidate_vectors"]
-            cand_vectors = catalog_product_vectors_dev[cand_idx] if cand_vectors is None else cand_vectors.to(dev)
+            unseen_mask = inputs["pairwise_features"][..., 0] == 0
 
             optimizer.zero_grad()
-            out = model(
-                text_embedding=t_emb,
-                city_id=city_id,
-                region_id=reg_id,
-                industry_id=ind_id,
-                tabular_features=tab_f,
-                sequence=seq,
-                attention_mask=mask,
-                seq_product_ids=seq_pids,
-                seq_category_ids=seq_cids,
-                seq_subcategory_ids=seq_sub_ids,
-                seq_business_line_ids=seq_line_ids,
-                candidate_vectors=cand_vectors,
-                pairwise_features=pw_f,
-                catalog_product_vectors=catalog_product_vectors_dev,
-                seq_purchase_dates=batch["seq_purchase_dates"].to(dev) if batch["seq_purchase_dates"] is not None else None,
-                prediction_day=batch["prediction_day"].to(dev) if batch["prediction_day"] is not None else None,
-            )
+            out = model(**inputs)
 
             loss_dict = loss_fn(out.logits, labels, unseen_mask=unseen_mask)
             loss = loss_dict["loss"]
@@ -1089,7 +1092,7 @@ def train_ranker(
 
         # 5. Save independent NDCG and discovery selections, plus selected alias.
         def checkpoint_payload(metric_name: str, metric_value: float) -> Dict[str, Any]:
-            return {
+            payload = {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
@@ -1105,12 +1108,22 @@ def train_ranker(
                 "vocabs": vocabs,
                 "retriever_digest": retriever_digest,
                 "slate_schema_version": SLATE_SCHEMA_VERSION,
+                "checkpoint_format_version": CHECKPOINT_FORMAT_VERSION,
                 "heuristic_fraction": heuristic_fraction,
                 "statistics_attention": statistics_attention,
                 "excluded_statistics": excluded_statistics,
                 "rolling_candidate_pool": rolling,
                 "config": {
                     "hidden_dim": model.hidden_dim,
+                    "num_pairwise_features": model.num_pairwise_features,
+                    "num_tabular_features": model.num_tabular_features,
+                    "seq_feature_dim": model.seq_feature_dim,
+                    "text_dim": model.text_dim,
+                    "statistics_attention": statistics_attention,
+                    "excluded_statistics": list(excluded_statistics),
+                    "cached_only": cached_only_training,
+                    "metadata_policy": "snapshot_unverified",
+                    "pairwise_metadata_policy": pairwise_metadata_policy,
                     "num_heads": model.num_heads,
                     "dropout": 0.1,
                     "pos_weight": pos_weight,
@@ -1120,6 +1133,12 @@ def train_ranker(
                     "selection_metric": metric_name,
                 },
             }
+            payload["provenance"] = ranker_provenance(
+                retriever_digest=retriever_digest, train_data=train_data, val_data=val_data,
+                model_config=payload["config"], selection_metric=metric_name,
+                metadata_policy=pairwise_metadata_policy,
+            )
+            return payload
 
         if ndcg10 > best_val_ndcg:
             best_val_ndcg = ndcg10
@@ -1144,6 +1163,17 @@ def train_ranker(
     with open(history_path, "w", encoding="utf-8") as f:
         json.dump(training_history, f, indent=2)
     print(f"Full training history saved to {history_path}")
+    qualified = selection_metric == "ndcg" or best_discovery_epoch is not None
+    atomic_json({
+        "version": 1, "run_id": ckpt_dir.name,
+        "status": "complete" if qualified else "no_qualifying_checkpoint",
+        "selected_checkpoint": best_checkpoint_path.name if qualified else None,
+        "selected_sha256": checkpoint_digest(best_checkpoint_path) if qualified else None,
+        "retriever_digest": retriever_digest, "input_contract_digest": json_digest(feature_contract()),
+        "slates": {name: data["cache_identity"] for name, data in (("train", train_data), ("val", val_data))},
+        "selection_metric": selection_metric, "discovery_min_overall_recall": discovery_min_overall_recall,
+        "seed": seed, "epochs": epochs,
+    }, ckpt_dir / "run.json")
     if selection_metric == "discovery" and best_discovery_epoch is None:
         raise RuntimeError(
             "No discovery checkpoint qualified: validation Recall@10 did not meet "
@@ -1152,6 +1182,8 @@ def train_ranker(
     print(f"Best checkpoint saved to {best_checkpoint_path} using {selection_metric} selection.")
 
     return {
+        "run_directory": str(ckpt_dir),
+        "run_manifest_path": str(ckpt_dir / "run.json"),
         "best_checkpoint_path": str(best_checkpoint_path),
         "history_path": str(history_path),
         "best_val_ndcg": best_val_ndcg,
@@ -1165,5 +1197,19 @@ def train_ranker(
     }
 
 
+def main():
+    parser = argparse.ArgumentParser(description="Train an isolated, provenance-bound Stage 2 run.")
+    parser.add_argument("--checkpoint-dir", type=Path, default=Path("checkpoints/ranker"))
+    parser.add_argument("--retriever-checkpoint", type=Path, default=Path("checkpoints/retriever-discovery-reference/best_retriever.pt"))
+    parser.add_argument("--run-id", default=None)
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--pairwise-metadata-policy", choices=("snapshot_unverified", "observed_only_v1"), default="snapshot_unverified")
+    parser.add_argument("--selection-metric", choices=("discovery", "ndcg"), default="discovery")
+    args = parser.parse_args()
+    train_ranker(checkpoint_dir=args.checkpoint_dir, retriever_checkpoint_path=args.retriever_checkpoint,
+                 run_id=args.run_id, epochs=args.epochs, pairwise_metadata_policy=args.pairwise_metadata_policy,
+                 selection_metric=args.selection_metric)
+
+
 if __name__ == "__main__":
-    train_ranker()
+    main()

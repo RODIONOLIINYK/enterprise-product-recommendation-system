@@ -18,7 +18,9 @@ Implements:
    - Loads checkpoints and generates candidate batches.
 """
 
+from collections import OrderedDict
 from bisect import bisect_left
+from heapq import heappush, heappop
 from dataclasses import dataclass
 import math
 from pathlib import Path
@@ -211,7 +213,8 @@ class PointInTimeFeatureStore:
     """Pre-aggregates customer historical statistics and industry affinities strictly point-in-time.
 
     Guarantees:
-    - Zero future leakage: only events strictly prior to as_of_date are accessed.
+    - Purchase statistics use strictly prior events; snapshot metadata is an explicit assumption.
+    - observed_only_v1 excludes unverifiable master attributes from pairwise features.
     - Sub-millisecond pairwise feature extraction per candidate slate via indexed snapshot lookups.
     - All 13 pairwise features bounded strictly in [0.0, 1.0] with zero NaNs.
     """
@@ -222,7 +225,22 @@ class PointInTimeFeatureStore:
         catalogue_df: Optional[pd.DataFrame] = None,
         companies_df: Optional[pd.DataFrame] = None,
         train_cutoff: Union[str, pd.Timestamp] = TRAIN_CUTOFF,
+        *, metadata_policy: str = "snapshot_unverified", max_snapshots: int = 1024,
+        max_prefixes: int = 128, max_cached_dates: int = 512,
     ):
+        if metadata_policy not in ("snapshot_unverified", "observed_only_v1"):
+            raise ValueError("Unknown pairwise metadata policy")
+        if min(max_snapshots, max_prefixes, max_cached_dates) < 0:
+            raise ValueError("Cache capacities must be nonnegative")
+        self.metadata_policy = metadata_policy
+        self.max_snapshots, self.max_prefixes, self.max_cached_dates = max_snapshots, max_prefixes, max_cached_dates
+        self._prefix_states = OrderedDict()
+        self._observed_metadata = {}
+        self._observed_metadata_dates = {}
+        if metadata_policy == "observed_only_v1":
+            # No effective-date proof exists for these snapshots. Unknown is safer
+            # than backfilling product attributes or industry from current masters.
+            catalogue_df = companies_df = None
         self.train_cutoff = pd.Timestamp(train_cutoff)
 
         # 1. Product metadata indexing (brand, category, subcategory, business_line)
@@ -269,9 +287,20 @@ class PointInTimeFeatureStore:
             else:
                 df["quantity"] = 1.0
 
-            # If product metadata missing attributes, complement from purchases_df
+            if self.metadata_policy == "observed_only_v1":
+                for column in ("brand", "product_category", "product_subcategory", "business_line"):
+                    if column not in df:
+                        continue
+                    for pid, rows in df.sort_values("purchase_date", kind="stable").groupby("product_id"):
+                        values = [(date, str(value).strip()) for date, value in zip(rows.purchase_date, rows[column])
+                                  if pd.notna(value) and str(value).strip()]
+                        self._observed_metadata[(pid, column)] = [value for _, value in values]
+                        self._observed_metadata_dates[(pid, column)] = [date for date, _ in values]
+
+            # Legacy snapshots remain available for historical checkpoint replay.
+            # Strict mode consults purchase observations by date instead.
             for col in ("product_category", "business_line", "product_name"):
-                if col in df.columns:
+                if col in df.columns and self.metadata_policy != "observed_only_v1":
                     for pid, val in df.groupby("product_id")[col].first().items():
                         pid_str = str(pid).strip()
                         if pid_str not in self.product_metadata:
@@ -292,8 +321,8 @@ class PointInTimeFeatureStore:
         self._index_customer_events(df)
 
         # 6. Snapshot cache for sub-millisecond retrieval
-        self._snapshots: Dict[Tuple[str, pd.Timestamp], CustomerSnapshot] = {}
-        self._popularity_rankings: Dict[pd.Timestamp, List[str]] = {}
+        self._snapshots = OrderedDict()
+        self._popularity_rankings = OrderedDict()
 
     def _index_training_sales(self, df: pd.DataFrame) -> None:
         """Fit the popularity scale and index training events for as-of counts."""
@@ -331,6 +360,9 @@ class PointInTimeFeatureStore:
                 qty = float(row.get("quantity", 1.0))
 
                 meta = self.product_metadata.get(pid, {})
+                if self.metadata_policy == "observed_only_v1":
+                    meta = {key: str(row.get(key)).strip() if pd.notna(row.get(key)) else ""
+                            for key in ("brand", "product_category", "product_subcategory", "business_line")}
                 cat = meta.get("product_category", "")
                 subcat = meta.get("product_subcategory", "")
                 brand = meta.get("brand", "")
@@ -348,20 +380,24 @@ class PointInTimeFeatureStore:
         cid = str(customer_id).strip()
         return self.customer_metadata.get(cid, {}).get("industry_branch", "")
 
-    def get_product_category(self, product_id: str) -> str:
-        """Get category string for product."""
+    def get_product_attribute(self, product_id, field, as_of_date=None):
         pid = str(product_id).strip()
-        return self.product_metadata.get(pid, {}).get("product_category", "")
+        if self.metadata_policy == "observed_only_v1":
+            if as_of_date is None:
+                return ""
+            key = (pid, field)
+            idx = bisect_left(self._observed_metadata_dates.get(key, ()), pd.Timestamp(as_of_date))
+            return self._observed_metadata[key][idx - 1] if idx else ""
+        return self.product_metadata.get(pid, {}).get(field, "")
 
-    def get_product_subcategory(self, product_id: str) -> str:
-        """Get subcategory string for product."""
-        pid = str(product_id).strip()
-        return self.product_metadata.get(pid, {}).get("product_subcategory", "")
+    def get_product_category(self, product_id, as_of_date=None):
+        return self.get_product_attribute(product_id, "product_category", as_of_date)
 
-    def get_product_brand(self, product_id: str) -> str:
-        """Get brand string for product."""
-        pid = str(product_id).strip()
-        return self.product_metadata.get(pid, {}).get("brand", "")
+    def get_product_subcategory(self, product_id, as_of_date=None):
+        return self.get_product_attribute(product_id, "product_subcategory", as_of_date)
+
+    def get_product_brand(self, product_id, as_of_date=None):
+        return self.get_product_attribute(product_id, "brand", as_of_date)
 
     def sku_population_statistics(self, customer_id: str, as_of: pd.Timestamp, sku: str) -> tuple[float, float]:
         """Training-history popularity and share of this industry's purchases."""
@@ -374,121 +410,64 @@ class PointInTimeFeatureStore:
         sku_count = bisect_left(self._industry_sku_sale_dates.get((industry, sku), ()), as_of)
         return popularity, sku_count / industry_count
 
-    def get_customer_snapshot(
-        self,
-        customer_id: str,
-        as_of_date: Union[str, pd.Timestamp],
-    ) -> CustomerSnapshot:
-        """Retrieve or compute customer historical snapshot strictly prior to as_of_date.
+    @staticmethod
+    def _remember(cache, key, value, capacity):
+        if capacity:
+            cache[key] = value
+            cache.move_to_end(key)
+            while len(cache) > capacity:
+                cache.popitem(last=False)
+        return value
 
-        Sub-millisecond performance:
-        - If precomputed/cached, returns in O(1) dict lookup (< 1 microsecond).
-        - If uncached, executes binary search over sorted dates (< 20 microseconds).
+    def get_customer_snapshot(self, customer_id, as_of_date):
+        """Extend chronological prefix statistics; backdated requests rebuild safely.
+
+        Cached snapshots own their dictionaries, so later events cannot mutate an
+        earlier result. Prefix state and snapshots both have bounded LRU storage.
+        Existing event-count and median-gap semantics are unchanged.
         """
-        cid = str(customer_id).strip()
-        as_of_ts = pd.Timestamp(as_of_date)
-        cache_key = (cid, as_of_ts)
-
-        if cache_key in self._snapshots:
-            return self._snapshots[cache_key]
-
-        events = self.customer_events.get(cid, [])
-        dates = self.customer_event_dates.get(cid, [])
-
-        if not events:
-            snap = CustomerSnapshot(
-                total_volume=0.0,
-                total_orders=0,
-                cat_orders={},
-                subcat_orders={},
-                brand_orders={},
-                business_lines=set(),
-                sku_stats={},
-            )
-            self._snapshots[cache_key] = snap
-            return snap
-
-        # Strictly point-in-time: bisect_left finds first index with date >= as_of_ts
-        cutoff_idx = bisect_left(dates, as_of_ts)
-        prior_events = events[:cutoff_idx]
-
-        if not prior_events:
-            snap = CustomerSnapshot(
-                total_volume=0.0,
-                total_orders=0,
-                cat_orders={},
-                subcat_orders={},
-                brand_orders={},
-                business_lines=set(),
-                sku_stats={},
-            )
-            self._snapshots[cache_key] = snap
-            return snap
-
-        total_vol = 0.0
-        total_orders = len(prior_events)
-        cat_counts: Dict[str, int] = {}
-        subcat_counts: Dict[str, int] = {}
-        brand_counts: Dict[str, int] = {}
-        business_lines: set[str] = set()
-        sku_data: Dict[str, Dict[str, Any]] = {}
-
-        for dt, pid, qty, cat, subcat, brand, line in prior_events:
-            total_vol += qty
-            if cat:
-                cat_counts[cat] = cat_counts.get(cat, 0) + 1
-            if subcat:
-                subcat_counts[subcat] = subcat_counts.get(subcat, 0) + 1
-            if brand:
-                brand_counts[brand] = brand_counts.get(brand, 0) + 1
+        cid, as_of = str(customer_id).strip(), pd.Timestamp(as_of_date)
+        key = (cid, as_of)
+        if key in self._snapshots:
+            self._snapshots.move_to_end(key)
+            return self._snapshots[key]
+        events = self.customer_events.get(cid, ())
+        end = bisect_left(self.customer_event_dates.get(cid, ()), as_of)
+        previous = self._prefix_states.get(cid)
+        state = previous if previous is not None and previous["end"] <= end else {
+            "end": 0, "volume": 0., "cats": {}, "subcats": {}, "brands": {}, "lines": set(), "skus": {}}
+        for dt, pid, qty, cat, subcat, brand, line in events[state["end"]:end]:
+            state["volume"] += qty
+            for field, value in (("cats", cat), ("subcats", subcat), ("brands", brand)):
+                if value:
+                    state[field][value] = state[field].get(value, 0) + 1
             if line:
-                business_lines.add(line)
-
-            if pid not in sku_data:
-                sku_data[pid] = {
-                    "order_count": 1,
-                    "volume": qty,
-                    "dates": [dt],
-                }
+                state["lines"].add(line)
+            sku = state["skus"].get(pid)
+            if sku is None:
+                sku = state["skus"][pid] = {"order_count": 0, "volume": 0., "lower_gaps": [], "upper_gaps": [], "median_gap": 0.}
             else:
-                entry = sku_data[pid]
-                entry["order_count"] += 1
-                entry["volume"] += qty
-                entry["dates"].append(dt)
-
-        # Precompute last_date and median_gap per SKU
-        sku_stats: Dict[str, Dict[str, Any]] = {}
-        for pid, data in sku_data.items():
-            d_list = data["dates"]
-            last_dt = d_list[-1]
-            cnt = data["order_count"]
-            if cnt >= 2:
-                gaps = [
-                    max(0.0, (d_list[j] - d_list[j - 1]).total_seconds() / 86400.0)
-                    for j in range(1, len(d_list))
-                ]
-                med_gap = float(np.median(gaps)) if gaps else 1.0
-            else:
-                med_gap = 0.0
-
-            sku_stats[pid] = {
-                "order_count": cnt,
-                "volume": data["volume"],
-                "last_date": last_dt,
-                "median_gap": med_gap,
-            }
-
+                gap = max(0., (dt - sku["last_date"]).total_seconds() / 86400.)
+                lower, upper = sku["lower_gaps"], sku["upper_gaps"]
+                heappush(lower, -gap) if not lower or gap <= -lower[0] else heappush(upper, gap)
+                if len(lower) > len(upper) + 1:
+                    heappush(upper, -heappop(lower))
+                elif len(upper) > len(lower):
+                    heappush(lower, -heappop(upper))
+                sku["median_gap"] = -lower[0] if len(lower) > len(upper) else (-lower[0] + upper[0]) / 2
+            sku["order_count"] += 1
+            sku["volume"] += qty
+            sku["last_date"] = dt
+        state["end"] = end
+        if previous is None or end >= previous["end"]:
+            self._remember(self._prefix_states, cid, state, self.max_prefixes)
         snap = CustomerSnapshot(
-            total_volume=total_vol,
-            total_orders=total_orders,
-            cat_orders=cat_counts,
-            subcat_orders=subcat_counts,
-            brand_orders=brand_counts,
-            business_lines=business_lines,
-            sku_stats=sku_stats,
-        )
-        self._snapshots[cache_key] = snap
-        return snap
+            total_volume=state["volume"], total_orders=end,
+            cat_orders=dict(state["cats"]), subcat_orders=dict(state["subcats"]), brand_orders=dict(state["brands"]),
+            business_lines=set(state["lines"]),
+            sku_stats={pid: {name: value for name, value in sku.items() if name not in ("lower_gaps", "upper_gaps")}
+                       for pid, sku in state["skus"].items()})
+        return self._remember(self._snapshots, key, snap, self.max_snapshots)
 
     def precompute_snapshots(self, transitions: Sequence[Dict[str, Any]]) -> None:
         """Precompute and cache snapshots for transitions to accelerate inference/training."""
@@ -519,7 +498,11 @@ class PointInTimeFeatureStore:
                 (sku for sku, count in counts.items() if count),
                 key=lambda sku: (-counts[sku], sku),
             )
-        popularity = [sku for sku in self._popularity_rankings[cutoff] if sku in eligible_products]
+        ranking = self._popularity_rankings[cutoff]
+        self._popularity_rankings.move_to_end(cutoff)
+        while len(self._popularity_rankings) > self.max_cached_dates:
+            self._popularity_rankings.popitem(last=False)
+        popularity = [sku for sku in ranking if sku in eligible_products]
         if include_zero_sales:
             popularity.extend(sorted(eligible_products - set(popularity)))
         return popularity
@@ -579,21 +562,21 @@ class PointInTimeFeatureStore:
 
         # 6. user_cat_order_share
         tot_orders = max(snap.total_orders, 1)
-        cat = self.get_product_category(pid)
+        cat = self.get_product_category(pid, as_of_ts)
         if cat and cat in snap.cat_orders and snap.total_orders > 0:
             feats[5] = float(min(1.0, max(0.0, snap.cat_orders[cat] / tot_orders)))
         else:
             feats[5] = 0.0
 
         # 7. user_subcat_order_share
-        subcat = self.get_product_subcategory(pid)
+        subcat = self.get_product_subcategory(pid, as_of_ts)
         if subcat and subcat in snap.subcat_orders and snap.total_orders > 0:
             feats[6] = float(min(1.0, max(0.0, snap.subcat_orders[subcat] / tot_orders)))
         else:
             feats[6] = 0.0
 
         # 8. user_brand_order_share
-        brand = self.get_product_brand(pid)
+        brand = self.get_product_brand(pid, as_of_ts)
         if brand and brand in snap.brand_orders and snap.total_orders > 0:
             feats[7] = float(min(1.0, max(0.0, snap.brand_orders[brand] / tot_orders)))
         else:
@@ -603,7 +586,7 @@ class PointInTimeFeatureStore:
         feats[8], feats[9] = self.sku_population_statistics(cid, as_of_ts, pid)
 
         # Attribute familiarity uses all customer events before the basket.
-        line = self.product_metadata.get(pid, {}).get("business_line", "")
+        line = self.get_product_attribute(pid, "business_line", as_of_ts)
         feats[10] = cat in snap.cat_orders
         feats[11] = brand in snap.brand_orders
         feats[12] = line in snap.business_lines
@@ -835,6 +818,7 @@ class CandidateRetriever:
         *,
         candidate_product_ids: Optional[Sequence[str]] = None,
         rolling_pool: Optional[RollingCandidatePool] = None,
+        metadata_policy: Optional[str] = None,
     ) -> "CandidateRetriever":
         """Load the checkpoint, optionally appending cold candidates in input order."""
         model, ckpt = load_retriever_from_checkpoint(checkpoint_path, device=device)
@@ -855,6 +839,11 @@ class CandidateRetriever:
                 bias = model.product_bias.detach()
                 model.product_bias = torch.nn.Parameter(torch.cat((bias, bias.new_zeros(extra))), requires_grad=False)
         config = ckpt.get("config", {})
+        if product_inputs is not None and config.get("demand_policy") == "disabled_v1":
+            product_inputs = dict(product_inputs)
+            demand = product_inputs["demand_features"].clone()
+            demand[:, :6 + int(config.get("include_sku_median_quantity", False))] = 0
+            product_inputs["demand_features"] = demand
         if config.get("discovery_only"):
             purchases_df = purchases_df.loc[actual_purchase_mask(purchases_df)]
             if rolling_pool is None:
@@ -873,6 +862,7 @@ class CandidateRetriever:
             purchases_df=purchases_df,
             catalogue_df=catalogue_df,
             companies_df=companies_df,
+            metadata_policy=metadata_policy or config.get("pairwise_metadata_policy", "snapshot_unverified"),
         )
 
         return cls(

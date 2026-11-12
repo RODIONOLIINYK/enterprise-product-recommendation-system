@@ -1,15 +1,16 @@
 """Stage 1 Modular Two-Tower Retriever Training and Evaluation Pipeline.
 
 Implements:
-1. Point-in-time product demand features (6 continuous signals normalized strictly to [0, 1]).
+1. Versioned product-input policy: new training disables dynamic demand;
+   legacy fixed-cutoff demand remains available for historical reconstruction.
 2. Next-basket customer lifecycle transition generator (train < 2025-10-01,
    val 2025-10-01..2026-02-18, test >= 2026-02-19) with full prior history.
 3. RetrieverDataset and DataLoader for multi-label next-basket prediction.
 4. Retrieval evaluation metrics: Recall@K (10, 50, 100), NDCG@10, MRR.
 5. End-to-end training loop with BCEWithLogitsLoss (pos_weight=20.0), AdamW,
    CosineAnnealingLR, automatic MPS/CUDA/CPU device selection.
-6. Checkpointing: saves best model to checkpoints/retriever/best_retriever.pt
-   and full metric history to checkpoints/retriever/training_history.json.
+6. Checkpointing: saves models and histories in a fresh
+   checkpoints/retriever/runs/<run-id>/ directory with an explicit selection manifest.
 """
 
 import argparse
@@ -23,6 +24,8 @@ import torch
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, Subset
 
+from recommender.artifacts import atomic_json, create_run_directory, file_digest
+from recommender.development import load_development_purchases
 from recommender.catalogue import load_product_catalogue, order_retriever_catalogue, select_eligible_products
 from recommender.familiarity import ATTRIBUTE_COLUMNS, BASE_FAMILIARITY_FIELDS, FamiliarityStore
 from recommender.merging import EVENT_KEY_COLUMNS, merge_purchase_events
@@ -554,23 +557,29 @@ def build_retriever_product_inputs(
     include_subcategory: bool,
     include_sku_median_quantity: bool = False,
     container_encoding: str = "one_hot",
+    demand_policy: str = "legacy_train_cutoff_v1",
 ) -> Dict[str, torch.Tensor]:
     """Share the training snapshot and product index order with downstream scoring."""
     ordered = order_retriever_catalogue(catalogue_df, product_ids)
     categories = ordered.set_index("product_id")["product_category"].dropna().to_dict()
-    demand = compute_product_demand_features(purchases_df, TRAIN_CUTOFF, list(product_ids), categories)
-    if include_sku_median_quantity:
+    if demand_policy not in ("disabled_v1", "legacy_train_cutoff_v1"):
+        raise ValueError("Unknown demand policy")
+    demand = (torch.zeros(len(product_ids), 6) if demand_policy == "disabled_v1" else
+              compute_product_demand_features(purchases_df, TRAIN_CUTOFF, list(product_ids), categories))
+    if include_sku_median_quantity and demand_policy == "disabled_v1":
+        demand = torch.cat([demand, torch.zeros(len(product_ids), 1)], dim=1)
+    elif include_sku_median_quantity:
         prior = purchases_df.loc[pd.to_datetime(purchases_df["purchase_date"], format="mixed") < TRAIN_CUTOFF]
         prior = merge_purchase_events(prior[[*EVENT_KEY_COLUMNS, "quantity"]])
         medians = prior.groupby("product_id")["quantity"].median().reindex(product_ids, fill_value=0)
-        log_values = torch.log1p(torch.as_tensor(medians.to_numpy(dtype=np.float32)))
+        log_values = torch.log1p(torch.as_tensor(medians.to_numpy(dtype=np.float32, copy=True)))
         reference = math.log1p(fit_quantity_reference(medians))
         demand = torch.cat([demand, (log_values / (log_values + reference)).unsqueeze(1)], dim=1)
     container_ids = None
     if "container_vocab" in vocabs:
         container_vocab = vocabs["container_vocab"]
         container_types = ordered.get("container_type", pd.Series(index=ordered.index, dtype="string"))
-        ids = container_types.map(container_vocab).fillna(0).to_numpy(dtype=np.int64)
+        ids = container_types.map(container_vocab).fillna(0).to_numpy(dtype=np.int64, copy=True)
         container_ids = torch.from_numpy(ids)
         if container_encoding != "embedding_none":
             indicators = torch.nn.functional.one_hot(container_ids, len(container_vocab) + 1)
@@ -618,12 +627,18 @@ def train_retriever(
     discovery_only: bool = False,
     familiarity_fields: Sequence[str] = (),
     remove_product_attribute_embeddings: bool = False,
+    demand_policy: str = "disabled_v1",
+    run_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Train Modular Two-Tower Retriever and save best checkpoint + metrics history.
 
     Returns:
         Dict containing training summary, best validation Recall@50, and output paths.
     """
+    if demand_policy not in ("disabled_v1", "legacy_train_cutoff_v1"):
+        raise ValueError("Unknown demand policy")
+    if epochs < 1 or batch_size < 1:
+        raise ValueError("epochs and batch_size must be positive")
     torch.manual_seed(seed)
     np.random.seed(seed)
     if history_encoder not in ("attention", "pool", "none"):
@@ -657,20 +672,18 @@ def train_retriever(
         profile_features = (*profile_features, MEDIAN_PURCHASE_QUANTITY)
 
     dev = get_device(device)
-    ckpt_dir = Path(checkpoint_dir)
-    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    ckpt_dir = create_run_directory(checkpoint_dir, run_id)
 
     # 1. Load DataFrames if not supplied
     if purchases_df is None:
         p_path = Path("data/interim/cleaned_purchases.csv")
         if not p_path.is_file():
             raise FileNotFoundError(f"Cleaned purchases file not found: {p_path}")
-        purchases_df = pd.read_csv(
-            p_path, dtype={"customer_id": str, "product_id": str}, low_memory=False,
-        )
+        purchases_df = load_development_purchases(p_path)
 
-    purchases_df = purchases_df.copy()
-    purchases_df["purchase_date"] = pd.to_datetime(purchases_df["purchase_date"], format="mixed")
+    dates = pd.to_datetime(purchases_df["purchase_date"], format="mixed")
+    purchases_df = purchases_df.loc[dates < TEST_START].copy()
+    purchases_df["purchase_date"] = dates.loc[dates < TEST_START]
     if include_customer_median_purchase_quantity:
         purchases_df["purchase_date"] = purchases_df["purchase_date"].dt.normalize()
         if purchases_df.duplicated(EVENT_KEY_COLUMNS).any():
@@ -861,6 +874,7 @@ def train_retriever(
         purchases_df, catalogue_df, catalogue_embeddings, eligible_pids, vocabs, include_subcategory=False,
         include_sku_median_quantity=include_sku_median_quantity,
         container_encoding=container_encoding,
+        demand_policy=demand_policy,
     )
     # Move product inputs to device
     for k in prod_inputs:
@@ -1118,6 +1132,9 @@ def train_retriever(
                     "train_eval_metrics": train_eval_metrics,
                     "vocabs": vocabs,
                     "config": {
+                        "demand_policy": demand_policy,
+                        "training_protocol_version": 2,
+                        "metadata_policy": "snapshot_unverified",
                         "output_dim": output_dim,
                         "training_epochs": epochs,
                         "text_dim": TEXT_DIM,
@@ -1152,7 +1169,13 @@ def train_retriever(
     with open(history_path, "w", encoding="utf-8") as f:
         json.dump(training_history, f, indent=2)
 
+    atomic_json({"version": 1, "run_id": ckpt_dir.name, "status": "complete",
+                 "selected_checkpoint": best_checkpoint_path.name,
+                 "selected_sha256": file_digest(best_checkpoint_path),
+                 "demand_policy": demand_policy, "metadata_policy": "snapshot_unverified",
+                 "seed": seed, "epochs": epochs, "selection_metric": selection_metric}, ckpt_dir / "run.json")
     return {
+        "run_directory": str(ckpt_dir), "run_manifest_path": str(ckpt_dir / "run.json"),
         "best_checkpoint_path": str(best_checkpoint_path),
         "history_path": str(history_path),
         "best_recall_50": best_recall_50,
@@ -1170,19 +1193,24 @@ def main() -> None:
         "--discovery-reference", action="store_true",
         help="Train the 128D discovery reference with four familiarity flags.",
     )
+    parser.add_argument("--demand-policy", choices=("disabled_v1", "legacy_train_cutoff_v1"), default="disabled_v1",
+                        help="Disabled demand is the safe new protocol; legacy is historical reproduction only.")
+    parser.add_argument("--checkpoint-dir", type=Path, default=None)
+    parser.add_argument("--run-id", default=None)
     args = parser.parse_args()
     if args.discovery_reference:
         train_retriever(
             epochs=30,
             output_dim=128,
             train_eval_size=2048,
-            checkpoint_dir="checkpoints/retriever-discovery-reference",
+            checkpoint_dir=args.checkpoint_dir or "checkpoints/retriever-discovery-reference",
+            demand_policy=args.demand_policy, run_id=args.run_id,
             discovery_only=True,
             familiarity_fields=(*BASE_FAMILIARITY_FIELDS, "family"),
             remove_product_attribute_embeddings=True,
         )
     else:
-        train_retriever()
+        train_retriever(checkpoint_dir=args.checkpoint_dir or "checkpoints/retriever", demand_policy=args.demand_policy, run_id=args.run_id)
 
 
 if __name__ == "__main__":

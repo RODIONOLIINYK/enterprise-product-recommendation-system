@@ -67,6 +67,7 @@ def load_stage1_discovery(
     companies: pd.DataFrame,
     embedding_cache: Path,
     device: torch.device,
+    *, metadata_policy: str | None = None,
 ) -> tuple[CandidateRetriever, dict]:
     """Load the Stage 1 checkpoint and metadata vectors for its rolling catalogue."""
     ckpt = torch.load(checkpoint_path, map_location="cpu")
@@ -84,9 +85,10 @@ def load_stage1_discovery(
         purchases, pool.merchandise, embeddings, candidate_ids, ckpt["vocabs"],
         include_subcategory=False, container_encoding=config["container_encoding"],
         include_sku_median_quantity=config.get("include_sku_median_quantity", False),
+        demand_policy=config.get("demand_policy", "legacy_train_cutoff_v1"),
     )
     retriever = CandidateRetriever.from_checkpoint(
         checkpoint_path, purchases, catalogue, companies, inputs, device,
-        candidate_product_ids=candidate_ids, rolling_pool=pool,
+        candidate_product_ids=candidate_ids, rolling_pool=pool, metadata_policy=metadata_policy,
     )
     return retriever, ckpt

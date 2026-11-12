@@ -1,5 +1,7 @@
 """Read source classification and expose the shared inference product scope."""
 
+from collections import OrderedDict
+
 from pathlib import Path
 from collections.abc import Sequence
 
@@ -85,7 +87,11 @@ def catalogue_blocked_mask(
 class RollingCandidatePool:
     """Merchandise with a paid sale before the query and no known block."""
 
-    def __init__(self, catalogue: pd.DataFrame, purchases: pd.DataFrame):
+    def __init__(self, catalogue: pd.DataFrame, purchases: pd.DataFrame, *, max_cached_dates: int = 512):
+        if max_cached_dates < 0:
+            raise ValueError("Cache capacity must be nonnegative")
+        self.max_cached_dates = max_cached_dates
+        self._eligible_dates = OrderedDict()
         self.merchandise = select_sellable_products(catalogue)
         self.product_ids = set(self.merchandise["product_id"].astype(str))
         paid = purchases.loc[actual_purchase_mask(purchases), ["product_id", "purchase_date"]].copy()
@@ -98,8 +104,16 @@ class RollingCandidatePool:
 
     def eligible_on(self, date: str | pd.Timestamp) -> set[str]:
         cutoff = pd.Timestamp(date).normalize()
-        prior = set(self.first_sales.index[self.first_sales.lt(cutoff)])
-        return (prior & self.product_ids) - self.blocked_on(cutoff)
+        if cutoff not in self._eligible_dates:
+            prior = set(self.first_sales.index[self.first_sales.lt(cutoff)])
+            eligible = frozenset((prior & self.product_ids) - self.blocked_on(cutoff))
+            if not self.max_cached_dates:
+                return set(eligible)
+            self._eligible_dates[cutoff] = eligible
+            while len(self._eligible_dates) > self.max_cached_dates:
+                self._eligible_dates.popitem(last=False)
+        self._eligible_dates.move_to_end(cutoff)
+        return set(self._eligible_dates[cutoff])  # Callers cannot poison cached membership.
 
 
 def select_eligible_products(

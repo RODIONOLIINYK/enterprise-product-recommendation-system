@@ -10,6 +10,8 @@ Next-basket recommendations for B2B enterprise customers using **Stage 1 Two-Tow
 
 The 2026-11-10 [audit](AUDIT_REPORT.md) found that local checkpoint selections differ from the historical reference metrics. Check [artifact metadata](audit/artifacts.json) before training or evaluation. Saved models and caches were preserved.
 
+The [2026-11-12 follow-up](HARDENING_REPORT.md) implements versioned demand-free training, validated caches, provenance-bound isolated runs, and compatible scoring/preprocessing refactors. Historical default aliases remain unchanged.
+
 ## Active Pipeline
 
 ```text
@@ -41,7 +43,11 @@ Use Python 3.12 (`./venv/bin/python`).
 ```bash
 python3.12 -m venv venv
 ./venv/bin/pip install -r requirements.txt
+# Tests and lint
+./venv/bin/pip install -r requirements-dev.txt
 ```
+
+Direct dependencies are pinned to tested versions. On the tested macOS arm64/Python 3.12 platform, add `-c constraints-macos-arm64.txt` for the recorded transitive dependency versions. This platform snapshot is not a universal wheel lock. Notebook dependencies are separate in `requirements-notebook.txt`.
 
 ## Data Preparation
 
@@ -53,11 +59,14 @@ data/raw/customers.csv
 data/raw/items.csv
 ```
 
-The preparation API returns tables; the CLI runs the configured stages and prints their row counts. It does not write `cleaned_purchases.csv`:
+The preparation API returns tables; the default CLI prints row counts. Explicitly export the purchases table when preparing data for training:
 
 ```bash
 ./venv/bin/python -m recommender
+./venv/bin/python -m recommender --export-purchases data/interim/cleaned_purchases.csv
 ```
+
+Exports refuse to replace an existing file unless `--overwrite` is supplied. Preparation reads configured raw data; it is not part of validation-only model selection. Development training/evaluation uses a date gate before materializing purchase fields.
 
 - **Paid-sale eligibility (`configs/product_scope.toml`):** Only positive finite `ПРОДАЖА` records with `Gen_ Prod_ Posting Group = ТОВАР` and item-master classification `ТОВАР` count as purchases. Gifts (`ПОДАРОК`), returns, and accounting rows are excluded.
 - **Record merging (`recommender/merging.py`):** Same-company, same-calendar-date, same-`product_id` lines are merged and their quantities summed. Package variants remain distinct product IDs.
@@ -71,21 +80,27 @@ The preparation API returns tables; the CLI runs the configured stages and print
 Run from the repository root using `./venv/bin/python`:
 
 ```bash
-# Train Stage 1 Discovery Reference Retriever (saves to checkpoints/retriever-discovery-reference/)
-PYTHONPATH=. ./venv/bin/python -m recommender.train_retriever --discovery-reference
+# Train the reference-shaped Stage 1 architecture in a fresh run, with dynamic demand disabled
+PYTHONPATH=. ./venv/bin/python -m recommender.train_retriever --discovery-reference --demand-policy disabled_v1 --run-id demand-free-01
 
 # Evaluate Stage 1 on rolling prior-sale discovery pool (saves to checkpoints/stage1-rolling-discovery/)
 PYTHONPATH=. ./venv/bin/python -m recommender.evaluate_stage1
 
-# Train Stage 2 UPS-CANR Reference Ranker (saves to checkpoints/ranker/)
+# Train Stage 2 in a new checkpoints/ranker/runs/<run-id>/ directory
 PYTHONPATH=. ./venv/bin/python -m recommender.train_ranker
 
-# Run full Stage 1 + Stage 2 Validation Evaluation (saves to checkpoints/evaluation_report.json)
+# Validate the preserved legacy default; report goes to checkpoints/evaluations/<unique-id>.json
 PYTHONPATH=. ./venv/bin/python -m recommender.evaluate
+
+# Validate an explicitly selected new run with complete provenance required
+PYTHONPATH=. ./venv/bin/python -m recommender.evaluate --ranker-checkpoint checkpoints/ranker/runs/RUN_ID --strict-provenance
 
 # Run the unit and integration test suite
 PYTHONPATH=. ./venv/bin/pytest tests/
+PYTHONPATH=. ./venv/bin/pytest tests/ --synthetic-only
 ```
+
+Both trainers create exclusive `runs/<run-id>/` subdirectories; they never replace parent reference aliases. Use the matching retriever `.pt` path for training and evaluation when selecting a new retriever. New ranker caches use format v4; historical v3 files remain untouched. Legacy checkpoint evaluation is explicitly labeled as having an unverified input contract. `--pairwise-metadata-policy observed_only_v1` opts new ranker training into strictly prior purchase-observed pairwise attributes; this does not recover missing historical catalogue metadata.
 
 Six legacy tests read the unsplit real purchase CSV and are skipped by default. Run them with `--allow-heldout-data` only after explicit authorization for final held-out testing. Synthetic split-boundary tests remain enabled. See [AUDIT_REPORT.md](AUDIT_REPORT.md) for remaining temporal and cache limitations.
 

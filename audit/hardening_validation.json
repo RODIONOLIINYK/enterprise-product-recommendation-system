@@ -1,0 +1,39 @@
+{
+  "starting_revision": "c7788ec",
+  "heldout_evaluated": false,
+  "default_promoted": false,
+  "artifact_sha256_unchanged": {
+    "checkpoints/retriever-discovery-reference/best_retriever.pt": "2dcfbc7eab6795ded6f25a6cb0ffe1f9e606f13c9885d4ee020b724d0a2b5ab7",
+    "checkpoints/retriever/best_retriever.pt": "863cb700afc7e8d4284b20d34f5f4f5345538146557375f1141cf9d5d77fae79",
+    "checkpoints/ranker/best_ranker.pt": "1701becf092e38e71a06152b124a832cabfa58172d6d497f305fe499757b0b17",
+    "checkpoints/ranker/best_discovery_ranker.pt": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+    "checkpoints/ranker/best_ndcg_ranker.pt": "2ff3e43dcd531d6604c536d93be1bbfce140f118e8f48fad88dbe99e1616701e",
+    "data/interim/ranker_train_slates_v3_repeat_0.5_rolling_v1.pt": "aaf0153b53d7dac35459562cbb87226fb0af6a7e5cbd103e198a0e108864c663",
+    "data/interim/ranker_val_slates_v3_repeat_0.5_rolling_v1.pt": "43aa986ed5c0ead13b1f4f3b321e28444fd846074b6a1192bd00b712789cad27"
+  },
+  "reference_replay": {
+    "matches_recorded_json_exactly": true,
+    "recorded_file_sha256": "908e2ece085e9f154da3382093ce9eefb3251389580de3afbafe20128c69927b"
+  },
+  "full_suite": {
+    "passed": 457,
+    "skipped": 6,
+    "subtests_passed": 70
+  },
+  "note": "Full suite protects real held-out readers. Linux Actions workflow has not run remotely.",
+  "synthetic_checkout_suite": {
+    "passed": 451,
+    "skipped": 12,
+    "subtests_passed": 70,
+    "private_directories_absent": [
+      "data",
+      "checkpoints"
+    ],
+    "fresh_environment_install": false
+  },
+  "lint": {
+    "undefined_symbols": "passed",
+    "changed_core_unused_symbols": "passed",
+    "git_diff_check": "passed"
+  }
+}

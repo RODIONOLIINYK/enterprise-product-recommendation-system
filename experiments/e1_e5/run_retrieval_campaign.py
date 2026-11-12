@@ -44,13 +44,15 @@ def main():
                 repeated.update((f'E4k{name[-1]}', f'E5k{name[-1]}'))
     decision = {'screening_seed': 42, 'promising': promising, 'repeated': sorted(repeated),
                 'rule': '>=10 additional Stage1 unseen hits@25 or @50, OR >=5 downstream new hits@10 with fixed recall guardrail; repeat paired controls; no promotion'}
+    decision['status'] = 'repeating'
     Path('experiments/e1_e5/repetition_selection.json').write_text(json.dumps(decision, indent=2)+'\n')
     for seed in (17, 2026):
         for name in CONFIGS:
             if name in repeated:
                 train_retrieval(name, seed, train, val, info, ts, vs, OUTPUT, 30, device)
                 downstream(name, seed, train, val, info, ts, vs, OUTPUT, device)
-    Path('experiments/e1_e5/campaign_complete.json').write_text(json.dumps(decision, indent=2)+'\n')
+    decision['status'] = 'complete'
+    Path('experiments/e1_e5/repetition_selection.json').write_text(json.dumps(decision, indent=2)+'\n')
 
 
 if __name__ == '__main__':

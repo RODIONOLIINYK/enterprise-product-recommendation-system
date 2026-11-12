@@ -6,6 +6,8 @@ This document tracks the current project state, root-cause findings from our lat
 
 Audit prerequisite (2026-11-10): resolve the artifact mismatch and fixed train-cutoff demand issue in [AUDIT_REPORT.md](AUDIT_REPORT.md) before treating the historical baseline below as locally reproducible. The audit preserved all checkpoints and implemented no new architecture. The shared-vector experiment now excludes source index 8 from tokens, uses three type dimensions, and preserves its effect only in the default mask-derived legacy bias. The nine-feature source format remains unchanged; use the ordered schema constants.
 
+Follow-up (2026-11-12): [hardening implementation](HARDENING_REPORT.md) preserves/replays the references, defaults new Stage 1 training to versioned demand-free inputs, and introduces validated v4 base caches and provenance-bound isolated runs. This does not retroactively repair the historical retriever or establish a new architecture winner. Effective-date metadata and basket-aware encoding remain separate work; the completed E1–E5 results remain in their report.
+
 ## 1. Current Baseline & Core Objective
 
 ### Active Reference Baseline (Verified on Validation: `6,191` Baskets, `1,857` New-to-Customer Targets)

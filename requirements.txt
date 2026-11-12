@@ -1,11 +1,5 @@
-# Direct dependencies for preparation, training, evaluation, and tests.
-pandas
-numpy
-openpyxl
-pyarrow
-torch
-transformers
-sentence-transformers
-scikit-learn
-pytest
-ipykernel
+-r requirements-core.txt
+# Optional text-embedding generation runtime; cached inference does not load BGE.
+transformers==5.19.0
+sentence-transformers==6.1.0
+scikit-learn==1.9.1

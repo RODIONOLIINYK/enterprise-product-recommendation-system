@@ -29,9 +29,13 @@ class SignalRanker(nn.Module):
                 expanded.weight[:, -1].zero_()
                 expanded.bias.copy_(first.bias)
             self.head[0] = expanded
-            self.base.mlp = nn.Identity()
+            self.base.mlp = None
 
     def forward(self, *, pairwise_features, **kwargs):
+        if self.mode == "transition_mlp":
+            features = self.base.encode_candidate_features(pairwise_features=pairwise_features[..., :13], **kwargs)
+            values = torch.cat([features.features, pairwise_features[..., 13:14]], -1)
+            return features.to_output(self.base.score_candidates(values, scoring_head=self.head))
         output = self.base(pairwise_features=pairwise_features[..., :13], **kwargs)
         if self.mode == "control":
             return output
@@ -39,8 +43,6 @@ class SignalRanker(nn.Module):
             logits = output.logits + self.residual_weight * (pairwise_features[..., 0] == 0)
         elif self.mode == "transition_residual":
             logits = output.logits + self.residual_weight * pairwise_features[..., 13]
-        else:
-            logits = self.head(torch.cat([output.raw_scores, pairwise_features[..., 13:14]], -1)).squeeze(-1)
         return replace(output, scores=logits, raw_scores=logits if self.mode == "transition_mlp" else output.raw_scores)
 
 
@@ -52,7 +54,7 @@ class TransitionStatistics:
     Jeffreys-smoothed background avoids undefined lift for unseen destinations.
     """
     def __init__(self, purchases, alpha=20.):
-        if alpha <= 0:
+        if not np.isfinite(alpha) or alpha <= 0:
             raise ValueError("alpha must be positive")
         if not purchases.purchase_date.lt(TEST_START).all():
             raise ValueError("Development purchases only")
@@ -102,12 +104,11 @@ class TransitionStatistics:
         weights = np.array(list(history.values()), dtype=float)
         weights /= weights.sum()
         known = [(j, self.index[str(sku)]) for j, sku in enumerate(candidates) if str(sku) in self.index]
-        if not known:
-            return result
-        slots, target = zip(*known)
-        probability = (self.b[list(target)] + .5) / (self.total + 1.)
-        conditional = (self.ab[np.ix_(source, target)] + self.alpha * probability) / (self.a[source, None] + self.alpha)
-        result[list(slots)] = weights @ np.log(conditional / probability)
+        if known:
+            slots, target = zip(*known)
+            probability = (self.b[list(target)] + .5) / (self.total + 1.)
+            conditional = (self.ab[np.ix_(source, target)] + self.alpha * probability) / (self.a[source, None] + self.alpha)
+            result[list(slots)] = weights @ np.log(conditional / probability)
         # Unknown destinations have no observations: smoothed conditional/background
         # ratio is alpha/(N_A+alpha), independent of the arbitrary floor.
         unknown = [j for j, sku in enumerate(candidates) if str(sku) not in self.index]

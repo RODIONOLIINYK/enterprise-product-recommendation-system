@@ -12,6 +12,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from recommender.candidates import rank_personal_repeat, rank_unseen_candidates
+from recommender.development import load_development_purchases
 from recommender.catalogue import catalogue_blocked_mask, load_product_catalogue
 from recommender.company import load_companies
 from recommender.scope import get_datasets_locs
@@ -117,9 +118,8 @@ def evaluate_stage1(
     """Replay catalogue policies using fixed weights and strictly prior observations."""
     output_dir.mkdir(parents=True, exist_ok=True)
     dev = get_device(device)
-    history = pd.read_csv("data/interim/cleaned_purchases.csv", dtype={"customer_id": str, "product_id": str})
-    history["purchase_date"] = pd.to_datetime(history["purchase_date"], format="mixed").dt.normalize()
-    history = history.loc[history["purchase_date"] < TEST_START]
+    history = load_development_purchases("data/interim/cleaned_purchases.csv")
+    history["purchase_date"] = history["purchase_date"].dt.normalize()
     train = history.loc[history["purchase_date"] < TRAIN_CUTOFF]
     _, validation, _ = build_retriever_transitions(history)
     if not validation:

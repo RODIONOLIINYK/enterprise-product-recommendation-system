@@ -21,8 +21,9 @@ Implements the Conditional Testing Gate:
 """
 
 from pathlib import Path
+from uuid import uuid4
+import argparse
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
-import json
 import math
 import numpy as np
 import pandas as pd
@@ -38,9 +39,11 @@ from recommender.candidates import (
 )
 from recommender.catalogue import load_product_catalogue
 from recommender.company import load_companies
+from recommender.artifacts import atomic_json, resolve_run_checkpoint, validate_ranker_provenance
+from recommender.development import load_development_purchases
 from recommender.ranker import UPSCANRRanker
 from recommender.scope import get_datasets_locs
-from recommender.split import TEST_START, TRAIN_CUTOFF
+from recommender.split import TRAIN_CUTOFF
 from recommender.train_ranker import (
     RankerDataset,
     SLATE_SCHEMA_VERSION,
@@ -461,10 +464,12 @@ def evaluate_split(
 def run_full_evaluation(
     retriever_checkpoint_path: Union[str, Path] = "checkpoints/retriever-discovery-reference/best_retriever.pt",
     ranker_checkpoint_path: Union[str, Path] = "checkpoints/ranker/best_ranker.pt",
-    output_report_path: Union[str, Path] = "checkpoints/evaluation_report.json",
+    output_report_path: Optional[Union[str, Path]] = None,
     device: Optional[str] = None,
     *,
     allow_test: bool = False,
+    allow_legacy_checkpoint: bool = True,
+    overwrite_report: bool = False,
 ) -> Dict[str, Any]:
     """Evaluate validation, and score test only with opt-in and a passing gate."""
     dev = get_device(device)
@@ -472,6 +477,7 @@ def run_full_evaluation(
 
     retriever_checkpoint_path = Path(retriever_checkpoint_path)
     retriever_digest = checkpoint_digest(retriever_checkpoint_path)
+    ranker_checkpoint_path = resolve_run_checkpoint(ranker_checkpoint_path)
     ranker_ckpt = torch.load(ranker_checkpoint_path, map_location="cpu")
     if (
         ranker_ckpt.get("retriever_digest") != retriever_digest
@@ -483,19 +489,13 @@ def run_full_evaluation(
         )
     heuristic_fraction = ranker_ckpt.get("heuristic_fraction", 0.0)
 
-    purchases_df = pd.read_csv(
-        "data/interim/cleaned_purchases.csv",
-        dtype={"customer_id": str, "product_id": str},
-        low_memory=False,
-    )
-    purchases_df["purchase_date"] = pd.to_datetime(purchases_df["purchase_date"], format="mixed")
-    all_purchases = purchases_df if allow_test else None
-    purchases_df = purchases_df.loc[purchases_df["purchase_date"] < TEST_START]
+    purchases_df = load_development_purchases("data/interim/cleaned_purchases.csv")
     catalogue_df = load_product_catalogue(get_datasets_locs("items"))
     companies_df = load_companies(purchases=purchases_df, minimum_purchases=1)
 
     retriever, vocabs = load_ranker_retriever(
         retriever_checkpoint_path, purchases_df, catalogue_df, companies_df, dev,
+        metadata_policy=ranker_ckpt.get("config", {}).get("pairwise_metadata_policy"),
     )
     rolling = retriever.rolling_pool is not None
     if ranker_ckpt.get("rolling_candidate_pool", False) != rolling:
@@ -508,6 +508,9 @@ def run_full_evaluation(
         num_pairwise_features=NUM_PAIRWISE_FEATURES,
         statistics_attention=ranker_ckpt.get("statistics_attention", False),
         excluded_statistics=tuple(ranker_ckpt.get("excluded_statistics", ())),
+        hidden_dim=ranker_ckpt.get("config", {}).get("hidden_dim", 128),
+        num_heads=ranker_ckpt.get("config", {}).get("num_heads", 4),
+        cached_only=ranker_ckpt.get("config", {}).get("cached_only", False),
     )
     ranker.load_state_dict(ranker_ckpt["model_state_dict"])
     ranker.eval()
@@ -522,9 +525,13 @@ def run_full_evaluation(
         company_cache_name=retriever.company_cache_name,
         rolling=rolling,
         product_inputs=retriever.product_inputs,
+        metadata_policy=ranker_ckpt.get("config", {}).get("pairwise_metadata_policy", "snapshot_unverified"),
     )
-    val_path = slate_cache_path("val", heuristic_fraction, rolling=rolling)
-    val_slates = load_slate_cache(val_path, f"{val_identity}:val")
+    val_path = slate_cache_path("val", heuristic_fraction, rolling=rolling, metadata_policy=ranker_ckpt.get("config", {}).get("pairwise_metadata_policy", "snapshot_unverified"))
+    provenance_mode = validate_ranker_provenance(ranker_ckpt, retriever_digest=retriever_digest,
+                                                  slate_identity=f"{val_identity}:val", allow_legacy=allow_legacy_checkpoint)
+    val_slates = load_slate_cache(val_path, f"{val_identity}:val", transitions=val_transitions,
+                                  product_ids=eligible_pids, split="val", candidates=50)
     if val_slates is None:
         slate_inputs = prepare_slate_inputs(
             retriever, retriever_checkpoint_path, purchases_df, catalogue_df, companies_df,
@@ -532,6 +539,11 @@ def run_full_evaluation(
         )
         slate_inputs["heuristic_fraction"] = heuristic_fraction
         val_slates = build_slate_cache(val_path, f"{val_identity}:val", val_transitions, slate_inputs)
+
+    validate_ranker_provenance(ranker_ckpt, retriever_digest=retriever_digest,
+                               slate_identity=f"{val_identity}:val",
+                               payload_digests={"val": val_slates["cache_payload_digest"]},
+                               allow_legacy=allow_legacy_checkpoint)
 
     print(f"Evaluating on Validation split ({len(val_transitions)} transitions)...")
     val_report = evaluate_split(
@@ -560,6 +572,7 @@ def run_full_evaluation(
 
     report: Dict[str, Any] = {
         "architecture_name": "Modular Two-Tower Retriever + Unified Profile-Sequence Candidate-Aware Neural Ranker (UPS-CANR)",
+        "checkpoint_provenance": provenance_mode,
         "heuristic_fraction": heuristic_fraction,
         "statistics_attention": ranker.statistics_attention_weights is not None,
         "excluded_statistics": list(ranker.excluded_statistics),
@@ -582,12 +595,15 @@ def run_full_evaluation(
         "validation": val_report,
     }
 
-    if validation_gate_passed and all_purchases is not None:
+    if validation_gate_passed and allow_test:
+        all_purchases = pd.read_csv("data/interim/cleaned_purchases.csv", dtype={"customer_id": str, "product_id": str}, low_memory=False)
+        all_purchases["purchase_date"] = pd.to_datetime(all_purchases["purchase_date"], format="mixed")
         _, _, test_transitions = build_retriever_transitions(all_purchases)
         print(f"Validation gate passed. Evaluating {len(test_transitions)} test transitions.")
         test_companies = load_companies(purchases=all_purchases, minimum_purchases=1)
         test_retriever, test_vocabs = load_ranker_retriever(
             retriever_checkpoint_path, all_purchases, catalogue_df, test_companies, dev,
+            metadata_policy=ranker_ckpt.get("config", {}).get("pairwise_metadata_policy"),
         )
         test_identity = slate_cache_identity(
             retriever_digest, retriever_checkpoint_path, all_purchases, catalogue_df, test_companies,
@@ -596,9 +612,11 @@ def run_full_evaluation(
             company_cache_name=test_retriever.company_cache_name,
             rolling=rolling,
             product_inputs=test_retriever.product_inputs,
+            metadata_policy=ranker_ckpt.get("config", {}).get("pairwise_metadata_policy", "snapshot_unverified"),
         )
-        test_path = slate_cache_path("test", heuristic_fraction, rolling=rolling)
-        test_slates = load_slate_cache(test_path, f"{test_identity}:test")
+        test_path = slate_cache_path("test", heuristic_fraction, rolling=rolling, metadata_policy=ranker_ckpt.get("config", {}).get("pairwise_metadata_policy", "snapshot_unverified"))
+        test_slates = load_slate_cache(test_path, f"{test_identity}:test", transitions=test_transitions,
+                                      product_ids=test_retriever.eligible_product_ids, split="test", candidates=50)
         if test_slates is None:
             slate_inputs = prepare_slate_inputs(
                 test_retriever, retriever_checkpoint_path, all_purchases, catalogue_df,
@@ -627,13 +645,26 @@ def run_full_evaluation(
     else:
         print("Validation gate passed. Held-out test evaluation requires explicit opt-in.")
 
-    out_path = Path(output_report_path)
+    out_path = (Path(output_report_path) if output_report_path is not None else
+                Path("checkpoints/evaluations") / f"{uuid4().hex}.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(report, f, indent=2)
+    atomic_json(report, out_path, overwrite=overwrite_report)
     print(f"Saved evaluation report to {out_path}")
     return report
 
 
+def main():
+    parser = argparse.ArgumentParser(description="Validation evaluation with explicit checkpoint provenance.")
+    parser.add_argument("--ranker-checkpoint", type=Path, default=Path("checkpoints/ranker/best_ranker.pt"))
+    parser.add_argument("--retriever-checkpoint", type=Path, default=Path("checkpoints/retriever-discovery-reference/best_retriever.pt"))
+    parser.add_argument("--output-report", type=Path, default=None)
+    parser.add_argument("--overwrite-report", action="store_true")
+    parser.add_argument("--strict-provenance", action="store_true", help="Reject legacy checkpoints without named contracts.")
+    args = parser.parse_args()
+    run_full_evaluation(ranker_checkpoint_path=args.ranker_checkpoint, retriever_checkpoint_path=args.retriever_checkpoint,
+                        output_report_path=args.output_report, overwrite_report=args.overwrite_report,
+                        allow_legacy_checkpoint=not args.strict_provenance)
+
+
 if __name__ == "__main__":
-    run_full_evaluation()
+    main()

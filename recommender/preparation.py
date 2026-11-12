@@ -2,6 +2,8 @@
 
 from collections.abc import Sequence
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+import os
 import tomllib
 
 import pandas as pd
@@ -57,3 +59,21 @@ def run_preparation(
         else:
             tables[stage] = load_purchases(paths[stage], items_path=paths["items"])
     return tables
+
+
+def export_purchases(table, path, *, overwrite=False):
+    """Export the prepared paid-sale table atomically; preserve existing output by default."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(mode="w", encoding="utf-8", newline="", dir=path.parent, delete=False) as temporary:
+        temporary_path = Path(temporary.name)
+        try:
+            table.to_csv(temporary, index=False, date_format="%Y-%m-%d")
+            temporary.flush()
+            if overwrite:
+                temporary_path.replace(path)
+            else:
+                os.link(temporary_path, path)  # Atomic exclusive publication, same filesystem.
+        finally:
+            temporary_path.unlink(missing_ok=True)
+    return path
