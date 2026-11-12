@@ -1,0 +1,4342 @@
+{
+  "stage1": {
+    "C0-seed42": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "C0",
+        "spec": {
+          "name": "C0",
+          "text_recipe": "c0_s0",
+          "product_embeddings": [],
+          "customer_embeddings": [],
+          "is_control": true
+        },
+        "seed": 42,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "e1_e5_retrieval_v1_reference",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 13,
+      "metrics": {
+        "val_recall@10": 0.3535370974163704,
+        "val_ndcg@10": 0.21619375978142394,
+        "new_hits@10": 321,
+        "new_recall@10": 0.172859450726979,
+        "new_hits@25": 707,
+        "new_hits@50": 1005,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3807215939687668,
+        "stage1_new_recall@50": 0.5411954765751211
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 192,
+          "recall@25": 0.3735408560311284,
+          "hits@50": 284,
+          "recall@50": 0.5525291828793775
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 515,
+          "recall@25": 0.383469843633656,
+          "hits@50": 721,
+          "recall@50": 0.5368577810871183
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 194,
+          "recall@25": 0.3688212927756654,
+          "hits@50": 289,
+          "recall@50": 0.5494296577946768
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 513,
+          "recall@25": 0.3854244928625094,
+          "hits@50": 716,
+          "recall@50": 0.5379413974455297
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 707,
+          "recall@25": 0.3813376483279396,
+          "hits@50": 1005,
+          "recall@50": 0.5420711974110033
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 707,
+          "recall@25": 0.381955699621826,
+          "hits@50": 1005,
+          "recall@50": 0.5429497568881686
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 44.50858249999874,
+      "parameters": 825133,
+      "trainable_parameters": 825133,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-C0-seed42/best.pt"
+    },
+    "T1-seed42": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "T1",
+        "spec": {
+          "name": "T1",
+          "text_recipe": "t1",
+          "product_embeddings": [],
+          "customer_embeddings": [],
+          "is_control": false
+        },
+        "seed": 42,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "088e89dc3acb3f8dc6c5f43370598670031ac794889c1dbc66ddcc2c5024dbf7",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 13,
+      "metrics": {
+        "val_recall@10": 0.3506628650961681,
+        "val_ndcg@10": 0.2136112624081674,
+        "new_hits@10": 322,
+        "new_recall@10": 0.17339795368874528,
+        "new_hits@25": 702,
+        "new_hits@50": 1009,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3780290791599354,
+        "stage1_new_recall@50": 0.5433494884221863
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 190,
+          "recall@25": 0.36964980544747084,
+          "hits@50": 285,
+          "recall@50": 0.5544747081712063
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 512,
+          "recall@25": 0.3812360387192852,
+          "hits@50": 724,
+          "recall@50": 0.5390915860014892
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 192,
+          "recall@25": 0.3650190114068441,
+          "hits@50": 291,
+          "recall@50": 0.5532319391634981
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 510,
+          "recall@25": 0.38317054845980464,
+          "hits@50": 718,
+          "recall@50": 0.5394440270473329
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 702,
+          "recall@25": 0.3786407766990291,
+          "hits@50": 1009,
+          "recall@50": 0.5442286947141316
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 702,
+          "recall@25": 0.37925445705024313,
+          "hits@50": 1009,
+          "recall@50": 0.5451107509454349
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 44.08657266700175,
+      "parameters": 825133,
+      "trainable_parameters": 825133,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-T1-seed42/best.pt"
+    },
+    "T2-seed42": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "T2",
+        "spec": {
+          "name": "T2",
+          "text_recipe": "t2",
+          "product_embeddings": [],
+          "customer_embeddings": [],
+          "is_control": false
+        },
+        "seed": 42,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "ce377673c2fee204cf6c025201fcdd595325ea615eeef8ba0ab2cc967293dae0",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 19,
+      "metrics": {
+        "val_recall@10": 0.34196371742130016,
+        "val_ndcg@10": 0.2065251702122722,
+        "new_hits@10": 307,
+        "new_recall@10": 0.16532040926225094,
+        "new_hits@25": 703,
+        "new_hits@50": 985,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.37856758212170166,
+        "stage1_new_recall@50": 0.5304254173397954
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 187,
+          "recall@25": 0.3638132295719844,
+          "hits@50": 269,
+          "recall@50": 0.5233463035019456
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 516,
+          "recall@25": 0.3842144452717796,
+          "hits@50": 716,
+          "recall@50": 0.5331347728965004
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 187,
+          "recall@25": 0.35551330798479086,
+          "hits@50": 272,
+          "recall@50": 0.5171102661596958
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 516,
+          "recall@25": 0.3876784372652141,
+          "hits@50": 713,
+          "recall@50": 0.535687453042825
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 703,
+          "recall@25": 0.37918015102481123,
+          "hits@50": 985,
+          "recall@50": 0.5312837108953614
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 703,
+          "recall@25": 0.3797947055645597,
+          "hits@50": 985,
+          "recall@50": 0.5321447866018368
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 43.83131200000935,
+      "parameters": 825133,
+      "trainable_parameters": 825133,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-T2-seed42/best.pt"
+    },
+    "A-seed42": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "A",
+        "spec": {
+          "name": "A",
+          "text_recipe": "t2",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand"
+          ],
+          "customer_embeddings": [],
+          "is_control": false
+        },
+        "seed": 42,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "ce377673c2fee204cf6c025201fcdd595325ea615eeef8ba0ab2cc967293dae0",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 23,
+      "metrics": {
+        "val_recall@10": 0.3617732267637903,
+        "val_ndcg@10": 0.21943883221323104,
+        "new_hits@10": 323,
+        "new_recall@10": 0.17393645665051158,
+        "new_hits@25": 711,
+        "new_hits@50": 1001,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.38287560581583197,
+        "stage1_new_recall@50": 0.539041464728056
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 186,
+          "recall@25": 0.36186770428015563,
+          "hits@50": 286,
+          "recall@50": 0.556420233463035
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 525,
+          "recall@25": 0.39091586001489204,
+          "hits@50": 715,
+          "recall@50": 0.5323901712583767
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 187,
+          "recall@25": 0.35551330798479086,
+          "hits@50": 289,
+          "recall@50": 0.5494296577946768
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 524,
+          "recall@25": 0.39368895567242673,
+          "hits@50": 712,
+          "recall@50": 0.5349361382419233
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 711,
+          "recall@25": 0.38349514563106796,
+          "hits@50": 1001,
+          "recall@50": 0.5399137001078749
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 711,
+          "recall@25": 0.3841166936790924,
+          "hits@50": 1001,
+          "recall@50": 0.5407887628309023
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 44.71244399998977,
+      "parameters": 842925,
+      "trainable_parameters": 842925,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-A-seed42/best.pt"
+    },
+    "F_emb-seed42": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "F_emb",
+        "spec": {
+          "name": "F_emb",
+          "text_recipe": "t2",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand",
+            "product_family"
+          ],
+          "customer_embeddings": [],
+          "is_control": false
+        },
+        "seed": 42,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "ce377673c2fee204cf6c025201fcdd595325ea615eeef8ba0ab2cc967293dae0",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 20,
+      "metrics": {
+        "val_recall@10": 0.3725379994506868,
+        "val_ndcg@10": 0.22469000152729462,
+        "new_hits@10": 315,
+        "new_recall@10": 0.16962843295638125,
+        "new_hits@25": 704,
+        "new_hits@50": 1009,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.37910608508346794,
+        "stage1_new_recall@50": 0.5433494884221863
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 186,
+          "recall@25": 0.36186770428015563,
+          "hits@50": 285,
+          "recall@50": 0.5544747081712063
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 518,
+          "recall@25": 0.3857036485480268,
+          "hits@50": 724,
+          "recall@50": 0.5390915860014892
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 186,
+          "recall@25": 0.35361216730038025,
+          "hits@50": 288,
+          "recall@50": 0.5475285171102662
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 518,
+          "recall@25": 0.38918106686701726,
+          "hits@50": 721,
+          "recall@50": 0.5416979714500376
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 704,
+          "recall@25": 0.37971952535059333,
+          "hits@50": 1009,
+          "recall@50": 0.5442286947141316
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 704,
+          "recall@25": 0.3803349540788763,
+          "hits@50": 1009,
+          "recall@50": 0.5451107509454349
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 45.44340558401018,
+      "parameters": 847837,
+      "trainable_parameters": 847837,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-F_emb-seed42/best.pt"
+    },
+    "F_txt-seed42": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "F_txt",
+        "spec": {
+          "name": "F_txt",
+          "text_recipe": "t2_fam",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand"
+          ],
+          "customer_embeddings": [],
+          "is_control": false
+        },
+        "seed": 42,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "a985caea24b02078a7c2644fdf8571f3b2f156b23c49187159c2270a7291fcf6",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 13,
+      "metrics": {
+        "val_recall@10": 0.35570030791851087,
+        "val_ndcg@10": 0.21707186046733554,
+        "new_hits@10": 311,
+        "new_recall@10": 0.1674744211093161,
+        "new_hits@25": 709,
+        "new_hits@50": 1004,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3817985998922994,
+        "stage1_new_recall@50": 0.5406569736133549
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 204,
+          "recall@25": 0.3968871595330739,
+          "hits@50": 292,
+          "recall@50": 0.5680933852140078
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 505,
+          "recall@25": 0.37602382725241995,
+          "hits@50": 712,
+          "recall@50": 0.530156366344006
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 205,
+          "recall@25": 0.3897338403041825,
+          "hits@50": 296,
+          "recall@50": 0.5627376425855514
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 504,
+          "recall@25": 0.3786626596543952,
+          "hits@50": 708,
+          "recall@50": 0.531930879038317
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 709,
+          "recall@25": 0.3824163969795038,
+          "hits@50": 1004,
+          "recall@50": 0.5415318230852212
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 709,
+          "recall@25": 0.38303619665045924,
+          "hits@50": 1004,
+          "recall@50": 0.5424095083738519
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 47.29064862499945,
+      "parameters": 842925,
+      "trainable_parameters": 842925,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-F_txt-seed42/best.pt"
+    },
+    "P-seed42": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "P",
+        "spec": {
+          "name": "P",
+          "text_recipe": "t2_fam",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand",
+            "tier",
+            "unit",
+            "country_of_origin"
+          ],
+          "customer_embeddings": [],
+          "is_control": false
+        },
+        "seed": 42,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "a985caea24b02078a7c2644fdf8571f3b2f156b23c49187159c2270a7291fcf6",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 20,
+      "metrics": {
+        "val_recall@10": 0.3758595989425546,
+        "val_ndcg@10": 0.2254295226733761,
+        "new_hits@10": 302,
+        "new_recall@10": 0.1626278944534195,
+        "new_hits@25": 725,
+        "new_hits@50": 1017,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.39041464728056,
+        "stage1_new_recall@50": 0.5476575121163166
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 190,
+          "recall@25": 0.36964980544747084,
+          "hits@50": 277,
+          "recall@50": 0.5389105058365758
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 535,
+          "recall@25": 0.3983618763961281,
+          "hits@50": 740,
+          "recall@50": 0.5510052122114668
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 191,
+          "recall@25": 0.36311787072243346,
+          "hits@50": 279,
+          "recall@50": 0.5304182509505704
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 534,
+          "recall@25": 0.40120210368144255,
+          "hits@50": 738,
+          "recall@50": 0.5544703230653644
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 725,
+          "recall@25": 0.39104638619201726,
+          "hits@50": 1017,
+          "recall@50": 0.5485436893203883
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 725,
+          "recall@25": 0.39168017287952456,
+          "hits@50": 1017,
+          "recall@50": 0.5494327390599676
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 49.340147083988995,
+      "parameters": 855613,
+      "trainable_parameters": 855613,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-P-seed42/best.pt"
+    },
+    "P_no_unit-seed42": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "P_no_unit",
+        "spec": {
+          "name": "P_no_unit",
+          "text_recipe": "t2_fam",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand",
+            "tier",
+            "country_of_origin"
+          ],
+          "customer_embeddings": [],
+          "is_control": false
+        },
+        "seed": 42,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "a985caea24b02078a7c2644fdf8571f3b2f156b23c49187159c2270a7291fcf6",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 17,
+      "metrics": {
+        "val_recall@10": 0.3642264730167161,
+        "val_ndcg@10": 0.21754186889433316,
+        "new_hits@10": 309,
+        "new_recall@10": 0.16639741518578352,
+        "new_hits@25": 715,
+        "new_hits@50": 985,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3850296176628972,
+        "stage1_new_recall@50": 0.5304254173397954
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 160,
+          "recall@25": 0.311284046692607,
+          "hits@50": 253,
+          "recall@50": 0.49221789883268485
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 555,
+          "recall@25": 0.41325390915860016,
+          "hits@50": 732,
+          "recall@50": 0.5450483991064781
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 164,
+          "recall@25": 0.311787072243346,
+          "hits@50": 257,
+          "recall@50": 0.48859315589353614
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 551,
+          "recall@25": 0.41397445529676935,
+          "hits@50": 728,
+          "recall@50": 0.5469571750563486
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 715,
+          "recall@25": 0.3856526429341963,
+          "hits@50": 985,
+          "recall@50": 0.5312837108953614
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 715,
+          "recall@25": 0.38627768773635873,
+          "hits@50": 985,
+          "recall@50": 0.5321447866018368
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 49.293833666000864,
+      "parameters": 851437,
+      "trainable_parameters": 851437,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-P_no_unit-seed42/best.pt"
+    },
+    "U0-seed42": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "U0",
+        "spec": {
+          "name": "U0",
+          "text_recipe": "t2_fam",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand",
+            "tier",
+            "unit",
+            "country_of_origin"
+          ],
+          "customer_embeddings": [
+            "sales_branch"
+          ],
+          "is_control": false
+        },
+        "seed": 42,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "a985caea24b02078a7c2644fdf8571f3b2f156b23c49187159c2270a7291fcf6",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 20,
+      "metrics": {
+        "val_recall@10": 0.3641492355967528,
+        "val_ndcg@10": 0.22078456508108482,
+        "new_hits@10": 310,
+        "new_recall@10": 0.16693591814754982,
+        "new_hits@25": 715,
+        "new_hits@50": 1015,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3850296176628972,
+        "stage1_new_recall@50": 0.5465805061927841
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 193,
+          "recall@25": 0.3754863813229572,
+          "hits@50": 282,
+          "recall@50": 0.5486381322957199
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 522,
+          "recall@25": 0.38868205510052123,
+          "hits@50": 733,
+          "recall@50": 0.5457930007446017
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 196,
+          "recall@25": 0.3726235741444867,
+          "hits@50": 285,
+          "recall@50": 0.5418250950570342
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 519,
+          "recall@25": 0.3899323816679189,
+          "hits@50": 730,
+          "recall@50": 0.5484598046581518
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 715,
+          "recall@25": 0.3856526429341963,
+          "hits@50": 1015,
+          "recall@50": 0.5474649406688241
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 715,
+          "recall@25": 0.38627768773635873,
+          "hits@50": 1015,
+          "recall@50": 0.5483522420313344
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 49.78971891700348,
+      "parameters": 857773,
+      "trainable_parameters": 857773,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-U0-seed42/best.pt"
+    },
+    "U1-seed42": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "U1",
+        "spec": {
+          "name": "U1",
+          "text_recipe": "t2_fam",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand",
+            "tier",
+            "unit",
+            "country_of_origin"
+          ],
+          "customer_embeddings": [
+            "sales_branch",
+            "vat_status"
+          ],
+          "is_control": false
+        },
+        "seed": 42,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "a985caea24b02078a7c2644fdf8571f3b2f156b23c49187159c2270a7291fcf6",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 20,
+      "metrics": {
+        "val_recall@10": 0.3698652120341287,
+        "val_ndcg@10": 0.22126773149031478,
+        "new_hits@10": 321,
+        "new_recall@10": 0.172859450726979,
+        "new_hits@25": 719,
+        "new_hits@50": 1006,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3871836295099623,
+        "stage1_new_recall@50": 0.5417339795368874
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 194,
+          "recall@25": 0.377431906614786,
+          "hits@50": 272,
+          "recall@50": 0.5291828793774319
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 525,
+          "recall@25": 0.39091586001489204,
+          "hits@50": 734,
+          "recall@50": 0.5465376023827252
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 195,
+          "recall@25": 0.37072243346007605,
+          "hits@50": 274,
+          "recall@50": 0.5209125475285171
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 524,
+          "recall@25": 0.39368895567242673,
+          "hits@50": 732,
+          "recall@50": 0.549962434259955
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 719,
+          "recall@25": 0.3878101402373247,
+          "hits@50": 1006,
+          "recall@50": 0.5426105717367853
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 719,
+          "recall@25": 0.38843868179362506,
+          "hits@50": 1006,
+          "recall@50": 0.5434900054024852
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 50.35756291699363,
+      "parameters": 859901,
+      "trainable_parameters": 859901,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-U1-seed42/best.pt"
+    },
+    "C0-seed17": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "C0",
+        "spec": {
+          "name": "C0",
+          "text_recipe": "c0_s0",
+          "product_embeddings": [],
+          "customer_embeddings": [],
+          "is_control": true
+        },
+        "seed": 17,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "e1_e5_retrieval_v1_reference",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 20,
+      "metrics": {
+        "val_recall@10": 0.3742407615621279,
+        "val_ndcg@10": 0.22185459358186171,
+        "new_hits@10": 345,
+        "new_recall@10": 0.18578352180936994,
+        "new_hits@25": 735,
+        "new_hits@50": 976,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.39579967689822293,
+        "stage1_new_recall@50": 0.5255788906838987
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 195,
+          "recall@25": 0.37937743190661477,
+          "hits@50": 265,
+          "recall@50": 0.5155642023346303
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 540,
+          "recall@25": 0.40208488458674607,
+          "hits@50": 711,
+          "recall@50": 0.5294117647058824
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 196,
+          "recall@25": 0.3726235741444867,
+          "hits@50": 269,
+          "recall@50": 0.5114068441064639
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 539,
+          "recall@25": 0.4049586776859504,
+          "hits@50": 707,
+          "recall@50": 0.5311795642374155
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 735,
+          "recall@25": 0.3964401294498382,
+          "hits@50": 976,
+          "recall@50": 0.5264293419633226
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 735,
+          "recall@25": 0.39708265802269044,
+          "hits@50": 976,
+          "recall@50": 0.5272825499729876
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 45.46319729099923,
+      "parameters": 825133,
+      "trainable_parameters": 825133,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-C0-seed17/best.pt"
+    },
+    "C0-seed2026": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "C0",
+        "spec": {
+          "name": "C0",
+          "text_recipe": "c0_s0",
+          "product_embeddings": [],
+          "customer_embeddings": [],
+          "is_control": true
+        },
+        "seed": 2026,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "e1_e5_retrieval_v1_reference",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 21,
+      "metrics": {
+        "val_recall@10": 0.3605235328836652,
+        "val_ndcg@10": 0.21157776598199163,
+        "new_hits@10": 330,
+        "new_recall@10": 0.1777059773828756,
+        "new_hits@25": 715,
+        "new_hits@50": 959,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3850296176628972,
+        "stage1_new_recall@50": 0.5164243403338719
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 196,
+          "recall@25": 0.38132295719844356,
+          "hits@50": 272,
+          "recall@50": 0.5291828793774319
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 519,
+          "recall@25": 0.3864482501861504,
+          "hits@50": 687,
+          "recall@50": 0.5115413253909159
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 198,
+          "recall@25": 0.376425855513308,
+          "hits@50": 276,
+          "recall@50": 0.5247148288973384
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 517,
+          "recall@25": 0.3884297520661157,
+          "hits@50": 683,
+          "recall@50": 0.5131480090157776
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 715,
+          "recall@25": 0.3856526429341963,
+          "hits@50": 959,
+          "recall@50": 0.517259978425027
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 715,
+          "recall@25": 0.38627768773635873,
+          "hits@50": 959,
+          "recall@50": 0.5180983252296056
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 44.811357790997135,
+      "parameters": 825133,
+      "trainable_parameters": 825133,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-C0-seed2026/best.pt"
+    },
+    "U0-seed17": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "U0",
+        "spec": {
+          "name": "U0",
+          "text_recipe": "t2_fam",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand",
+            "tier",
+            "unit",
+            "country_of_origin"
+          ],
+          "customer_embeddings": [
+            "sales_branch"
+          ],
+          "is_control": false
+        },
+        "seed": 17,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "a985caea24b02078a7c2644fdf8571f3b2f156b23c49187159c2270a7291fcf6",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 19,
+      "metrics": {
+        "val_recall@10": 0.37087245069524094,
+        "val_ndcg@10": 0.22677006487016402,
+        "new_hits@10": 305,
+        "new_recall@10": 0.16424340333871837,
+        "new_hits@25": 729,
+        "new_hits@50": 1010,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3925686591276252,
+        "stage1_new_recall@50": 0.5438879913839526
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 182,
+          "recall@25": 0.3540856031128405,
+          "hits@50": 272,
+          "recall@50": 0.5291828793774319
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 547,
+          "recall@25": 0.4072970960536113,
+          "hits@50": 738,
+          "recall@50": 0.5495160089352197
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 183,
+          "recall@25": 0.34790874524714827,
+          "hits@50": 275,
+          "recall@50": 0.5228136882129277
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 546,
+          "recall@25": 0.41021788129226144,
+          "hits@50": 735,
+          "recall@50": 0.5522163786626596
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 729,
+          "recall@25": 0.3932038834951456,
+          "hits@50": 1010,
+          "recall@50": 0.5447680690399137
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 729,
+          "recall@25": 0.39384116693679094,
+          "hits@50": 1010,
+          "recall@50": 0.5456509994597515
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 49.231434082990745,
+      "parameters": 857773,
+      "trainable_parameters": 857773,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-U0-seed17/best.pt"
+    },
+    "U0-seed2026": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "U0",
+        "spec": {
+          "name": "U0",
+          "text_recipe": "t2_fam",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand",
+            "tier",
+            "unit",
+            "country_of_origin"
+          ],
+          "customer_embeddings": [
+            "sales_branch"
+          ],
+          "is_control": false
+        },
+        "seed": 2026,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "a985caea24b02078a7c2644fdf8571f3b2f156b23c49187159c2270a7291fcf6",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 16,
+      "metrics": {
+        "val_recall@10": 0.3755401006120429,
+        "val_ndcg@10": 0.2262093167065303,
+        "new_hits@10": 344,
+        "new_recall@10": 0.18524501884760367,
+        "new_hits@25": 750,
+        "new_hits@50": 1044,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.40387722132471726,
+        "stage1_new_recall@50": 0.5621970920840065
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 204,
+          "recall@25": 0.3968871595330739,
+          "hits@50": 286,
+          "recall@50": 0.556420233463035
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 546,
+          "recall@25": 0.40655249441548774,
+          "hits@50": 758,
+          "recall@50": 0.5644080416976918
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 206,
+          "recall@25": 0.3916349809885932,
+          "hits@50": 291,
+          "recall@50": 0.5532319391634981
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 544,
+          "recall@25": 0.4087152516904583,
+          "hits@50": 753,
+          "recall@50": 0.5657400450788881
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 750,
+          "recall@25": 0.4045307443365696,
+          "hits@50": 1044,
+          "recall@50": 0.5631067961165048
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 750,
+          "recall@25": 0.4051863857374392,
+          "hits@50": 1044,
+          "recall@50": 0.5640194489465153
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 54.7440482910024,
+      "parameters": 857773,
+      "trainable_parameters": 857773,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-U0-seed2026/best.pt"
+    },
+    "U1-seed17": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "U1",
+        "spec": {
+          "name": "U1",
+          "text_recipe": "t2_fam",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand",
+            "tier",
+            "unit",
+            "country_of_origin"
+          ],
+          "customer_embeddings": [
+            "sales_branch",
+            "vat_status"
+          ],
+          "is_control": false
+        },
+        "seed": 17,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "a985caea24b02078a7c2644fdf8571f3b2f156b23c49187159c2270a7291fcf6",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 18,
+      "metrics": {
+        "val_recall@10": 0.36875125004168435,
+        "val_ndcg@10": 0.2256795566368796,
+        "new_hits@10": 327,
+        "new_recall@10": 0.17609046849757673,
+        "new_hits@25": 725,
+        "new_hits@50": 1023,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.39041464728056,
+        "stage1_new_recall@50": 0.5508885298869144
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 185,
+          "recall@25": 0.35992217898832685,
+          "hits@50": 267,
+          "recall@50": 0.519455252918288
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 540,
+          "recall@25": 0.40208488458674607,
+          "hits@50": 756,
+          "recall@50": 0.5629188384214445
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 187,
+          "recall@25": 0.35551330798479086,
+          "hits@50": 271,
+          "recall@50": 0.5152091254752852
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 538,
+          "recall@25": 0.4042073628850488,
+          "hits@50": 752,
+          "recall@50": 0.5649887302779865
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 725,
+          "recall@25": 0.39104638619201726,
+          "hits@50": 1023,
+          "recall@50": 0.551779935275081
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 725,
+          "recall@25": 0.39168017287952456,
+          "hits@50": 1023,
+          "recall@50": 0.5526742301458671
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 54.3498090840003,
+      "parameters": 859901,
+      "trainable_parameters": 859901,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-U1-seed17/best.pt"
+    },
+    "U1-seed2026": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "U1",
+        "spec": {
+          "name": "U1",
+          "text_recipe": "t2_fam",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand",
+            "tier",
+            "unit",
+            "country_of_origin"
+          ],
+          "customer_embeddings": [
+            "sales_branch",
+            "vat_status"
+          ],
+          "is_control": false
+        },
+        "seed": 2026,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "a985caea24b02078a7c2644fdf8571f3b2f156b23c49187159c2270a7291fcf6",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 21,
+      "metrics": {
+        "val_recall@10": 0.3650935854086225,
+        "val_ndcg@10": 0.2164979884459065,
+        "new_hits@10": 306,
+        "new_recall@10": 0.16478190630048464,
+        "new_hits@25": 741,
+        "new_hits@50": 996,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3990306946688207,
+        "stage1_new_recall@50": 0.5363489499192245
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 206,
+          "recall@25": 0.40077821011673154,
+          "hits@50": 279,
+          "recall@50": 0.5428015564202334
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 535,
+          "recall@25": 0.3983618763961281,
+          "hits@50": 717,
+          "recall@50": 0.533879374534624
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 207,
+          "recall@25": 0.3935361216730038,
+          "hits@50": 283,
+          "recall@50": 0.5380228136882129
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 534,
+          "recall@25": 0.40120210368144255,
+          "hits@50": 713,
+          "recall@50": 0.535687453042825
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 741,
+          "recall@25": 0.39967637540453077,
+          "hits@50": 996,
+          "recall@50": 0.5372168284789643
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 741,
+          "recall@25": 0.40032414910858993,
+          "hits@50": 996,
+          "recall@50": 0.5380875202593193
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 53.98452629199892,
+      "parameters": 859901,
+      "trainable_parameters": 859901,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-U1-seed2026/best.pt"
+    },
+    "P-seed17": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "P",
+        "spec": {
+          "name": "P",
+          "text_recipe": "t2_fam",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand",
+            "tier",
+            "unit",
+            "country_of_origin"
+          ],
+          "customer_embeddings": [],
+          "is_control": false
+        },
+        "seed": 17,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "a985caea24b02078a7c2644fdf8571f3b2f156b23c49187159c2270a7291fcf6",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 23,
+      "metrics": {
+        "val_recall@10": 0.36492050416199645,
+        "val_ndcg@10": 0.22114129508453895,
+        "new_hits@10": 321,
+        "new_recall@10": 0.172859450726979,
+        "new_hits@25": 733,
+        "new_hits@50": 1006,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3947226709746904,
+        "stage1_new_recall@50": 0.5417339795368874
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 205,
+          "recall@25": 0.39883268482490275,
+          "hits@50": 294,
+          "recall@50": 0.5719844357976653
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 528,
+          "recall@25": 0.39314966492926284,
+          "hits@50": 712,
+          "recall@50": 0.530156366344006
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 206,
+          "recall@25": 0.3916349809885932,
+          "hits@50": 296,
+          "recall@50": 0.5627376425855514
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 527,
+          "recall@25": 0.3959429000751315,
+          "hits@50": 710,
+          "recall@50": 0.5334335086401202
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 733,
+          "recall@25": 0.395361380798274,
+          "hits@50": 1006,
+          "recall@50": 0.5426105717367853
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 733,
+          "recall@25": 0.3960021609940573,
+          "hits@50": 1006,
+          "recall@50": 0.5434900054024852
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 54.294629084004555,
+      "parameters": 855613,
+      "trainable_parameters": 855613,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-P-seed17/best.pt"
+    },
+    "P-seed2026": {
+      "settings": {
+        "stage": "stage1",
+        "variant": "P",
+        "spec": {
+          "name": "P",
+          "text_recipe": "t2_fam",
+          "product_embeddings": [
+            "category",
+            "subcategory",
+            "business_line",
+            "brand",
+            "tier",
+            "unit",
+            "country_of_origin"
+          ],
+          "customer_embeddings": [],
+          "is_control": false
+        },
+        "seed": 2026,
+        "epochs": 30,
+        "identity": "e3e5-v1:no-demand:scratch:shared1:af0984dc67cabee0b6bce7e6a0e4de0209785923ec90f6f04d74274e32a1fef6:ca0df79886d1b8a8d4e8fecd40cb9ff49f3e238f7aeb4542b980ec5ab5aae92d:7cc219c9a3f2c43a9dacc1037e14bb83cce05539fc304688a87fb260aa6c8aa9",
+        "enrichment_identity": "7c5484417374ec567c10f16429b8d65639a12b2c3d6d45e6fdb8b15ed4da9d75",
+        "text_recipe_hash": "a985caea24b02078a7c2644fdf8571f3b2f156b23c49187159c2270a7291fcf6",
+        "batch_size": 256,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "pos_weight": 20.0,
+        "selection": "new_hits@25, then new_hits@50; first epoch wins ties",
+        "demand_policy": "disabled_v1",
+        "metadata_policy": "snapshot_unverified",
+        "initialization": "scratch"
+      },
+      "selected_epoch": 16,
+      "metrics": {
+        "val_recall@10": 0.35677189189896513,
+        "val_ndcg@10": 0.21432495789450964,
+        "new_hits@10": 336,
+        "new_recall@10": 0.18093699515347333,
+        "new_hits@25": 743,
+        "new_hits@50": 1038,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.40010770059235323,
+        "stage1_new_recall@50": 0.5589660743134087
+      },
+      "cohorts": {
+        "with_description_nonempty": {
+          "targets": 514,
+          "hits@25": 217,
+          "recall@25": 0.42217898832684825,
+          "hits@50": 303,
+          "recall@50": 0.5894941634241245
+        },
+        "without_description_nonempty": {
+          "targets": 1343,
+          "hits@25": 526,
+          "recall@25": 0.39166046165301566,
+          "hits@50": 735,
+          "recall@50": 0.5472822040208488
+        },
+        "in_description_csv": {
+          "targets": 526,
+          "hits@25": 217,
+          "recall@25": 0.41254752851711024,
+          "hits@50": 305,
+          "recall@50": 0.5798479087452472
+        },
+        "not_in_description_csv": {
+          "targets": 1331,
+          "hits@25": 526,
+          "recall@25": 0.39519158527422993,
+          "hits@50": 733,
+          "recall@50": 0.5507137490608565
+        },
+        "brand_present": {
+          "targets": 1854,
+          "hits@25": 743,
+          "recall@25": 0.4007551240560949,
+          "hits@50": 1038,
+          "recall@50": 0.5598705501618123
+        },
+        "brand_missing": {
+          "targets": 3,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        },
+        "family_present": {
+          "targets": 1851,
+          "hits@25": 743,
+          "recall@25": 0.4014046461372231,
+          "hits@50": 1038,
+          "recall@50": 0.5607779578606159
+        },
+        "family_missing": {
+          "targets": 6,
+          "hits@25": 0,
+          "recall@25": 0.0,
+          "hits@50": 0,
+          "recall@50": 0.0
+        }
+      },
+      "training_seconds": 54.43162879199372,
+      "parameters": 855613,
+      "trainable_parameters": 855613,
+      "device": "mps",
+      "training_discovery_rows": 8465,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/stage1-P-seed2026/best.pt"
+    }
+  },
+  "downstream": {
+    "C0-dot100-control-seed42": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "C0",
+        "mode": "control",
+        "policy": "quota100_50",
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "18076fb11f746fbf7ab0471db58486fc57110333bc4a744f4c7e9289b9617155",
+        "train_slate_identity": "4b0bdafd8352cf5dd090ffbef41192be122e395518d23ae22d5a3f78689a686e",
+        "val_slate_identity": "d6f2018cfcf6fc9c4de6cba225ce79e782a18be4be1b3c3394d5eb4b1bdc36bf",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 10,
+      "metrics": {
+        "recall@5": 0.6493151020838708,
+        "recall@10": 0.762125272298784,
+        "ndcg@10": 0.5938008147055561,
+        "mrr": 0.5740623136886858,
+        "new_hits@10": 217,
+        "new_targets": 1857,
+        "new_recall@10": 0.11685514270328487,
+        "conditional_new_recall@10": 0.1715415019762846,
+        "repeat_recall@10_micro": 0.8871599952488419,
+        "repeat_recall@10_macro": 0.9151804971431952,
+        "mixed_coverage_macro": 0.934308011873812,
+        "mixed_coverage_micro": 0.9394706111327364,
+        "new_targets_in_slate": 1265,
+        "new_slate_coverage": 0.6812062466343565,
+        "new_reachable_lost_at10": 1048,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.7038253114866018,
+            "new_hits@10": 140,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.7979084659809217,
+            "new_hits@10": 67,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7622375288304919,
+            "new_hits@10": 10,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7561591426999843,
+            "ndcg@10": 0.5867333997325697,
+            "new_hits@10": 61,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7745604302681929,
+            "ndcg@10": 0.603441127072669,
+            "new_hits@10": 51,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7812371852720784,
+            "ndcg@10": 0.6103370693569455,
+            "new_hits@10": 44,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7442855954605302,
+            "ndcg@10": 0.5749649697090128,
+            "new_hits@10": 33,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7462370487074046,
+            "ndcg@10": 0.5911952883599149,
+            "new_hits@10": 28,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 57
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 160
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 9
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 208
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 94
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 123
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 866313,
+      "trainable_parameters": 664329,
+      "training_seconds": 133.80976162500156,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-C0-dot100-control-seed42/best.pt"
+    },
+    "C0-dot100-dynamic_features-seed42": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "C0",
+        "mode": "dynamic_features",
+        "policy": "quota100_50",
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "18076fb11f746fbf7ab0471db58486fc57110333bc4a744f4c7e9289b9617155",
+        "train_slate_identity": "4b0bdafd8352cf5dd090ffbef41192be122e395518d23ae22d5a3f78689a686e",
+        "val_slate_identity": "d6f2018cfcf6fc9c4de6cba225ce79e782a18be4be1b3c3394d5eb4b1bdc36bf",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 5,
+      "metrics": {
+        "recall@5": 0.6518318063813859,
+        "recall@10": 0.7627766000983917,
+        "ndcg@10": 0.5951649260348472,
+        "mrr": 0.5762281046377224,
+        "new_hits@10": 230,
+        "new_targets": 1857,
+        "new_recall@10": 0.12385568120624664,
+        "conditional_new_recall@10": 0.18181818181818182,
+        "repeat_recall@10_micro": 0.8849031951538188,
+        "repeat_recall@10_macro": 0.9140201045786666,
+        "mixed_coverage_macro": 0.934308011873812,
+        "mixed_coverage_micro": 0.9394706111327364,
+        "new_targets_in_slate": 1265,
+        "new_slate_coverage": 0.6812062466343565,
+        "new_reachable_lost_at10": 1035,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.720820532514081,
+            "new_hits@10": 160,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.7997841483737501,
+            "new_hits@10": 64,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7566282450761209,
+            "new_hits@10": 6,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7572712851642307,
+            "ndcg@10": 0.5936809849289658,
+            "new_hits@10": 59,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7722782312394185,
+            "ndcg@10": 0.6009631469517928,
+            "new_hits@10": 49,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7819390087011746,
+            "ndcg@10": 0.612566248603346,
+            "new_hits@10": 51,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.741353960805658,
+            "ndcg@10": 0.571115818573386,
+            "new_hits@10": 37,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7563198403119352,
+            "ndcg@10": 0.5936729913580064,
+            "new_hits@10": 34,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 55
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 175
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 7
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 223
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 84
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 146
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 1017482,
+      "trainable_parameters": 815498,
+      "training_seconds": 145.76770516700344,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-C0-dot100-dynamic_features-seed42/best.pt"
+    },
+    "C0-dot100-control-seed17": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "C0",
+        "mode": "control",
+        "policy": "quota100_50",
+        "seed": 17,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "b426aff23c614bebf329d3f343568457fe1668b29d64c61fb18642beba97c80a",
+        "train_slate_identity": "11d2bb2daaadb5f07bcc0e4d259fdcb3bea2a6be5a0357d82d1dc4e7fa6869cf",
+        "val_slate_identity": "fbbd0883df06aec8b07a19d4f184f8415f3fb81be27f821bf405d464f5952aca",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 7,
+      "metrics": {
+        "recall@5": 0.6488982142820694,
+        "recall@10": 0.7636141627294957,
+        "ndcg@10": 0.592694046518284,
+        "mrr": 0.5729467179053291,
+        "new_hits@10": 212,
+        "new_targets": 1857,
+        "new_recall@10": 0.11416262789445342,
+        "conditional_new_recall@10": 0.16932907348242812,
+        "repeat_recall@10_micro": 0.8883477847725383,
+        "repeat_recall@10_macro": 0.9174951318384832,
+        "mixed_coverage_macro": 0.9338412564967028,
+        "mixed_coverage_micro": 0.9379135850525496,
+        "new_targets_in_slate": 1252,
+        "new_slate_coverage": 0.6742057081313947,
+        "new_reachable_lost_at10": 1040,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.7085146782727428,
+            "new_hits@10": 143,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.7984799999042256,
+            "new_hits@10": 62,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7631408205323192,
+            "new_hits@10": 7,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7625234510058149,
+            "ndcg@10": 0.5897672237716677,
+            "new_hits@10": 65,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7715392420871873,
+            "ndcg@10": 0.6006982075699282,
+            "new_hits@10": 43,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.77842234452399,
+            "ndcg@10": 0.6041320055761359,
+            "new_hits@10": 39,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7455359479510917,
+            "ndcg@10": 0.5733931935918539,
+            "new_hits@10": 37,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7531865404395048,
+            "ndcg@10": 0.5938974712137596,
+            "new_hits@10": 28,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 60
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 152
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 7
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 205
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 80
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 132
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 866313,
+      "trainable_parameters": 664329,
+      "training_seconds": 151.60447016599937,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-C0-dot100-control-seed17/best.pt"
+    },
+    "C0-dot100-dynamic_features-seed17": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "C0",
+        "mode": "dynamic_features",
+        "policy": "quota100_50",
+        "seed": 17,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "b426aff23c614bebf329d3f343568457fe1668b29d64c61fb18642beba97c80a",
+        "train_slate_identity": "11d2bb2daaadb5f07bcc0e4d259fdcb3bea2a6be5a0357d82d1dc4e7fa6869cf",
+        "val_slate_identity": "fbbd0883df06aec8b07a19d4f184f8415f3fb81be27f821bf405d464f5952aca",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 10,
+      "metrics": {
+        "recall@5": 0.6534312799260218,
+        "recall@10": 0.7623688914105181,
+        "ndcg@10": 0.5962693497714322,
+        "mrr": 0.5768353574795256,
+        "new_hits@10": 248,
+        "new_targets": 1857,
+        "new_recall@10": 0.13354873451803984,
+        "conditional_new_recall@10": 0.19808306709265175,
+        "repeat_recall@10_micro": 0.8843093003919705,
+        "repeat_recall@10_macro": 0.9125723305492343,
+        "mixed_coverage_macro": 0.9338412564967028,
+        "mixed_coverage_micro": 0.9379135850525496,
+        "new_targets_in_slate": 1252,
+        "new_slate_coverage": 0.6742057081313947,
+        "new_reachable_lost_at10": 1004,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.7165791944017751,
+            "new_hits@10": 159,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.8008405403593457,
+            "new_hits@10": 77,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7567198435263053,
+            "new_hits@10": 12,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7589009458981613,
+            "ndcg@10": 0.5959388981952957,
+            "new_hits@10": 69,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7671071191619138,
+            "ndcg@10": 0.6006335162245487,
+            "new_hits@10": 48,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7779892588534204,
+            "ndcg@10": 0.6118623906429377,
+            "new_hits@10": 53,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7479934870274296,
+            "ndcg@10": 0.5767962676922433,
+            "new_hits@10": 45,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7554665872847691,
+            "ndcg@10": 0.5911002878972331,
+            "new_hits@10": 33,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 62
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 186
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 8
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 240
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 104
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 144
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 1017482,
+      "trainable_parameters": 815498,
+      "training_seconds": 155.5544002079987,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-C0-dot100-dynamic_features-seed17/best.pt"
+    },
+    "C0-dot100-control-seed2026": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "C0",
+        "mode": "control",
+        "policy": "quota100_50",
+        "seed": 2026,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "6ade65652967fc59b4a7b829e97042292ddedcf7f8ef9f9dfddc973bb96aba7e",
+        "train_slate_identity": "869cfa460de854a7fd9df3519da58091551ed4e0bbb135c507f9834e40650dd5",
+        "val_slate_identity": "1c2a04f255c243993887fb6f7598baf8f4b1fd8631c3558978321ebcee6502ee",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 7,
+      "metrics": {
+        "recall@5": 0.6492310682674028,
+        "recall@10": 0.7580764078840657,
+        "ndcg@10": 0.5921369305440706,
+        "mrr": 0.5732776136133563,
+        "new_hits@10": 201,
+        "new_targets": 1857,
+        "new_recall@10": 0.10823909531502424,
+        "conditional_new_recall@10": 0.16288492706645058,
+        "repeat_recall@10_micro": 0.8840717424872313,
+        "repeat_recall@10_macro": 0.9123392777818754,
+        "mixed_coverage_macro": 0.9317469479553234,
+        "mixed_coverage_micro": 0.9360646165823278,
+        "new_targets_in_slate": 1234,
+        "new_slate_coverage": 0.6645126548196015,
+        "new_reachable_lost_at10": 1033,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.7045869602321214,
+            "new_hits@10": 139,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.7935528243880015,
+            "new_hits@10": 57,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7567151781749916,
+            "new_hits@10": 5,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7521439867201006,
+            "ndcg@10": 0.5876292002909869,
+            "new_hits@10": 56,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7666169763772503,
+            "ndcg@10": 0.6000499320484202,
+            "new_hits@10": 44,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7767586015252023,
+            "ndcg@10": 0.6053466290763252,
+            "new_hits@10": 40,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7433325136327747,
+            "ndcg@10": 0.5764845927172959,
+            "new_hits@10": 35,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7449383474087031,
+            "ndcg@10": 0.5881825460395799,
+            "new_hits@10": 26,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 49
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 152
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 10
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 191
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 81
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 120
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 866313,
+      "trainable_parameters": 664329,
+      "training_seconds": 158.11797150000348,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-C0-dot100-control-seed2026/best.pt"
+    },
+    "C0-dot100-dynamic_features-seed2026": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "C0",
+        "mode": "dynamic_features",
+        "policy": "quota100_50",
+        "seed": 2026,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "6ade65652967fc59b4a7b829e97042292ddedcf7f8ef9f9dfddc973bb96aba7e",
+        "train_slate_identity": "869cfa460de854a7fd9df3519da58091551ed4e0bbb135c507f9834e40650dd5",
+        "val_slate_identity": "1c2a04f255c243993887fb6f7598baf8f4b1fd8631c3558978321ebcee6502ee",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 7,
+      "metrics": {
+        "recall@5": 0.6527189822988477,
+        "recall@10": 0.7628790784273275,
+        "ndcg@10": 0.5949919133067296,
+        "mrr": 0.5759311939480244,
+        "new_hits@10": 226,
+        "new_targets": 1857,
+        "new_recall@10": 0.12170166935918147,
+        "conditional_new_recall@10": 0.18314424635332252,
+        "repeat_recall@10_micro": 0.8873975531535812,
+        "repeat_recall@10_macro": 0.9150604726416478,
+        "mixed_coverage_macro": 0.9317469479553234,
+        "mixed_coverage_micro": 0.9360646165823278,
+        "new_targets_in_slate": 1234,
+        "new_slate_coverage": 0.6645126548196015,
+        "new_reachable_lost_at10": 1008,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.7135774022870797,
+            "new_hits@10": 151,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.8008497586484312,
+            "new_hits@10": 68,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7587069574394982,
+            "new_hits@10": 7,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7569206250982241,
+            "ndcg@10": 0.5940201679475312,
+            "new_hits@10": 58,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7742418223582607,
+            "ndcg@10": 0.5987046492179817,
+            "new_hits@10": 48,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7811057900187321,
+            "ndcg@10": 0.6107474516300073,
+            "new_hits@10": 53,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7415655686543415,
+            "ndcg@10": 0.5730955948882609,
+            "new_hits@10": 37,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7556678755295356,
+            "ndcg@10": 0.5956947222981723,
+            "new_hits@10": 30,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 49
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 177
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 11
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 215
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 86
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 140
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 1017482,
+      "trainable_parameters": 815498,
+      "training_seconds": 163.11571962499875,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-C0-dot100-dynamic_features-seed2026/best.pt"
+    },
+    "P-dot100-control-seed42": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "P",
+        "mode": "control",
+        "policy": "quota100_50",
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "71e7970f449d86abfd80dc7ad5b1c126feaaf5382d0b4d6a554677aacaa707ac",
+        "train_slate_identity": "c12e77331b03905784041dd882df066d48ee4585bc883dc94e56f6556efb89d3",
+        "val_slate_identity": "381dde804505b751aa9cf63e4a720200233679c4cb6767796717233971cab5d2",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 9,
+      "metrics": {
+        "recall@5": 0.6477477503953755,
+        "recall@10": 0.7575579083268513,
+        "ndcg@10": 0.5920010043447772,
+        "mrr": 0.5736096711861987,
+        "new_hits@10": 189,
+        "new_targets": 1857,
+        "new_recall@10": 0.10177705977382875,
+        "conditional_new_recall@10": 0.15156375300721733,
+        "repeat_recall@10_micro": 0.8870412162964723,
+        "repeat_recall@10_macro": 0.9133104102228571,
+        "mixed_coverage_macro": 0.931437931606895,
+        "mixed_coverage_micro": 0.9373297002724795,
+        "new_targets_in_slate": 1247,
+        "new_slate_coverage": 0.6715131933225633,
+        "new_reachable_lost_at10": 1058,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.6939388120839733,
+            "new_hits@10": 126,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.7918652190361261,
+            "new_hits@10": 55,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7603039425003081,
+            "new_hits@10": 8,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7485934307716485,
+            "ndcg@10": 0.5891421849139371,
+            "new_hits@10": 51,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7696538684552383,
+            "ndcg@10": 0.6008697660702216,
+            "new_hits@10": 48,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7769708375846783,
+            "ndcg@10": 0.6049793393831512,
+            "new_hits@10": 35,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7383592232156201,
+            "ndcg@10": 0.5722017766059663,
+            "new_hits@10": 30,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7501614656752996,
+            "ndcg@10": 0.5895713925634563,
+            "new_hits@10": 25,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 48
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 141
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 4
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 185
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 78
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 111
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 866313,
+      "trainable_parameters": 664329,
+      "training_seconds": 147.32280929099943,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-P-dot100-control-seed42/best.pt"
+    },
+    "P-dot100-dynamic_features-seed42": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "P",
+        "mode": "dynamic_features",
+        "policy": "quota100_50",
+        "seed": 42,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "71e7970f449d86abfd80dc7ad5b1c126feaaf5382d0b4d6a554677aacaa707ac",
+        "train_slate_identity": "c12e77331b03905784041dd882df066d48ee4585bc883dc94e56f6556efb89d3",
+        "val_slate_identity": "381dde804505b751aa9cf63e4a720200233679c4cb6767796717233971cab5d2",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 6,
+      "metrics": {
+        "recall@5": 0.6527050436360641,
+        "recall@10": 0.7641557455495771,
+        "ndcg@10": 0.5963668964767691,
+        "mrr": 0.5777153057546043,
+        "new_hits@10": 233,
+        "new_targets": 1857,
+        "new_recall@10": 0.1254711900915455,
+        "conditional_new_recall@10": 0.1868484362469928,
+        "repeat_recall@10_micro": 0.8866848794393634,
+        "repeat_recall@10_macro": 0.9158410733062841,
+        "mixed_coverage_macro": 0.931437931606895,
+        "mixed_coverage_micro": 0.9373297002724795,
+        "new_targets_in_slate": 1247,
+        "new_slate_coverage": 0.6715131933225633,
+        "new_reachable_lost_at10": 1014,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.7166837344256698,
+            "new_hits@10": 156,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.8026558848599777,
+            "new_hits@10": 68,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7590656055254189,
+            "new_hits@10": 9,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7609630382681125,
+            "ndcg@10": 0.5942838284667827,
+            "new_hits@10": 63,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7764343279754239,
+            "ndcg@10": 0.6021940308195152,
+            "new_hits@10": 52,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7755698850925832,
+            "ndcg@10": 0.6118599424336055,
+            "new_hits@10": 43,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.748360589222208,
+            "ndcg@10": 0.5740042825822229,
+            "new_hits@10": 41,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7532607013832311,
+            "ndcg@10": 0.5969491567705819,
+            "new_hits@10": 34,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 62
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 171
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 3
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 230
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 93
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 140
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 1017482,
+      "trainable_parameters": 815498,
+      "training_seconds": 140.4388814999984,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-P-dot100-dynamic_features-seed42/best.pt"
+    },
+    "P-dot100-control-seed17": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "P",
+        "mode": "control",
+        "policy": "quota100_50",
+        "seed": 17,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "4916008e9d9909fa824f50f214afc4e406005728dbeceb6ff164960e98e815e4",
+        "train_slate_identity": "1dd79fe2e7c90597a118d7e7a054c4e874d7e13cf368256544fd63f8aad15c79",
+        "val_slate_identity": "d4b853e977136c1f7f2f9378f5076a38bb3d92dfd04ba06db8baa895a8b038ec",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 8,
+      "metrics": {
+        "recall@5": 0.651795271011302,
+        "recall@10": 0.7592807695392942,
+        "ndcg@10": 0.59281577361973,
+        "mrr": 0.573395437174929,
+        "new_hits@10": 203,
+        "new_targets": 1857,
+        "new_recall@10": 0.10931610123855681,
+        "conditional_new_recall@10": 0.15971675845790717,
+        "repeat_recall@10_micro": 0.8853783109632973,
+        "repeat_recall@10_macro": 0.913330351197572,
+        "mixed_coverage_macro": 0.9351299499009672,
+        "mixed_coverage_micro": 0.9401518100428182,
+        "new_targets_in_slate": 1271,
+        "new_slate_coverage": 0.6844372644049542,
+        "new_reachable_lost_at10": 1068,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.702794845536781,
+            "new_hits@10": 137,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.7966409512316591,
+            "new_hits@10": 60,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7579006295598051,
+            "new_hits@10": 6,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7519954227565613,
+            "ndcg@10": 0.5882695572084603,
+            "new_hits@10": 51,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7707347193648563,
+            "ndcg@10": 0.6057515048973139,
+            "new_hits@10": 47,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7798163660399627,
+            "ndcg@10": 0.6067650795259809,
+            "new_hits@10": 49,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7394284445851026,
+            "ndcg@10": 0.5721092755809994,
+            "new_hits@10": 30,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7484089508793067,
+            "ndcg@10": 0.586580582812366,
+            "new_hits@10": 26,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 58
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 145
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 7
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 196
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 79
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 124
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 866313,
+      "trainable_parameters": 664329,
+      "training_seconds": 154.03087491699262,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-P-dot100-control-seed17/best.pt"
+    },
+    "P-dot100-dynamic_features-seed17": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "P",
+        "mode": "dynamic_features",
+        "policy": "quota100_50",
+        "seed": 17,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "4916008e9d9909fa824f50f214afc4e406005728dbeceb6ff164960e98e815e4",
+        "train_slate_identity": "1dd79fe2e7c90597a118d7e7a054c4e874d7e13cf368256544fd63f8aad15c79",
+        "val_slate_identity": "d4b853e977136c1f7f2f9378f5076a38bb3d92dfd04ba06db8baa895a8b038ec",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 8,
+      "metrics": {
+        "recall@5": 0.6503390317158606,
+        "recall@10": 0.7602119060924926,
+        "ndcg@10": 0.5947024578043282,
+        "mrr": 0.5766901149092273,
+        "new_hits@10": 235,
+        "new_targets": 1857,
+        "new_recall@10": 0.12654819601507808,
+        "conditional_new_recall@10": 0.1848937844217152,
+        "repeat_recall@10_micro": 0.8832402898206437,
+        "repeat_recall@10_macro": 0.9112224869255213,
+        "mixed_coverage_macro": 0.9351299499009672,
+        "mixed_coverage_micro": 0.9401518100428182,
+        "new_targets_in_slate": 1271,
+        "new_slate_coverage": 0.6844372644049542,
+        "new_reachable_lost_at10": 1036,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.7112775217613927,
+            "new_hits@10": 151,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.8021945513925602,
+            "new_hits@10": 76,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7536940457346673,
+            "new_hits@10": 8,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7552826153151029,
+            "ndcg@10": 0.5955837894877619,
+            "new_hits@10": 65,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7679623775514186,
+            "ndcg@10": 0.5970101513706779,
+            "new_hits@10": 50,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7782793522698995,
+            "ndcg@10": 0.6131316944385949,
+            "new_hits@10": 48,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7398598065699894,
+            "ndcg@10": 0.5698023206920979,
+            "new_hits@10": 38,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7558916453185227,
+            "ndcg@10": 0.5936734183170783,
+            "new_hits@10": 34,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 55
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 180
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 9
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 226
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 91
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 144
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 1017482,
+      "trainable_parameters": 815498,
+      "training_seconds": 166.6765279169922,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-P-dot100-dynamic_features-seed17/best.pt"
+    },
+    "P-dot100-control-seed2026": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "P",
+        "mode": "control",
+        "policy": "quota100_50",
+        "seed": 2026,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "c0086508f77390d4ae9023bbe72ada9007b7e3dc34a2c8fe8583f2315d2fa71b",
+        "train_slate_identity": "67390740261e224b2d702c9cc7d72b9a9f002b409344d9c59650a6f0b2f25606",
+        "val_slate_identity": "d863406a2a59a089269d1f8a5ea68d6787b7613a955cf16c64a38b37f9f16aeb",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 6,
+      "metrics": {
+        "recall@5": 0.6462094131964019,
+        "recall@10": 0.7610963027489777,
+        "ndcg@10": 0.5922349919239105,
+        "mrr": 0.5721397181507396,
+        "new_hits@10": 198,
+        "new_targets": 1857,
+        "new_recall@10": 0.10662358642972536,
+        "conditional_new_recall@10": 0.15384615384615385,
+        "repeat_recall@10_micro": 0.888466563724908,
+        "repeat_recall@10_macro": 0.9167546383844218,
+        "mixed_coverage_macro": 0.9369850368733511,
+        "mixed_coverage_micro": 0.941708836123005,
+        "new_targets_in_slate": 1287,
+        "new_slate_coverage": 0.6930533117932148,
+        "new_reachable_lost_at10": 1089,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.7047960402799112,
+            "new_hits@10": 140,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.7971295205531932,
+            "new_hits@10": 53,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7603871001549943,
+            "new_hits@10": 5,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.758835626866258,
+            "ndcg@10": 0.5900371179248779,
+            "new_hits@10": 53,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7651942637102453,
+            "ndcg@10": 0.5987168626989898,
+            "new_hits@10": 45,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7791800283368727,
+            "ndcg@10": 0.6069854552887474,
+            "new_hits@10": 42,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7449263240385956,
+            "ndcg@10": 0.5729711343046997,
+            "new_hits@10": 32,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7510575100496049,
+            "ndcg@10": 0.5885609229592614,
+            "new_hits@10": 26,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 54
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 144
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 10
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 188
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 76
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 122
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 866313,
+      "trainable_parameters": 664329,
+      "training_seconds": 156.15859825001098,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-P-dot100-control-seed2026/best.pt"
+    },
+    "P-dot100-dynamic_features-seed2026": {
+      "settings": {
+        "stage": "ranker",
+        "upstream_variant": "P",
+        "mode": "dynamic_features",
+        "policy": "quota100_50",
+        "seed": 2026,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+        "feature_contract": {
+          "version": 1,
+          "names": [
+            "is_repeat_sku",
+            "user_sku_order_count_norm",
+            "user_sku_qty_share",
+            "days_since_last_sku_buy_norm",
+            "sku_urgency",
+            "user_cat_order_share",
+            "user_subcat_order_share",
+            "user_brand_order_share",
+            "global_sku_popularity_norm",
+            "industry_sku_affinity",
+            "is_repeat_category",
+            "is_repeat_brand",
+            "is_repeat_business_line",
+            "customer_age",
+            "customer_overdue_ratio",
+            "customer_30d_activity",
+            "customer_90d_activity",
+            "category_age",
+            "category_overdue_ratio",
+            "category_never_seen",
+            "family_age",
+            "family_overdue_ratio",
+            "family_never_seen",
+            "family_history_share",
+            "sku_orders_7d",
+            "sku_orders_30d",
+            "sku_orders_90d",
+            "sku_buyers_30d",
+            "sku_growth_30d",
+            "category_relative_share",
+            "global_sale_age",
+            "month_sin",
+            "month_cos",
+            "sku_last_lift",
+            "sku_recent3_lift",
+            "category_last_lift",
+            "family_last_lift",
+            "line_last_lift",
+            "sku_support_confidence",
+            "hierarchical_backoff",
+            "same_basket_lift"
+          ],
+          "dtype_on_disk": "float16",
+          "compute_dtype": "float32",
+          "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+          "age_scale": "days/365, clipped [0,1]",
+          "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+          "lift_scale": "log_lift/5 clipped [-1,1]",
+          "missing": "never flags; missing metadata yields zero",
+          "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+          "metadata_policy": "snapshot_unverified",
+          "customer_embedding_policy": "last-purchase snapshot only",
+          "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+        },
+        "upstream_digest": "c0086508f77390d4ae9023bbe72ada9007b7e3dc34a2c8fe8583f2315d2fa71b",
+        "train_slate_identity": "67390740261e224b2d702c9cc7d72b9a9f002b409344d9c59650a6f0b2f25606",
+        "val_slate_identity": "d863406a2a59a089269d1f8a5ea68d6787b7613a955cf16c64a38b37f9f16aeb",
+        "recall_guardrail": 0.7558833119851873,
+        "ndcg_guardrail": 0.5918928743676547,
+        "guardrail_artifact_sha256": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "selection": "new_hits@10 then NDCG subject to both reference quality floors"
+      },
+      "epoch": 8,
+      "metrics": {
+        "recall@5": 0.6516468581165638,
+        "recall@10": 0.7630629169529015,
+        "ndcg@10": 0.5963109935633537,
+        "mrr": 0.5771257500195272,
+        "new_hits@10": 240,
+        "new_targets": 1857,
+        "new_recall@10": 0.12924071082390953,
+        "conditional_new_recall@10": 0.1864801864801865,
+        "repeat_recall@10_micro": 0.8854970899156669,
+        "repeat_recall@10_macro": 0.9140869234703792,
+        "mixed_coverage_macro": 0.9369850368733511,
+        "mixed_coverage_micro": 0.941708836123005,
+        "new_targets_in_slate": 1287,
+        "new_slate_coverage": 0.6930533117932148,
+        "new_reachable_lost_at10": 1047,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.7185505205666497,
+            "new_hits@10": 159,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.7992418256522239,
+            "new_hits@10": 71,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7582463780605484,
+            "new_hits@10": 10,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7575175821153545,
+            "ndcg@10": 0.595448777451408,
+            "new_hits@10": 67,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7732434633690342,
+            "ndcg@10": 0.6003126927843833,
+            "new_hits@10": 49,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7816047894265888,
+            "ndcg@10": 0.6121643188496839,
+            "new_hits@10": 52,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7399463557427003,
+            "ndcg@10": 0.5727556011194456,
+            "new_hits@10": 40,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7591864986133762,
+            "ndcg@10": 0.5986175881168684,
+            "new_hits@10": 32,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 60
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 180
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 9
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 231
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 92
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 148
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "qualified": true,
+      "parameters": 1017482,
+      "trainable_parameters": 815498,
+      "training_seconds": 158.2765440420044,
+      "selected_checkpoint": "checkpoints/static-enrichment-v1/runs/ranker-P-dot100-dynamic_features-seed2026/best.pt"
+    }
+  },
+  "decisions": {
+    "best_t": "T2",
+    "best_f": "F_txt",
+    "best_p": "P",
+    "best_screen_product": "P",
+    "best_screen_overall": "P",
+    "repeated_variants": [
+      "C0",
+      "U0",
+      "U1",
+      "P"
+    ],
+    "best_stage1_3seed": "P"
+  }
+}
