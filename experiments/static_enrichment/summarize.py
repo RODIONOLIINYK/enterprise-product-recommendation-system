@@ -1,5 +1,6 @@
 """Aggregate Stage 1, cohort, and downstream Stage 2 metrics with paired customer-clustered intervals."""
 
+import argparse
 from collections import defaultdict
 import json
 from pathlib import Path
@@ -214,5 +215,143 @@ def main() -> None:
     print("Wrote summary.json and COMPARISON.md to", EVIDENCE_ROOT, flush=True)
 
 
+def summarize_clean_v2() -> None:
+    raw = json.loads((EVIDENCE_ROOT / "clean_v2_results.json").read_text(encoding="utf-8"))
+    best_clean = raw["decisions"]["best_clean"]
+    seed = raw["decisions"]["seed"]
+
+    stage1_summary = {}
+    for key, res in raw["stage1"].items():
+        var = res["settings"]["variant"]
+        stage1_summary[var] = {
+            "seed": res["settings"]["seed"],
+            "selected_epoch": res["selected_epoch"],
+            "parameters": res["parameters"],
+            "trainable_parameters": res["trainable_parameters"],
+            "training_seconds": res["training_seconds"],
+            "text_recipe": res["settings"]["spec"]["text_recipe"],
+            "customer_tabular_features": res["settings"]["spec"]["customer_tabular_features"],
+            "product_demand_features": res["settings"]["spec"]["product_demand_features"],
+            "metrics": res["metrics"],
+            "cohorts": res["cohorts"],
+            "selected_checkpoint": res["selected_checkpoint"],
+        }
+
+    c0_pred = Path(stage1_summary["C0_clean"]["selected_checkpoint"]).parent / "stage1_predictions.npz"
+    stage1_paired_vs_c0 = {}
+    for var, entry in stage1_summary.items():
+        if var == "C0_clean":
+            continue
+        trt_pred = Path(entry["selected_checkpoint"]).parent / "stage1_predictions.npz"
+        stage1_paired_vs_c0[var] = paired_stage1_intervals([c0_pred], [trt_pred])
+
+    stage1_paired_u0_vs_nosubcat = {}
+    if "U0_t1_fam_clean" in stage1_summary and "U0_t1_fam_nosubcat" in stage1_summary:
+        p_sub = Path(stage1_summary["U0_t1_fam_clean"]["selected_checkpoint"]).parent / "stage1_predictions.npz"
+        p_nosub = Path(stage1_summary["U0_t1_fam_nosubcat"]["selected_checkpoint"]).parent / "stage1_predictions.npz"
+        stage1_paired_u0_vs_nosubcat["U0_t1_fam_clean_vs_nosubcat"] = paired_stage1_intervals([p_nosub], [p_sub])
+
+    ds_summary = {}
+    for key, res in raw["downstream"].items():
+        cfg = f"{res['settings']['upstream_variant']}-{res['settings']['mode']}"
+        ds_summary[cfg] = {
+            "seed": res["settings"]["seed"],
+            "epoch": res["epoch"],
+            "qualified": res["qualified"],
+            "parameters": res["parameters"],
+            "trainable_parameters": res["trainable_parameters"],
+            "training_seconds": res["training_seconds"],
+            "metrics": res["metrics"],
+            "selected_checkpoint": res.get("selected_checkpoint"),
+            "diagnostic_checkpoint": res.get("diagnostic_checkpoint"),
+        }
+
+    def _pred_path(cfg: str) -> Path:
+        ckpt = ds_summary[cfg].get("selected_checkpoint") or ds_summary[cfg]["diagnostic_checkpoint"]
+        return Path(ckpt).parent / "predictions.npz"
+
+    ds_paired = {}
+    c0_cfg = "C0_clean-dot100_41"
+    best_41 = f"{best_clean}-dot100_41"
+    best_47 = f"{best_clean}-dot100_47"
+    best_mlp = f"{best_clean}-precomputed_mlp_47"
+    for trt, ctrl in (
+        (best_41, c0_cfg),
+        (best_47, c0_cfg),
+        (best_47, best_41),
+        (best_mlp, c0_cfg),
+        (best_mlp, best_47),
+    ):
+        if trt in ds_summary and ctrl in ds_summary:
+            ds_paired[f"{trt}_vs_{ctrl}"] = paired_intervals(_pred_path(ctrl), _pred_path(trt))
+
+    summary = {
+        "decisions": raw["decisions"],
+        "stage1": stage1_summary,
+        "stage1_paired_vs_C0_clean": stage1_paired_vs_c0,
+        "stage1_paired_ablations": stage1_paired_u0_vs_nosubcat,
+        "downstream": ds_summary,
+        "downstream_paired": ds_paired,
+        "heldout_access": False,
+        "promoted": False,
+        "seed": seed,
+        "source_sha256": {
+            str(p): file_digest(p)
+            for p in Path("recommender/experiments/static_enrichment").glob("*.py")
+        },
+    }
+    atomic_json(summary, EVIDENCE_ROOT / "clean_v2_summary.json")
+
+    lines = [
+        "# Clean Static Towers + Transferred 6-Stat Scoring MLP (seed=42)",
+        "",
+        "All metrics computed strictly on the 6,191 validation transitions / 1,857 new-to-customer targets. No test-split access.",
+        "",
+        "## Stage 1 Clean Towers (0 customer tabular stats, 12D container_type only, 30 epochs, seed=42)",
+        "",
+        "| Variant | Ep | Params | Fit (s) | Unseen Hits@25 | Recall@25 | Unseen Hits@50 | Recall@50 |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for var in ("C0_clean", "P_t1_fam_clean", "U0_t1_fam_clean", "U0_t1_fam_nosubcat"):
+        if var not in stage1_summary:
+            continue
+        s = stage1_summary[var]
+        m = s["metrics"]
+        lines.append(
+            f"| {var} | {s['selected_epoch']} | {s['parameters']:,} | {s['training_seconds']:.1f} | "
+            f"{m['new_hits@25']} | {m['stage1_new_recall@25']*100:.2f}% | "
+            f"{m['new_hits@50']} | {m['stage1_new_recall@50']*100:.2f}% |"
+        )
+
+    lines.extend([
+        "",
+        f"Selected `best_clean = {best_clean}`.",
+        "",
+        "## Downstream Stage 2 (quota100_50, 10 epochs, seed=42)",
+        "",
+        "| Config | Ep | Qual | Params (Trainable) | Fit (s) | New Hits@10 | New Recall@10 | Recall@10 | NDCG@10 | Slate New Targets |",
+        "|---|---:|---:|---|---:|---:|---:|---:|---:|---:|",
+    ])
+    for cfg in (c0_cfg, best_41, best_47, best_mlp):
+        if cfg not in ds_summary:
+            continue
+        d = ds_summary[cfg]
+        m = d["metrics"]
+        lines.append(
+            f"| {cfg} | {d['epoch']} | {d['qualified']} | {d['parameters']:,} ({d['trainable_parameters']:,}) | "
+            f"{d['training_seconds']:.1f} | {m['new_hits@10']} | {m['new_recall@10']*100:.2f}% | "
+            f"{m['recall@10']:.6f} | {m['ndcg@10']:.6f} | {m['new_targets_in_slate']} |"
+        )
+
+    (EVIDENCE_ROOT / "clean_v2_COMPARISON.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("Wrote clean_v2_summary.json and clean_v2_COMPARISON.md to", EVIDENCE_ROOT, flush=True)
+
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--campaign", choices=("v1", "clean_v2"), default="v1")
+    args = parser.parse_args()
+    if args.campaign == "clean_v2":
+        summarize_clean_v2()
+    else:
+        main()

@@ -14,6 +14,7 @@ from recommender.models import (
     ProductTower,
     TwoTowerModel,
 )
+from recommender.ranker import RankerOutput
 from recommender.sequences import normalize_purchase_history_gaps
 
 from .config import VariantSpec
@@ -165,7 +166,7 @@ class StaticEnrichedCustomerTower(nn.Module):
         city_id: torch.Tensor,
         region_id: torch.Tensor,
         industry_id: torch.Tensor,
-        tabular_features: torch.Tensor,
+        tabular_features: Optional[torch.Tensor],
         sequence: torch.Tensor,
         attention_mask: torch.Tensor,
         seq_product_ids: torch.Tensor,
@@ -187,7 +188,10 @@ class StaticEnrichedCustomerTower(nn.Module):
                 raise ValueError("Extra customer attribute IDs required for this variant.")
             for name in self.extra_attr_order:
                 tab_parts.append(self.extra_attr_embeddings[name](extra_attr_ids[name]))
-        tab_parts.append(tabular_features[..., :self.num_tabular_features])
+        if self.num_tabular_features > 0:
+            if tabular_features is None:
+                raise ValueError("Customer tabular features required when num_tabular_features > 0.")
+            tab_parts.append(tabular_features[..., :self.num_tabular_features])
         h_tab = self.tabular_proj(torch.cat(tab_parts, dim=-1))
 
         catalog_with_padding = F.pad(catalog_product_vectors, (0, 0, 1, 0))
@@ -237,9 +241,11 @@ class StaticEnrichedRetriever(nn.Module):
         super().__init__()
         self.spec = spec
         self.temperature = temperature
+        cust_tab_dim = int(spec.customer_tabular_features)
+        prod_dem_dim = int(spec.product_demand_features)
 
         if spec.is_control:
-            # Exact S0 parameter construction & initialization order.
+            # Exact S0 parameter construction & initialization order (or clean 0-tab / 12-container variant).
             customer = CustomerTower(
                 text_dim=text_dim,
                 output_dim=output_dim,
@@ -247,7 +253,7 @@ class StaticEnrichedRetriever(nn.Module):
                 num_cities=num_cities,
                 num_regions=num_regions,
                 num_industries=num_industries,
-                num_tabular_features=6,
+                num_tabular_features=cust_tab_dim,
                 catalog_history_encoder="attention",
                 history_gap_reference_days=74.0,
                 max_seq_len=32,
@@ -264,7 +270,7 @@ class StaticEnrichedRetriever(nn.Module):
                 num_categories=0,
                 num_business_lines=0,
                 num_subcategories=0,
-                num_demand_features=num_demand_features,
+                num_demand_features=prod_dem_dim,
                 hidden_dim=hidden_dim,
                 dropout=0.1,
             )
@@ -297,7 +303,7 @@ class StaticEnrichedRetriever(nn.Module):
                 num_regions=num_regions,
                 num_industries=num_industries,
                 extra_attr_vocab_sizes=c_sizes,
-                num_tabular_features=6,
+                num_tabular_features=cust_tab_dim,
                 history_gap_reference_days=74.0,
                 max_seq_len=32,
                 num_heads=4,
@@ -310,7 +316,7 @@ class StaticEnrichedRetriever(nn.Module):
                 text_dim=text_dim,
                 output_dim=output_dim,
                 hidden_dim=hidden_dim,
-                num_demand_features=num_demand_features,
+                num_demand_features=prod_dem_dim,
                 dropout=0.1,
             )
             self.product_bias = nn.Parameter(torch.zeros(num_catalog_products))
@@ -321,8 +327,12 @@ class StaticEnrichedRetriever(nn.Module):
 
     def product_vectors(self, product_inputs: Mapping[str, object]) -> torch.Tensor:
         demand = product_inputs["demand_features"]
-        # Enforce disabled_v1 policy: first 6 demand dimensions are always zero.
-        demand = torch.cat([torch.zeros_like(demand[:, :6]), demand[:, 6:]], dim=-1)
+        if self.spec.product_demand_features == 12:
+            # Clean ProductTower: strictly 12D static container_type one-hot only (no demand inputs).
+            demand = demand[:, 6:] if demand.size(1) == 18 else demand
+        else:
+            # Enforce disabled_v1 policy: first 6 demand dimensions are always zero.
+            demand = torch.cat([torch.zeros_like(demand[:, :6]), demand[:, 6:]], dim=-1)
         if self.towers is not None:
             return self.towers.product_tower(
                 product_inputs["text_embedding"],
@@ -340,13 +350,16 @@ class StaticEnrichedRetriever(nn.Module):
         )
 
     def encode_purchase(self, inputs: Mapping[str, object], vectors: torch.Tensor) -> torch.Tensor:
+        tab = inputs["tabular_features"]
+        if self.spec.customer_tabular_features == 0:
+            tab = tab[..., :0]
         if self.towers is not None:
             return self.towers.customer_tower(
                 inputs["text_embedding"],
                 inputs["city_id"],
                 inputs["region_id"],
                 inputs["industry_id"],
-                inputs["tabular_features"],
+                tab,
                 inputs["sequence"],
                 inputs["attention_mask"],
                 inputs["seq_product_ids"],
@@ -358,7 +371,7 @@ class StaticEnrichedRetriever(nn.Module):
             inputs["city_id"],
             inputs["region_id"],
             inputs["industry_id"],
-            inputs["tabular_features"],
+            tab,
             inputs["sequence"],
             inputs["attention_mask"],
             inputs["seq_product_ids"],
@@ -391,3 +404,126 @@ class StaticEnrichedRetriever(nn.Module):
                 raise ValueError("Familiarity features required.")
             scores = scores + familiarity.to(scores) @ self.familiarity_weights
         return scores
+
+
+class TransferredStatsDynamicRanker(nn.Module):
+    """UPS-CANR dynamic_features ranker extended with the 6 transferred point-in-time customer stats."""
+
+    def __init__(
+        self,
+        dynamic_ranker: nn.Module,
+        *,
+        num_customer_stats: int = 6,
+    ):
+        super().__init__()
+        if getattr(dynamic_ranker, "mode", None) != "dynamic_features":
+            raise ValueError("TransferredStatsDynamicRanker requires a dynamic_features CandidateContextRanker.")
+        self.ranker = dynamic_ranker
+        self.num_customer_stats = int(num_customer_stats)
+
+        old = self.ranker.head[0]
+        expanded = nn.Linear(old.in_features + self.num_customer_stats, old.out_features)
+        with torch.no_grad():
+            expanded.weight[:, : old.in_features].copy_(old.weight)
+            expanded.weight[:, old.in_features :].zero_()
+            expanded.bias.copy_(old.bias)
+        self.ranker.head[0] = expanded
+
+    def forward(
+        self,
+        *,
+        pairwise_features: torch.Tensor,
+        transferred_customer_stats: torch.Tensor,
+        cached_customer_vectors: Optional[torch.Tensor] = None,
+        candidate_mask: Optional[torch.Tensor] = None,
+        **kwargs,
+    ) -> RankerOutput:
+        if transferred_customer_stats.shape[-1] != self.num_customer_stats:
+            raise ValueError(
+                f"Expected {self.num_customer_stats} transferred customer stats, got {transferred_customer_stats.shape[-1]}."
+            )
+        features = pairwise_features[..., :13].clone()
+        encoded = self.ranker.base.encode_candidate_features(pairwise_features=features, **kwargs)
+        extra_candidate = pairwise_features[..., self.ranker.extra_columns]
+        stats_expanded = transferred_customer_stats.unsqueeze(1).expand(-1, pairwise_features.size(1), -1)
+        combined = torch.cat([encoded.features, extra_candidate, stats_expanded], dim=-1)
+        scores = self.ranker.head(combined).squeeze(-1)
+        return RankerOutput(
+            scores=scores,
+            raw_scores=scores,
+            attn_weights=encoded.attn_weights,
+            h_attended=encoded.h_attended,
+            z_candidate=encoded.z_candidate,
+            token_0_weight=encoded.token_0_weight,
+            history_weights=encoded.history_weights,
+        )
+
+
+class PrecomputedEmbeddingMLPRanker(nn.Module):
+    """Lightweight scoring MLP over ONLY precomputed u_c, v_p, interactions, and 47 changeable features."""
+
+    def __init__(
+        self,
+        embedding_dim: int = OUTPUT_DIM,
+        num_pairwise_features: int = 41,
+        num_customer_stats: int = 6,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embedding_dim = int(embedding_dim)
+        self.num_pairwise_features = int(num_pairwise_features)
+        self.num_customer_stats = int(num_customer_stats)
+        in_dim = self.embedding_dim * 4 + 1 + self.num_pairwise_features + self.num_customer_stats
+        self.head = nn.Sequential(
+            nn.Linear(in_dim, 256),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(256, 128),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(128, 64),
+            nn.GELU(),
+            nn.Linear(64, 1),
+        )
+
+    def forward(
+        self,
+        *,
+        candidate_vectors: torch.Tensor,
+        pairwise_features: torch.Tensor,
+        cached_customer_vectors: torch.Tensor,
+        transferred_customer_stats: torch.Tensor,
+        **kwargs,
+    ) -> RankerOutput:
+        if cached_customer_vectors is None:
+            raise ValueError("PrecomputedEmbeddingMLPRanker requires cached_customer_vectors.")
+        if transferred_customer_stats.shape[-1] != self.num_customer_stats:
+            raise ValueError(
+                f"Expected {self.num_customer_stats} transferred customer stats, got {transferred_customer_stats.shape[-1]}."
+            )
+        v = candidate_vectors
+        u = cached_customer_vectors.unsqueeze(1).expand_as(v)
+        dot = (u * v).sum(dim=-1, keepdim=True)
+        stats_expanded = transferred_customer_stats.unsqueeze(1).expand(-1, v.size(1), -1)
+        x = torch.cat(
+            [
+                u,
+                v,
+                u * v,
+                (u - v).abs(),
+                dot,
+                pairwise_features[..., : self.num_pairwise_features],
+                stats_expanded,
+            ],
+            dim=-1,
+        )
+        scores = self.head(x).squeeze(-1)
+        return RankerOutput(
+            scores=scores,
+            raw_scores=scores,
+            attn_weights=None,
+            h_attended=u,
+            z_candidate=v,
+            token_0_weight=None,
+            history_weights=None,
+        )

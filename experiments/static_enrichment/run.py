@@ -13,11 +13,14 @@ from recommender.artifacts import atomic_json
 from recommender.experiment_retrieval_data import prepare_retrieval_data
 from recommender.experiments.static_enrichment.config import (
     ARTIFACT_ROOT,
+    CLEAN_V2_ROOT,
     EVIDENCE_ROOT,
+    build_clean_v2_variant_specs,
     build_variant_specs,
 )
 from recommender.experiments.static_enrichment.data import prepare_static_enrichment_bundle
 from recommender.experiments.static_enrichment.train import (
+    run_clean_v2_downstream,
     run_downstream_for_stage1,
     train_stage1_variant,
 )
@@ -38,7 +41,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--phase",
-        choices=("all", "prep", "c0", "screen", "repeat", "downstream"),
+        choices=("all", "prep", "c0", "screen", "repeat", "downstream", "clean_v2"),
         default="all",
     )
     parser.add_argument("--device", default=None)
@@ -57,6 +60,66 @@ def main() -> None:
         return
 
     train, val, info, train_source, val_source = prepare_retrieval_data()
+    if args.phase == "clean_v2":
+        CLEAN_V2_ROOT.mkdir(parents=True, exist_ok=True)
+        v2_path = EVIDENCE_ROOT / "clean_v2_results.json"
+        if v2_path.is_file():
+            v2_results = json.loads(v2_path.read_text(encoding="utf-8"))
+        else:
+            v2_results = {"stage1": {}, "downstream": {}, "decisions": {}}
+        v2_specs = build_clean_v2_variant_specs()
+        seed = 42
+        for vname in ("C0_clean", "P_t1_fam_clean", "U0_t1_fam_clean", "U0_t1_fam_nosubcat"):
+            res = train_stage1_variant(
+                v2_specs[vname],
+                seed,
+                train,
+                val,
+                info,
+                train_source,
+                val_source,
+                enrichment,
+                CLEAN_V2_ROOT,
+                epochs=args.stage1_epochs,
+                device=str(device),
+                save_train_cache=True,
+            )
+            v2_results["stage1"][f"{vname}-seed{seed}"] = res
+            atomic_json(v2_results, v2_path)
+
+        clean_candidates = ("P_t1_fam_clean", "U0_t1_fam_clean", "U0_t1_fam_nosubcat")
+        best_clean = _winner(
+            {n: v2_results["stage1"][f"{n}-seed{seed}"] for n in clean_candidates},
+            clean_candidates,
+        )
+        v2_results["decisions"] = {"best_clean": best_clean, "seed": seed}
+        atomic_json(v2_results, v2_path)
+
+        ds_runs = [
+            ("C0_clean", v2_specs["C0_clean"], "dot100_41"),
+            (best_clean, v2_specs[best_clean], "dot100_41"),
+            (best_clean, v2_specs[best_clean], "dot100_47"),
+            (best_clean, v2_specs[best_clean], "precomputed_mlp_47"),
+        ]
+        ds_res = run_clean_v2_downstream(
+            ds_runs,
+            seed,
+            train,
+            val,
+            info,
+            train_source,
+            val_source,
+            enrichment,
+            CLEAN_V2_ROOT,
+            epochs=args.ranker_epochs,
+            device=str(device),
+        )
+        for cfg_key, res in ds_res.items():
+            v2_results["downstream"][f"{cfg_key}-seed{seed}"] = res
+        atomic_json(v2_results, v2_path)
+        print(f"Clean v2 campaign complete (best_clean={best_clean}).", flush=True)
+        return
+
     results_path = EVIDENCE_ROOT / "raw_results.json"
     if results_path.is_file():
         all_results = json.loads(results_path.read_text(encoding="utf-8"))

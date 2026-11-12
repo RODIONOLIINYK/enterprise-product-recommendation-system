@@ -11,6 +11,8 @@ import torch
 from recommender.artifacts import atomic_json, file_digest, json_digest
 from recommender.development import load_development_purchases
 from recommender.experiment_retrieval_data import prepare_retrieval_data
+from recommender.experiments.dynamic_selector.feature_schema import quantize_features
+from recommender.features import PointInTimeNormalizer, compute_point_in_time_features
 from recommender.scope import get_datasets_locs
 from recommender.shared_data import atomic_torch_save
 from recommender.split import TEST_START, TRAIN_CUTOFF
@@ -21,6 +23,7 @@ from .config import (
     DYNAMIC_CACHE_DIR,
     MIN_TRAIN_CATEGORY_COUNT,
     PRODUCT_ATTR_COLUMNS,
+    TRANSFERRED_CUSTOMER_STAT_NAMES,
 )
 from .metadata import (
     encode_categorical_values,
@@ -208,3 +211,76 @@ def load_dynamic_campaign_features_readonly() -> tuple[dict[str, Any], np.ndarra
     train_features = np.load(DYNAMIC_CACHE_DIR / "train_features.npy", mmap_mode="r")
     val_features = np.load(DYNAMIC_CACHE_DIR / "val_features.npy", mmap_mode="r")
     return manifest, train_features, val_features
+
+
+def quantize_transferred_stats(stats: torch.Tensor | np.ndarray) -> torch.Tensor:
+    """Apply the dynamic_campaign float16 storage -> float32 compute quantization boundary."""
+    arr = stats.detach().cpu().numpy() if isinstance(stats, torch.Tensor) else np.asarray(stats)
+    return torch.from_numpy(quantize_features(arr))
+
+
+def extract_point_in_time_customer_stats(
+    purchases: pd.DataFrame,
+    train_queries: Sequence[tuple[str, pd.Timestamp]],
+    val_queries: Sequence[tuple[str, pd.Timestamp]],
+    *,
+    catalogue: Optional[pd.DataFrame] = None,
+    train_cutoff: pd.Timestamp = TRAIN_CUTOFF,
+) -> tuple[torch.Tensor, torch.Tensor, PointInTimeNormalizer]:
+    """Compute strictly point-in-time 6 customer stats scaled ONLY on training (< train_cutoff)."""
+    df = purchases.copy()
+    df["customer_id"] = df["customer_id"].astype(str)
+    df["product_id"] = df["product_id"].astype(str)
+    df["purchase_date"] = pd.to_datetime(df["purchase_date"])
+    if bool(df["purchase_date"].ge(TEST_START).any()):
+        raise ValueError("Held-out purchases detected in customer stats extraction.")
+    if "product_category" not in df.columns:
+        if catalogue is not None and "product_category" in catalogue.columns:
+            cat_map = catalogue[["product_id", "product_category"]].drop_duplicates("product_id")
+            df = df.merge(cat_map, on="product_id", how="left")
+        else:
+            df["product_category"] = "UNKNOWN"
+
+    for _, as_of in train_queries:
+        if pd.Timestamp(as_of) >= pd.Timestamp(train_cutoff):
+            raise ValueError(f"Training query date {as_of} >= train_cutoff {train_cutoff}.")
+    for _, as_of in val_queries:
+        if pd.Timestamp(as_of) >= TEST_START:
+            raise ValueError(f"Validation query date {as_of} >= TEST_START {TEST_START}.")
+
+    grouped = {
+        cid: grp.sort_values(["purchase_date", "product_id"], kind="stable")
+        for cid, grp in df.groupby("customer_id", sort=False)
+    }
+    raw_train: list[dict[str, float]] = []
+    for cid, as_of in train_queries:
+        grp = grouped.get(str(cid), pd.DataFrame(columns=df.columns))
+        raw_train.append(
+            compute_point_in_time_features(
+                grp,
+                str(cid),
+                pd.Timestamp(as_of),
+                normalizer=None,
+                include_median_purchase_quantity=True,
+            )
+        )
+
+    normalizer = PointInTimeNormalizer().fit(pd.DataFrame(raw_train))
+
+    def _transform_queries(queries: Sequence[tuple[str, pd.Timestamp]]) -> torch.Tensor:
+        rows = []
+        for cid, as_of in queries:
+            grp = grouped.get(str(cid), pd.DataFrame(columns=df.columns))
+            feats = compute_point_in_time_features(
+                grp,
+                str(cid),
+                pd.Timestamp(as_of),
+                normalizer=normalizer,
+                include_median_purchase_quantity=True,
+            )
+            rows.append([float(feats[name]) for name in TRANSFERRED_CUSTOMER_STAT_NAMES])
+        if not rows:
+            return torch.zeros((0, len(TRANSFERRED_CUSTOMER_STAT_NAMES)), dtype=torch.float32)
+        return quantize_transferred_stats(np.asarray(rows, dtype=np.float32))
+
+    return _transform_queries(train_queries), _transform_queries(val_queries), normalizer

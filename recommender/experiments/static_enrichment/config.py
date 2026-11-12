@@ -7,6 +7,7 @@ from pathlib import Path
 
 CACHE_DIR = Path(os.environ.get("RECSYS_STATIC_CACHE", "data/interim/static_enrichment_v1"))
 ARTIFACT_ROOT = Path(os.environ.get("RECSYS_STATIC_ROOT", "checkpoints/static-enrichment-v1"))
+CLEAN_V2_ROOT = ARTIFACT_ROOT / "clean_v2"
 EVIDENCE_ROOT = Path(os.environ.get("RECSYS_STATIC_EVIDENCE", "experiments/static_enrichment"))
 
 DEFAULT_RETRIEVER = Path("checkpoints/retriever-discovery-reference/best_retriever.pt")
@@ -15,6 +16,15 @@ DEFAULT_DESCRIPTION_PATH = Path("data/raw/описание.csv")
 DYNAMIC_CACHE_DIR = Path("data/interim/dynamic_campaign_v1")
 
 MIN_TRAIN_CATEGORY_COUNT = 3
+
+TRANSFERRED_CUSTOMER_STAT_NAMES = (
+    "distinct_orders",
+    "total_quantity",
+    "distinct_products",
+    "distinct_categories",
+    "median_order_gap",
+    "median_purchase_quantity",
+)
 
 PRODUCT_ATTR_COLUMNS = {
     "brand": "brand",
@@ -42,6 +52,8 @@ class VariantSpec:
     product_embeddings: tuple[str, ...] = ()
     customer_embeddings: tuple[str, ...] = ()
     is_control: bool = False
+    customer_tabular_features: int = 6
+    product_demand_features: int = 18
 
 
 def build_variant_specs(*, best_t: str = "T1", best_f: str = "F_emb", best_p: str = "P") -> dict[str, VariantSpec]:
@@ -73,5 +85,58 @@ def build_variant_specs(*, best_t: str = "T1", best_f: str = "F_emb", best_p: st
             text_recipe=f_recipe,
             product_embeddings=best_p_embs,
             customer_embeddings=("sales_branch", "vat_status"),
+        ),
+    }
+
+
+def build_clean_v2_variant_specs() -> dict[str, VariantSpec]:
+    """Return clean-tower Stage 1 variants (0 customer tabular stats, 12D container_type only)."""
+    p_full = (
+        "category",
+        "subcategory",
+        "business_line",
+        "brand",
+        "tier",
+        "unit",
+        "country_of_origin",
+    )
+    p_nosubcat = (
+        "category",
+        "business_line",
+        "brand",
+        "tier",
+        "unit",
+        "country_of_origin",
+    )
+    return {
+        "C0_clean": VariantSpec(
+            name="C0_clean",
+            text_recipe="c0_s0",
+            is_control=True,
+            customer_tabular_features=0,
+            product_demand_features=12,
+        ),
+        "P_t1_fam_clean": VariantSpec(
+            name="P_t1_fam_clean",
+            text_recipe="t1_fam",
+            product_embeddings=p_full,
+            customer_tabular_features=0,
+            product_demand_features=12,
+        ),
+        "U0_t1_fam_clean": VariantSpec(
+            name="U0_t1_fam_clean",
+            text_recipe="t1_fam",
+            product_embeddings=p_full,
+            customer_embeddings=("sales_branch",),
+            customer_tabular_features=0,
+            product_demand_features=12,
+        ),
+        "U0_t1_fam_nosubcat": VariantSpec(
+            name="U0_t1_fam_nosubcat",
+            text_recipe="t1_fam",
+            product_embeddings=p_nosubcat,
+            customer_embeddings=("sales_branch",),
+            customer_tabular_features=0,
+            product_demand_features=12,
         ),
     }

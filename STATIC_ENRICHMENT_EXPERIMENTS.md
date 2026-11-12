@@ -153,3 +153,62 @@ PYTHONPATH=. ./venv/bin/python experiments/static_enrichment/run.py --phase repe
 PYTHONPATH=. ./venv/bin/python experiments/static_enrichment/run.py --phase downstream
 PYTHONPATH=. ./venv/bin/python experiments/static_enrichment/summarize.py
 ```
+
+---
+
+## 7. Clean Static Towers + Transferred 6-Stat Scoring MLP (`seed=42`)
+
+**Namespace:** `checkpoints/static-enrichment-v1/clean_v2/runs/` (preserves all v1 artifacts untouched)  
+**Evidence:** [`experiments/static_enrichment/clean_v2_results.json`](experiments/static_enrichment/clean_v2_results.json), [`experiments/static_enrichment/clean_v2_summary.json`](experiments/static_enrichment/clean_v2_summary.json), [`experiments/static_enrichment/clean_v2_COMPARISON.md`](experiments/static_enrichment/clean_v2_COMPARISON.md)
+
+### 7.1 Architectural Changes
+
+- **Zero Changeable Tower Inputs (Stage 1):**
+  - **`CustomerTower` (`num_tabular_features=0`):** Deleted all 6 changing customer statistics (`distinct_orders`, `total_quantity`, `distinct_products`, `distinct_categories`, `median_order_gap`, `median_purchase_quantity`) from `h_tab`. `tabular_proj[0]` takes strictly static IDs (`city_id`, `region_id`, `industry_id` -> `48D`, plus `sales_branch` `16D` -> `64D` in `U0_*`), fused with `h_text` and `h_hist` (last 32 purchases) into precomputed `u_c`.
+  - **`ProductTower` (`num_demand_features=12`):** Deleted the 6 demand columns (`demand[:, :6]`) from the tower input layer, leaving ONLY the `12D` static `container_type` one-hot buckets (`demand[:, 6:]`).
+  - **Text (`t1_fam`):** Uses `T1 + product_family` deduplicated text with **no `описание.csv` descriptions**.
+- **Transferred 6 Customer Stats & Precomputed MLP (Stage 2, `quota100_50`, 10 epochs, `seed=42`):**
+  - The 6 point-in-time customer stats (log1p-scaled strictly on training `< 2025-10-01`, quantized `float16 -> float32`) are fed directly into the downstream scoring MLP (`41 + 6 = 47` scalar features).
+  - **`best_clean-dot100_47`** (`TransferredStatsDynamicRanker`): `UPS-CANR` `dot100_41` (`425D` head) expanded to `431D` (`397 + 28 + 6`, zero-initialized on the 6 transferred columns).
+  - **`best_clean-precomputed_mlp_47`** (`PrecomputedEmbeddingMLPRanker`): Lightweight `184,833`-param MLP (`560 -> 256 -> 128 -> 64 -> 1`) using ONLY precomputed `u_c`, precomputed `v_p`, `u_c * v_p`, `|u_c - v_p|`, `u_c · v_p`, and all `47` changeable features — NO `h_text`/`h_tab` recomputation and NO 33-token cross-attention.
+
+### 7.2 Clean Stage 1 Results (`30` epochs verified, `seed=42`, `1,857` new targets)
+
+| Variant | Ep | Params | Fit (s) | Hits@25 | Recall@25 | Hits@50 | Recall@50 | With-Desc @25/@50 (514) | No-Desc @25/@50 (1,343) | Δ@25 vs `C0_clean` (95% CI) | Δ@50 vs `C0_clean` (95% CI) |
+|---|---:|---:|---:|---:|---:|---:|---:|---|---|---|---|
+| `C0_clean` | 13 | 822,829 | 50.71 | 710 | 38.23% | 972 | 52.34% | 188 / 264 | 522 / 708 | — | — |
+| `P_t1_fam_clean` (`best_clean`) | 21 | 853,309 | 49.62 | **749** | **40.33%** | **1,037** | **55.84%** | 190 / 279 | 559 / 758 | **[+0.11, +2.07, +4.09] pp** | **[+1.71, +3.48, +5.38] pp** |
+| `U0_t1_fam_clean` | 26 | 855,469 | 49.36 | 737 | 39.69% | 1,009 | 54.33% | 206 / 281 | 531 / 728 | [-0.59, +1.45, +3.35] pp | [-0.05, +1.99, +4.06] pp |
+| `U0_t1_fam_nosubcat` | 20 | 850,637 | 50.50 | 719 | 38.72% | 1,015 | 54.66% | 205 / 285 | 514 / 730 | [-1.40, +0.51, +2.48] pp | [+0.38, +2.33, +4.29] pp |
+
+- **`subcategory` embedding ablation (`U0_t1_fam_clean` vs `U0_t1_fam_nosubcat`):** Keeping the `16D` `subcategory` embedding yielded `+18` unseen hits@25 (`737` vs `719`; customer-clustered 95% CI `[-0.65, +0.93, +2.55] pp`) and `-6` hits@50 (`1,009` vs `1,015`; 95% CI `[-1.99, -0.33, +1.36] pp`).
+- **`P_t1_fam_clean` vs `C0_clean`:** Removing the 6 changing customer stats and 6 product demand inputs while using `t1_fam` (no `описание.csv`) + 7 static product attribute embeddings delivered a strictly positive seed-42 gain of `+39` unseen hits@25 and `+65` unseen hits@50.
+
+### 7.3 Downstream Stage 2 Results (`quota100_50`, `10` epochs verified, `seed=42`)
+
+| Config | Ep | Qual | Params (Trainable) | Fit (s) | New Hits@10 | New Recall@10 | Recall@10 | NDCG@10 | Slate New Targets |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|
+| `C0_clean-dot100_41` | 8 | True | 1,017,482 (815,498) | 134.38 | **241** | **12.98%** | **0.762081** | **0.597476** | 1,230 |
+| `P_t1_fam_clean-dot100_41` | 7 | True | 1,017,482 (815,498) | 134.52 | 239 | 12.87% | 0.761552 | 0.593200 | 1,267 |
+| `P_t1_fam_clean-dot100_47` | 7 | True | 1,019,018 (817,034) | 143.44 | 233 | 12.55% | 0.760275 | 0.592892 | 1,267 |
+| `P_t1_fam_clean-precomputed_mlp_47` | 1 | **False** | 184,833 (184,833) | 59.87 | 198 | 10.66% | 0.745342 | 0.575605 | 1,267 |
+
+Paired customer-clustered 95% intervals (`seed=42`):
+- `P_t1_fam_clean-dot100_41` vs `C0_clean-dot100_41`: `Δ Recall@10 = [-0.00517, -0.00043, +0.00415]`, `Δ NDCG@10 = [-0.00702, -0.00427, -0.00140]`, `Δ New Recall@10 = [-0.01041, -0.00107, +0.00839]`.
+- `P_t1_fam_clean-dot100_47` vs `P_t1_fam_clean-dot100_41`: `Δ Recall@10 = [-0.00432, -0.00124, +0.00159]`, `Δ NDCG@10 = [-0.00241, -0.00030, +0.00210]`, `Δ New Recall@10 = [-0.01131, -0.00331, +0.00479]`.
+- `P_t1_fam_clean-precomputed_mlp_47` vs `P_t1_fam_clean-dot100_47`: `Δ Recall@10 = [-0.02063, -0.01501, -0.00924]`, `Δ NDCG@10 = [-0.02165, -0.01733, -0.01318]`, `Δ New Recall@10 = [-0.03363, -0.01870, -0.00485]`.
+
+### 7.4 Conclusions (`clean_v2`, `seed=42`)
+
+1. **Stage 1 clean static towers work cleanly:** Removing the 6 changeable customer stats and 6 demand dims preserves baseline quality (`C0_clean` `710@25`) and `P_t1_fam_clean` reaches `749@25` / `1,037@50` without `описание.csv` descriptions.
+2. **Transferring the 6 customer stats to the Stage 2 `dot100` MLP (`47` vs `41`) is neutral-to-slightly-negative:** `UPS-CANR` already models customer profile statistics in its statistics-biased cross-attention (`dot100_41` `239` vs `dot100_47` `233`).
+3. **Lightweight precomputed-embedding MLP (`precomputed_mlp_47`) is insufficient:** Replacing `UPS-CANR`'s 33-token cross-attention with an MLP over precomputed `(u_c, v_p)` + `47` features trains faster (`59.9s` vs `143.4s`) but drops `-0.0173` NDCG@10 and `-0.0150` Recall@10, failing both reference quality floors (`Recall@10 >= 0.7558833`, `NDCG@10 >= 0.5918929`).
+
+### 7.5 Reproduction Commands (`clean_v2`)
+
+```bash
+PYTHONPATH=. ./venv/bin/pytest tests/
+PYTHONPATH=. ./venv/bin/pytest tests/ --synthetic-only
+PYTHONPATH=. ./venv/bin/python experiments/static_enrichment/run.py --phase clean_v2
+PYTHONPATH=. ./venv/bin/python experiments/static_enrichment/summarize.py --campaign clean_v2
+```

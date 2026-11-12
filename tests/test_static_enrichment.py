@@ -5,8 +5,13 @@ import pandas as pd
 import pytest
 import torch
 
-from recommender.experiments.static_enrichment.config import VariantSpec, build_variant_specs
+from recommender.experiments.static_enrichment.config import (
+    VariantSpec,
+    build_clean_v2_variant_specs,
+    build_variant_specs,
+)
 from recommender.experiments.static_enrichment.data import (
+    extract_point_in_time_customer_stats,
     load_dynamic_campaign_features_readonly,
     prepare_static_enrichment_bundle,
 )
@@ -26,7 +31,13 @@ from recommender.experiments.static_enrichment.metadata import (
     load_enriched_catalogue,
     load_enriched_companies,
 )
-from recommender.experiments.static_enrichment.model import StaticEnrichedRetriever
+from recommender.experiments.static_enrichment.model import (
+    PrecomputedEmbeddingMLPRanker,
+    StaticEnrichedRetriever,
+    TransferredStatsDynamicRanker,
+)
+from recommender.experiments.candidate_context.model import CandidateContextRanker
+from recommender.ranker import UPSCANRRanker
 from recommender.experiments.static_enrichment.text_cache import (
     build_product_text,
     compute_text_recipe_hash,
@@ -243,3 +254,169 @@ def test_stage1_cohort_metrics_and_paired_intervals(tmp_path):
 
     ci = paired_stage1_intervals([tmp_path / "p.npz"], [tmp_path / "p.npz"], repeats=20)
     assert all(vals == [0.0, 0.0, 0.0] for vals in ci.values())
+
+
+def test_clean_v2_towers_delete_changeable_customer_and_product_inputs():
+    clean_specs = build_clean_v2_variant_specs()
+    assert set(clean_specs.keys()) == {
+        "C0_clean",
+        "P_t1_fam_clean",
+        "U0_t1_fam_clean",
+        "U0_t1_fam_nosubcat",
+    }
+    assert "subcategory" in clean_specs["U0_t1_fam_clean"].product_embeddings
+    assert "subcategory" not in clean_specs["U0_t1_fam_nosubcat"].product_embeddings
+
+    for name in ("C0_clean", "U0_t1_fam_clean"):
+        spec = clean_specs[name]
+        p_sizes = {k: 5 for k in spec.product_embeddings}
+        c_sizes = {k: 4 for k in spec.customer_embeddings}
+        model = StaticEnrichedRetriever(
+            spec,
+            num_cities=10,
+            num_regions=6,
+            num_industries=6,
+            num_catalog_products=4,
+            num_demand_features=spec.product_demand_features,
+            product_attr_vocab_sizes=p_sizes,
+            customer_attr_vocab_sizes=c_sizes,
+            text_dim=16,
+            output_dim=8,
+            hidden_dim=16,
+        )
+        cust_tower = model.towers.customer_tower if spec.is_control else model.customer_tower
+        prod_tower = model.towers.product_tower if spec.is_control else model.product_tower
+        assert cust_tower.num_tabular_features == 0
+        expected_tab_in = 48 + (16 if "sales_branch" in spec.customer_embeddings else 0)
+        assert cust_tower.tabular_proj[0].in_features == expected_tab_in
+        assert prod_tower.num_demand_features == 12
+        assert prod_tower.mlp[0].in_features == 16 + 16 * len(spec.product_embeddings) + 12
+
+        prod_base = {
+            "text_embedding": torch.randn(4, 16),
+            "brand_id": torch.zeros(4, dtype=torch.long),
+            "category_id": torch.zeros(4, dtype=torch.long),
+            "subcategory_id": torch.zeros(4, dtype=torch.long),
+            "business_line_id": torch.zeros(4, dtype=torch.long),
+            "demand_features": torch.cat([torch.zeros(4, 6), torch.eye(12)[:4]], dim=1),
+            "attr_ids": {k: torch.zeros(4, dtype=torch.long) for k in spec.product_embeddings},
+        }
+        prod_mut = dict(prod_base)
+        prod_mut["demand_features"] = prod_base["demand_features"].clone()
+        prod_mut["demand_features"][:, :6] = 999.0
+
+        model.eval()
+        v1 = model.product_vectors(prod_base)
+        v2 = model.product_vectors(prod_mut)
+        torch.testing.assert_close(v1, v2, atol=0.0, rtol=0.0)
+
+        cust_base = {
+            "text_embedding": torch.randn(2, 16),
+            "city_id": torch.zeros(2, dtype=torch.long),
+            "region_id": torch.zeros(2, dtype=torch.long),
+            "industry_id": torch.zeros(2, dtype=torch.long),
+            "tabular_features": torch.zeros(2, 6),
+            "sequence": torch.rand(2, 4, 9),
+            "attention_mask": torch.tensor([[1, 1, 0, 0], [1, 0, 0, 0]]),
+            "seq_product_ids": torch.tensor([[1, 2, 0, 0], [3, 0, 0, 0]]),
+            "seq_purchase_dates": torch.zeros(2, 4),
+            "extra_attr_ids": {k: torch.zeros(2, dtype=torch.long) for k in spec.customer_embeddings},
+        }
+        cust_mut = dict(cust_base)
+        cust_mut["tabular_features"] = torch.full((2, 6), 999.0)
+        u1 = model.encode_purchase(cust_base, v1)
+        u2 = model.encode_purchase(cust_mut, v1)
+        torch.testing.assert_close(u1, u2, atol=0.0, rtol=0.0)
+
+
+def test_point_in_time_customer_stats_and_47_feature_rankers():
+    purchases = pd.DataFrame([
+        {
+            "customer_id": "C1",
+            "product_id": "P1",
+            "purchase_date": pd.Timestamp("2025-02-01"),
+            "quantity": 10.0,
+            "product_category": "CAT_A",
+        },
+        {
+            "customer_id": "C1",
+            "product_id": "P2",
+            "purchase_date": pd.Timestamp("2025-04-01"),
+            "quantity": 20.0,
+            "product_category": "CAT_B",
+        },
+        {
+            "customer_id": "C1",
+            "product_id": "P3",
+            "purchase_date": pd.Timestamp("2025-11-01"),
+            "quantity": 5000.0,
+            "product_category": "CAT_C",
+        },
+    ])
+    train_queries = [("C1", pd.Timestamp("2025-03-01"))]
+    val_queries = [("C1", pd.Timestamp("2025-11-01")), ("C1", pd.Timestamp("2025-12-01"))]
+    tr_stats, val_stats, normalizer = extract_point_in_time_customer_stats(
+        purchases, train_queries, val_queries
+    )
+    assert tr_stats.shape == (1, 6) and val_stats.shape == (2, 6)
+    # Normalizer fitted strictly on train_queries (1 prior order, max=1, max_qty=10):
+    assert normalizer.scalers["distinct_orders"].max_val == 1.0
+    assert normalizer.scalers["total_quantity"].max_val == 10.0
+    # 2025-11-01 purchase is strictly excluded on 2025-11-01 (only 2 prior orders), included on 2025-12-01.
+    assert val_stats[0, 0] <= val_stats[1, 0] and torch.isfinite(val_stats).all()
+
+    base = UPSCANRRanker(
+        text_dim=16,
+        memory_dim=16,
+        hidden_dim=16,
+        num_cities=5,
+        num_regions=5,
+        num_industries=5,
+        num_products=10,
+        num_categories=5,
+        num_subcategories=5,
+        num_business_lines=5,
+        statistics_attention=True,
+        excluded_statistics=("history_repeat",),
+        cached_only=True,
+    )
+    dyn_41 = CandidateContextRanker(base, mode="dynamic_features")
+    dyn_47 = TransferredStatsDynamicRanker(dyn_41, num_customer_stats=6)
+    assert dyn_47.ranker.head[0].in_features == 16 * 3 + 41 + 6
+
+    B, C = 2, 5
+    common = {
+        "text_embedding": torch.randn(B, 16),
+        "city_id": torch.zeros(B, dtype=torch.long),
+        "region_id": torch.zeros(B, dtype=torch.long),
+        "industry_id": torch.zeros(B, dtype=torch.long),
+        "tabular_features": torch.rand(B, 8),
+        "sequence": torch.rand(B, 4, 9),
+        "attention_mask": torch.tensor([[1, 1, 0, 0], [1, 0, 0, 0]]),
+        "seq_product_ids": torch.tensor([[1, 2, 0, 0], [3, 0, 0, 0]]),
+        "seq_category_ids": torch.zeros(B, 4, dtype=torch.long),
+        "seq_subcategory_ids": torch.zeros(B, 4, dtype=torch.long),
+        "seq_business_line_ids": torch.zeros(B, 4, dtype=torch.long),
+        "seq_purchase_dates": torch.zeros(B, 4),
+        "prediction_day": torch.tensor([100.0, 120.0]),
+        "candidate_vectors": torch.randn(B, C, 16),
+        "pairwise_features": torch.rand(B, C, 41),
+        "cached_customer_vectors": torch.randn(B, 16),
+        "transferred_customer_stats": torch.rand(B, 6),
+    }
+    out_47 = dyn_47(**common)
+    assert out_47.scores.shape == (B, C) and torch.isfinite(out_47.scores).all()
+    out_47.scores.sum().backward()
+
+    mlp_47 = PrecomputedEmbeddingMLPRanker(
+        embedding_dim=16, num_pairwise_features=41, num_customer_stats=6
+    )
+    assert mlp_47.head[0].in_features == 16 * 4 + 1 + 41 + 6
+    out_mlp = mlp_47(
+        candidate_vectors=common["candidate_vectors"],
+        pairwise_features=common["pairwise_features"],
+        cached_customer_vectors=common["cached_customer_vectors"],
+        transferred_customer_stats=common["transferred_customer_stats"],
+    )
+    assert out_mlp.scores.shape == (B, C) and out_mlp.attn_weights is None
+    out_mlp.scores.sum().backward()
