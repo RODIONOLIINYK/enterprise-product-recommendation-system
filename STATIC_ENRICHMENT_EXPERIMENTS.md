@@ -212,3 +212,81 @@ PYTHONPATH=. ./venv/bin/pytest tests/ --synthetic-only
 PYTHONPATH=. ./venv/bin/python experiments/static_enrichment/run.py --phase clean_v2
 PYTHONPATH=. ./venv/bin/python experiments/static_enrichment/summarize.py --campaign clean_v2
 ```
+
+---
+
+## 8. Compact Stage 1 Selector (`stage1_mlp_v3`) & Stage 2 Isolation Audit (`seed=42`, Validation-Only)
+
+**Namespace:** `checkpoints/static-enrichment-v1/stage1_mlp_v3/runs/` (all `v1` and `clean_v2` checkpoints/caches preserved untouched; `promoted = false`, `heldout_access = false`)  
+**Evidence:** [`experiments/static_enrichment/stage1_mlp_v3_results.json`](experiments/static_enrichment/stage1_mlp_v3_results.json), [`experiments/static_enrichment/stage1_mlp_v3_summary.json`](experiments/static_enrichment/stage1_mlp_v3_summary.json), [`experiments/static_enrichment/stage1_mlp_v3_COMPARISON.md`](experiments/static_enrichment/stage1_mlp_v3_COMPARISON.md)
+
+### 8.1 Architecture Alignment & Contracts
+
+1. **Clean Static Stage 1 Towers (128D `u_c` and `v_p`):**
+   - `CustomerTower`: **`num_tabular_features=0`** (no changing customer stats), retaining `h_text`, static `h_tab`, and `h_hist` (last 32 purchases). **`U0_t1_fam_clean` (`64D` tabular: `48D` `city`/`region`/`industry` + `16D` `sales_branch`)** satisfies the user `sales_branch` requirement; `P_t1_fam_clean` (`48D`, no `sales_branch`) is retained strictly as a benchmark comparison.
+   - `ProductTower`: **`num_demand_features=12`** (`container_type` one-hot only, zero demand stats), `t1_fam` deduplicated text (no `описание.csv` descriptions, `product_family` in text), and seven `16D` embeddings (`category`, `subcategory`, `business_line`, `brand`, `tier`, `unit`, `country_of_origin`).
+2. **Stage 1 Full-Pool `CompactStage1Selector` (scores full eligible pool before `quota100_50` slate selection):**
+   - Trained for `10` epochs (`batch_size=64`, `lr=1e-3`, `weight_decay=1e-4`, eligible-pool `BCEWithLogitsLoss(pos_weight=20.0)`), checkpoint selected by `(new_hits@50, ndcg@10, recall@10)`.
+   - **`uv_47` (`303D`, `47,617` params):** `[u(128), v(128), features_41(41), customer_stats_6(6)] -> 128 -> 64 -> 1`.
+   - **`uv_47_ref` (`304D`, `47,745` params):** `[u(128), v(128), features_41(41), customer_stats_6(6), reference_score/10(1)] -> 128 -> 64 -> 1`.
+   - `customer_stats_6` contains all 6 transferred point-in-time stats (`distinct_orders`, `total_quantity`, `distinct_products`, `distinct_categories`, `median_order_gap`, `median_purchase_quantity`), `float16 -> float32` quantized consistently.
+3. **Stage 2 Ranker (`UPS-CANR`):** Retained (`CandidateContextRanker(dynamic_features)`, `quota100_50` 100-item slates) to produce final top-10 rankings; BOTH discovery-selected (`best.pt`) and NDCG-selected (`best_ndcg.pt`) checkpoints are saved and replayed.
+
+### 8.2 Latent Bug Fixes & `LEGACY_PROFILE_FEATURES` Accounting
+
+- **Item D (`_make_downstream_ranker` bug fix):** Previously checked `source.shape[1] >= 48 + len(ref_config["profile_features"])` (`54`), which evaluated `True` for `U0_t1_fam_clean` (`64D = 48D + 16D sales_branch`), causing the last 6 coordinates of `sales_branch` weights to be miscopied into `UPS-CANR` profile stats. Fixed via `_resolve_stage1_customer_tabular_contract` in [`recommender/experiments/static_enrichment/train.py`](recommender/experiments/static_enrichment/train.py) to inspect explicit metadata (`customer_tabular_features`, `customer_profile_features`, `customer_embeddings`), validate exact widths, reject ambiguous checkpoints missing metadata with `ValueError`, and leave `tabular_proj[0].weight[:, 48:]` untouched when `customer_tabular_features=0`.
+- **Item E (`LEGACY_PROFILE_FEATURES` overlap):** `UPSCANRRanker`'s 8-feature `LEGACY_PROFILE_FEATURES` (`total_purchases`, `total_quantity`, `distinct_products`, `distinct_orders`, `distinct_categories`, `days_since_first_order`, `days_since_last_order`, `median_order_gap`) overlaps **5 of the 6** transferred stats and omits `median_purchase_quantity`.
+
+### 8.3 Stage 1 Clean Towers vs `CompactStage1Selector` (Full Pool & `quota100_50` Coverage, `6,191` Val Queries)
+
+Note on denominators: all `6,191` validation transitions have `>= 100` eligible rolling SKUs; total new targets = `1,857` (used by `new_recall@10` and Stage 1 `@25/@50`), of which `1,810` belong to the rolling eligible pool (`(target & unseen).sum()`) and `47` are uneligible cold targets (`target & ~allowed`).
+
+| Stage 1 Scorer | Input | Ep | `sales_branch` | Unseen@25 | Unseen@50 | Recall@10 | NDCG@10 | Slate New Targets (Elig Cov / All Cov) | Slate Overall Cov |
+|---|---|---:|---|---:|---:|---:|---:|---:|---:|
+| `C0_clean + dot` | 128D dot | 13 | No (`48D`) | 710 | 972 | 0.34870 | 0.20980 | 1,230 (67.96% / 66.24%) | 93.60% |
+| `P_t1_fam_clean + dot` | 128D dot | 21 | No (`48D`) | **749** | **1,037** | 0.35373 | 0.21049 | 1,267 (70.00% / 68.23%) | 94.02% |
+| `U0_t1_fam_clean + dot` | 128D dot | 26 | **Yes (`16D`, total `64D`)** | 737 | 1,009 | 0.37333 | 0.22104 | **1,274 (70.39% / 68.61%)** | 93.99% |
+| `U0 + CompactStage1Selector (uv_47)` | 303D MLP | 1 | Yes (`16D` in `u`) | 737 | 1,012 | **0.75052** | **0.57713** | 1,254 (69.28% / 67.53%) | **94.04%** |
+| `U0 + CompactStage1Selector (uv_47_ref)` | 304D MLP | 1 | Yes (`16D` in `u`) | 703 | 993 | 0.74662 | 0.57582 | 1,251 (69.12% / 67.37%) | 93.96% |
+
+**Feature-group zero ablations on `CompactStage1Selector` (epoch 1):**
+- **`uv_47` (`303D`):** Full (`R@10=0.75052`, `NDCG=0.57713`, `unseen@25=737`, `unseen@50=1,012`, `slate_new=1,254`) vs zero `features_41` (`R@10=0.18806`, `NDCG=0.09200`, `unseen@25=547`, `unseen@50=839`, `slate_new=1,088`) vs zero `customer_stats_6` (`R@10=0.75275`, `NDCG=0.57460`, `unseen@25=723`, `unseen@50=1,011`, `slate_new=1,244`) vs zero both 47 (`R@10=0.21095`, `NDCG=0.10203`, `unseen@25=572`, `unseen@50=841`, `slate_new=1,084`).
+- **`uv_47_ref` (`304D`):** Full (`R@10=0.74662`, `NDCG=0.57582`, `unseen@25=703`, `unseen@50=993`, `slate_new=1,251`) vs zero `features_41` (`R@10=0.37381`, `NDCG=0.22509`, `unseen@25=676`, `unseen@50=963`, `slate_new=1,205` — falls back to the dot anchor) vs zero `customer_stats_6` (`R@10=0.74785`, `NDCG=0.57560`, `unseen@25=702`, `unseen@50=1,004`, `slate_new=1,257`).
+- By epoch 10, Stage 1 selector overall ranking increases (`uv_47` `NDCG=0.58683`, `uv_47_ref` `NDCG=0.58832`) while unseen recall@50 declines (`946` and `933`) as repeat purchases dominate eligible-pool BCE.
+
+### 8.4 Stage 2 End-to-End `UPS-CANR` & Regression Isolation Diagnostics (`quota100_50`, `seed=42`)
+
+| Config | Selector / Init / Slate | Ep (Disc/NDCG) | R@5 (Disc) | R@10 (Disc) | NDCG@10 (Disc) | Repeat R@10 | New@10 (Disc) | Cond New | Slate New | R@10 (NDCG) | NDCG@10 (NDCG) | New@10 (NDCG) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `C0_clean-dot100_41` (v2) | `C0_clean` dot / `C0` / `C0` | 8 / 8 | 0.65251 | 0.76208 | **0.59748** | 0.88407 | 241 (12.98%) | **19.59%** | 1,230 | 0.76208 | **0.59748** | 241 |
+| `U0-dot100_41` | `U0` dot / `U0` (fixed) / `U0` | 6 / 6 | 0.65343 | 0.76457 | 0.59606 | 0.88775 | 233 (12.55%) | 18.29% | **1,274** | 0.76457 | 0.59606 | 233 |
+| `U0-mlp303_100_41` | `uv_47` (303D) / `U0` / `uv_47` | 7 / 6 | 0.65015 | 0.75973 | 0.59461 | 0.88348 | 226 (12.17%) | 18.02% | 1,254 | 0.76377 | 0.59665 | 224 |
+| `U0-mlp304_100_41` | `uv_47_ref` (304D) / `U0` / `uv_47_ref` | 6 / 6 | **0.65525** | **0.76516** | 0.59667 | **0.88859** | 233 (12.55%) | 18.63% | 1,251 | 0.76516 | 0.59667 | 233 |
+| `P-dot100_41` | `P` dot / `P` / `P` | 7 / 6 | 0.64782 | 0.76065 | 0.59311 | 0.88300 | 234 (12.60%) | 18.47% | 1,267 | 0.76342 | 0.59475 | 230 |
+| `P-dot100_41-init_c0` | `P` dot / `C0` init / `P` | 7 / 6 | 0.65068 | 0.76189 | 0.59365 | 0.88419 | **243 (13.09%)** | 19.18% | 1,267 | 0.76469 | 0.59542 | 239 |
+| `P-c0_slate_init_c0-41` | `C0` dot / `C0` init / `C0` (`P` vecs) | 10 / 6 | 0.65357 | 0.75920 | 0.59547 | 0.88312 | 233 (12.55%) | 18.94% | 1,230 | **0.76595** | 0.59606 | 231 |
+
+**Diagnosis Findings (Items A–C):**
+- **Item A (Selection objective):** In `clean_v2` `P_t1_fam_clean-dot100_41`, discovery selection picked epoch 7 (`NDCG=0.59320`, `R@10=0.76155`, `new=239`) while NDCG peaked at epoch 6 (`NDCG=0.59608`, `R@10=0.76413`, `new=227`, weights unsaved in `clean_v2`). In our v3 replay (`P-dot100_41`), saving BOTH checkpoints confirms epoch 6 (`NDCG=0.59475`, `R@10=0.76342`) vs epoch 7 (`NDCG=0.59311`, `R@10=0.76065`). Meanwhile `C0_clean-dot100_41`, `U0-dot100_41`, and `U0-mlp304_100_41` all unify discovery and NDCG peaks on the same epoch (`8`, `6`, `6`).
+- **Item B (Conversion vs coverage):** Both `U0` (`1,274` slate new targets) and `P` (`1,267`) widen Stage 1 slate new-target coverage over `C0_clean` (`1,230`), yet Stage 2 converts a smaller fraction to Top-10 (`18.29%` for `U0-dot100_41`, `18.63%` for `U0-mlp304_100_41`, vs `19.59%` for `C0_clean-dot100_41`).
+- **Item C (Copied init vs slates vs vectors):** On `P_t1_fam_clean`, holding `P` slates (`1,267`) and `P` vectors fixed while swapping ONLY Stage 1 copied initialization from `P` to `C0_clean` (`P-dot100_41-init_c0`) lifts discovery hits `+9` (`234 -> 243`, exceeding `C0_clean`'s `241`) and NDCG (`0.59311 -> 0.59365` disc; `0.59475 -> 0.59542` NDCG). Swapping slates back to `C0_clean` (`P-c0_slate_init_c0-41`) recovers `NDCG@10` (`0.59606`) and highest `R@10` (`0.76595` NDCG ep) at the cost of losing 37 slate new targets (`1,267 -> 1,230`). Paired customer-clustered 95% CIs within `seed=42` (`U0-mlp304_100_41` vs `U0-dot100_41`: `ΔR@10=[-0.00259, +0.00053, +0.00364]`, `ΔNDCG@10=[-0.00157, +0.00057, +0.00284]`, `ΔNewR@10=[-0.00860, 0.0, +0.00809]`) show query-level uncertainty only (not multi-seed variance) and cross zero.
+
+### 8.5 Warm Single-Request Latency (`U0_t1_fam_clean` Cached Vectors, 50 repeats)
+
+| Device | Pipeline | E2E Median (ms) | E2E p95 (ms) | Selector (ms) | Select100 (ms) | Ranker (ms) |
+|---|---|---:|---:|---:|---:|---:|
+| CPU | `U0-dot100_41` | **1.014** | 1.137 | 0.015 | 0.039 | 0.860 |
+| CPU | `U0-mlp303_100_41` | 1.478 | 1.973 | 0.415 | 0.045 | 0.929 |
+| CPU | `U0-mlp304_100_41` | 1.517 | 2.002 | 0.453 | 0.046 | 0.935 |
+| MPS | `U0-dot100_41` | **4.117** | 10.638 | 0.269 | 0.965 | 2.636 |
+| MPS | `U0-mlp303_100_41` | 4.197 | **9.001** | 0.491 | 0.994 | 2.644 |
+| MPS | `U0-mlp304_100_41` | 4.174 | 10.603 | 0.573 | 1.067 | 2.623 |
+
+### 8.6 Reproduction Commands (`stage1_mlp_v3`)
+
+```bash
+PYTHONPATH=. ./venv/bin/pytest tests/
+PYTHONPATH=. ./venv/bin/pytest tests/ --synthetic-only
+PYTHONPATH=. ./venv/bin/python experiments/static_enrichment/run.py --phase stage1_mlp_v3
+PYTHONPATH=. ./venv/bin/python experiments/static_enrichment/summarize.py --campaign stage1_mlp_v3
+```

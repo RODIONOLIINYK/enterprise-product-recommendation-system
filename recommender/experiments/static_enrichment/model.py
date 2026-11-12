@@ -527,3 +527,154 @@ class PrecomputedEmbeddingMLPRanker(nn.Module):
             token_0_weight=None,
             history_weights=None,
         )
+
+
+COMPACT_SELECTOR_RECIPES = ("uv_47", "uv_47_ref")
+
+
+class CompactStage1Selector(nn.Module):
+    """Pointwise Stage 1 full-pool selector over cached u_c, v_p, and 47 dynamic features (+ optional ref)."""
+
+    def __init__(
+        self,
+        recipe: str = "uv_47",
+        *,
+        embedding_dim: int = OUTPUT_DIM,
+        num_dynamic_features: int = 41,
+        num_customer_stats: int = 6,
+        hidden_dims: Sequence[int] = (128, 64),
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        if recipe not in COMPACT_SELECTOR_RECIPES:
+            raise ValueError(f"Unsupported CompactStage1Selector recipe {recipe!r}; expected one of {COMPACT_SELECTOR_RECIPES}.")
+        if len(hidden_dims) < 1:
+            raise ValueError("hidden_dims must contain at least one layer width.")
+        self.recipe = recipe
+        self.embedding_dim = int(embedding_dim)
+        self.num_dynamic_features = int(num_dynamic_features)
+        self.num_customer_stats = int(num_customer_stats)
+        self.hidden_dims = tuple(int(h) for h in hidden_dims)
+        self.dropout = float(dropout)
+
+        blocks = [
+            ("u", self.embedding_dim),
+            ("v", self.embedding_dim),
+            ("features_41", self.num_dynamic_features),
+            ("customer_stats_6", self.num_customer_stats),
+        ]
+        if recipe == "uv_47_ref":
+            blocks.append(("reference_score_over_10", 1))
+        self.ordered_input_blocks = tuple(blocks)
+        self.input_dim = sum(dim for _, dim in self.ordered_input_blocks)
+
+        layers = []
+        prev_dim = self.input_dim
+        for width in self.hidden_dims:
+            layers.extend([
+                nn.Linear(prev_dim, width),
+                nn.LayerNorm(width),
+                nn.GELU(),
+                nn.Dropout(self.dropout),
+            ])
+            prev_dim = width
+        layers.append(nn.Linear(prev_dim, 1))
+        self.head = nn.Sequential(*layers)
+
+    def input_contract(self) -> dict:
+        return {
+            "recipe": self.recipe,
+            "input_dim": self.input_dim,
+            "ordered_input_blocks": [{"name": name, "dim": dim} for name, dim in self.ordered_input_blocks],
+        }
+
+    def _score_chunk(
+        self,
+        u_expanded: torch.Tensor,
+        v_chunk: torch.Tensor,
+        f_chunk: torch.Tensor,
+        stats_expanded: torch.Tensor,
+        ref_chunk: Optional[torch.Tensor],
+    ) -> torch.Tensor:
+        parts = [u_expanded, v_chunk, f_chunk, stats_expanded]
+        if self.recipe == "uv_47_ref":
+            if ref_chunk is None:
+                raise ValueError("reference_scores must be provided for recipe='uv_47_ref'.")
+            parts.append(ref_chunk)
+        x = torch.cat(parts, dim=-1)
+        return self.head(x).squeeze(-1)
+
+    def forward(
+        self,
+        *,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        features_41: torch.Tensor,
+        customer_stats_6: torch.Tensor,
+        reference_scores: Optional[torch.Tensor] = None,
+        product_chunk_size: Optional[int] = None,
+    ) -> torch.Tensor:
+        if u.ndim != 2 or u.shape[-1] != self.embedding_dim:
+            raise ValueError(f"Expected u shape (B, {self.embedding_dim}), got {tuple(u.shape)}.")
+        if customer_stats_6.ndim != 2 or customer_stats_6.shape[-1] != self.num_customer_stats:
+            raise ValueError(
+                f"Expected customer_stats_6 shape (B, {self.num_customer_stats}), got {tuple(customer_stats_6.shape)}."
+            )
+        if features_41.ndim != 3 or features_41.shape[-1] != self.num_dynamic_features:
+            raise ValueError(
+                f"Expected features_41 shape (B, P, {self.num_dynamic_features}), got {tuple(features_41.shape)}."
+            )
+        batch_size, num_products, _ = features_41.shape
+        if v.ndim == 2:
+            if v.shape != (num_products, self.embedding_dim):
+                raise ValueError(f"Expected v shape ({num_products}, {self.embedding_dim}), got {tuple(v.shape)}.")
+        elif v.ndim == 3:
+            if v.shape != (batch_size, num_products, self.embedding_dim):
+                raise ValueError(
+                    f"Expected v shape ({batch_size}, {num_products}, {self.embedding_dim}), got {tuple(v.shape)}."
+                )
+        else:
+            raise ValueError(f"Expected 2D or 3D v tensor, got shape {tuple(v.shape)}.")
+
+        ref_scaled: Optional[torch.Tensor] = None
+        if self.recipe == "uv_47_ref":
+            if reference_scores is None:
+                raise ValueError("reference_scores must be provided for recipe='uv_47_ref'.")
+            if reference_scores.ndim == 2:
+                ref_scaled = (reference_scores / 10.0).unsqueeze(-1)
+            elif reference_scores.ndim == 3 and reference_scores.shape[-1] == 1:
+                ref_scaled = reference_scores / 10.0
+            else:
+                raise ValueError(f"Unexpected reference_scores shape {tuple(reference_scores.shape)}.")
+            if ref_scaled.shape[:2] != (batch_size, num_products):
+                raise ValueError(
+                    f"Expected reference_scores batch/product dims ({batch_size}, {num_products}), got {tuple(ref_scaled.shape[:2])}."
+                )
+
+        if product_chunk_size is not None and int(product_chunk_size) > 0 and int(product_chunk_size) < num_products:
+            chunk = int(product_chunk_size)
+            outputs = []
+            for start in range(0, num_products, chunk):
+                end = min(start + chunk, num_products)
+                span = end - start
+                u_chunk = u.unsqueeze(1).expand(batch_size, span, self.embedding_dim)
+                stats_chunk = customer_stats_6.unsqueeze(1).expand(batch_size, span, self.num_customer_stats)
+                v_chunk = (
+                    v[start:end].unsqueeze(0).expand(batch_size, span, self.embedding_dim)
+                    if v.ndim == 2
+                    else v[:, start:end, :]
+                )
+                f_chunk = features_41[:, start:end, :]
+                r_chunk = None if ref_scaled is None else ref_scaled[:, start:end, :]
+                outputs.append(self._score_chunk(u_chunk, v_chunk, f_chunk, stats_chunk, r_chunk))
+            return torch.cat(outputs, dim=1)
+
+        u_exp = u.unsqueeze(1).expand(batch_size, num_products, self.embedding_dim)
+        stats_exp = customer_stats_6.unsqueeze(1).expand(batch_size, num_products, self.num_customer_stats)
+        v_exp = (
+            v.unsqueeze(0).expand(batch_size, num_products, self.embedding_dim)
+            if v.ndim == 2
+            else v
+        )
+        return self._score_chunk(u_exp, v_exp, features_41, stats_exp, ref_scaled)
+

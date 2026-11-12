@@ -347,11 +347,165 @@ def summarize_clean_v2() -> None:
     print("Wrote clean_v2_summary.json and clean_v2_COMPARISON.md to", EVIDENCE_ROOT, flush=True)
 
 
+def summarize_stage1_mlp_v3() -> None:
+    raw = json.loads((EVIDENCE_ROOT / "stage1_mlp_v3_results.json").read_text(encoding="utf-8"))
+    v2_raw_path = EVIDENCE_ROOT / "clean_v2_results.json"
+    v2_raw = json.loads(v2_raw_path.read_text(encoding="utf-8")) if v2_raw_path.is_file() else {}
+    seed = 42
+
+    c0_v2 = v2_raw.get("downstream", {}).get(f"C0_clean-dot100_41-seed{seed}")
+    c0_pred = (
+        Path(c0_v2["selected_checkpoint"]).parent / "predictions.npz"
+        if c0_v2 and c0_v2.get("selected_checkpoint")
+        else None
+    )
+
+    def _pred_pair(cfg: str, kind: str = "discovery") -> Path:
+        d = raw["downstream"][cfg]
+        if kind == "ndcg":
+            return Path(d["ndcg_selection"]["predictions"])
+        return Path(d["discovery_selection"]["predictions"])
+
+    paired_discovery = {}
+    paired_ndcg = {}
+    u0_dot_cfg = "U0-dot100_41"
+    for cfg in raw["downstream"]:
+        if c0_pred is not None and c0_pred.is_file():
+            paired_discovery[f"{cfg}_vs_C0_clean-dot100_41"] = paired_intervals(c0_pred, _pred_pair(cfg, "discovery"))
+            paired_ndcg[f"{cfg}_vs_C0_clean-dot100_41"] = paired_intervals(c0_pred, _pred_pair(cfg, "ndcg"))
+        if cfg != u0_dot_cfg and u0_dot_cfg in raw["downstream"]:
+            paired_discovery[f"{cfg}_vs_U0-dot100_41"] = paired_intervals(
+                _pred_pair(u0_dot_cfg, "discovery"), _pred_pair(cfg, "discovery")
+            )
+            paired_ndcg[f"{cfg}_vs_U0-dot100_41"] = paired_intervals(
+                _pred_pair(u0_dot_cfg, "ndcg"), _pred_pair(cfg, "ndcg")
+            )
+
+    summary = {
+        "seed": seed,
+        "heldout_access": False,
+        "promoted": False,
+        "stage1_clean_towers": {
+            var: {
+                "selected_epoch": res["selected_epoch"],
+                "parameters": res["parameters"],
+                "training_seconds": res["training_seconds"],
+                "customer_embeddings": list(res["settings"]["spec"]["customer_embeddings"]),
+                "customer_tabular_features": res["settings"]["spec"]["customer_tabular_features"],
+                "product_demand_features": res["settings"]["spec"]["product_demand_features"],
+                "full_metrics": res["metrics"],
+                "dot_baseline": raw["dot_baseline"].get(var),
+                "selected_checkpoint": res["selected_checkpoint"],
+            }
+            for var, res in raw["stage1"].items()
+        },
+        "compact_selectors": raw["selectors"],
+        "downstream": raw["downstream"],
+        "clean_v2_c0_reference": c0_v2,
+        "downstream_paired_discovery": paired_discovery,
+        "downstream_paired_ndcg": paired_ndcg,
+        "latency": raw.get("latency", {}),
+        "note_on_intervals": "95% CIs are customer-clustered bootstrap intervals within seed=42 (query-sampling uncertainty only, not multi-seed variance).",
+        "source_sha256": {
+            str(p): file_digest(p)
+            for p in Path("recommender/experiments/static_enrichment").glob("*.py")
+        },
+    }
+    atomic_json(summary, EVIDENCE_ROOT / "stage1_mlp_v3_summary.json")
+
+    lines = [
+        "# Compact Stage 1 Selector (`uv_47` / `uv_47_ref`) & Stage 2 Isolation Report (`seed=42`)",
+        "",
+        "All metrics computed strictly on validation transitions (`< 2026-02-19`, `6,191` transitions, `1,857` new targets). Zero test-split access.",
+        "",
+        "## 1. Stage 1 Full-Pool Ranking & `quota100_50` Slate Coverage",
+        "",
+        "| Stage 1 Scorer | Input Dim | Ep | Sales Branch | Unseen@25 | Unseen@50 | Recall@10 | NDCG@10 | Slate New Targets (Cov) | Slate Overall Cov |",
+        "|---|---:|---:|---|---:|---:|---:|---:|---:|---:|",
+    ]
+    for var, label in (
+        ("C0_clean", "C0_clean + dot"),
+        ("P_t1_fam_clean", "P_t1_fam_clean + dot (NO sales_branch)"),
+        ("U0_t1_fam_clean", "U0_t1_fam_clean + dot (WITH sales_branch)"),
+    ):
+        if var in raw["stage1"]:
+            s = raw["stage1"][var]
+            db = raw["dot_baseline"][var]
+            fp = db["full_pool"]
+            cov = db["quota100_50_coverage"]
+            sb = "Yes (16D)" if s["settings"]["spec"]["customer_embeddings"] else "No"
+            lines.append(
+                f"| {label} | 128D dot | {s['selected_epoch']} | {sb} | "
+                f"{fp['new_hits@25']} | {fp['new_hits@50']} | {fp['recall@10']:.5f} | {fp['ndcg@10']:.5f} | "
+                f"{cov['new_targets_in_slate']} ({cov['new_slate_coverage']*100:.2f}%) | {cov['overall_slate_coverage']*100:.2f}% |"
+            )
+    for key, label in (
+        ("U0_t1_fam_clean-uv_47", "U0 + CompactStage1Selector (`uv_47`)"),
+        ("U0_t1_fam_clean-uv_47_ref", "U0 + CompactStage1Selector (`uv_47_ref`)"),
+    ):
+        if key in raw["selectors"]:
+            sr = raw["selectors"][key]
+            fp = sr["metrics"]
+            cov = sr["quota100_50_coverage"]
+            dim = sr["settings"]["input_contract"]["input_dim"]
+            lines.append(
+                f"| {label} | {dim}D MLP | {sr['selected_epoch']} | Yes (16D in u) | "
+                f"{fp['new_hits@25']} | {fp['new_hits@50']} | {fp['recall@10']:.5f} | {fp['ndcg@10']:.5f} | "
+                f"{cov['new_targets_in_slate']} ({cov['new_slate_coverage']*100:.2f}%) | {cov['overall_slate_coverage']*100:.2f}% |"
+            )
+
+    lines.extend([
+        "",
+        "## 2. Stage 2 End-to-End `UPS-CANR` Results (Discovery vs NDCG Checkpoints)",
+        "",
+        "| Config | Sel | Ep (Disc/NDCG) | R@5 (Disc) | R@10 (Disc) | NDCG@10 (Disc) | Repeat R@10 | New@10 (Disc) | Cond New (Disc) | Slate New | R@10 (NDCG) | NDCG@10 (NDCG) | New@10 (NDCG) |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ])
+    if c0_v2:
+        cm = c0_v2["metrics"]
+        lines.append(
+            f"| C0_clean-dot100_41 (v2 ref) | disc=ndcg | {c0_v2['epoch']} / {c0_v2['epoch']} | "
+            f"{cm['recall@5']:.5f} | {cm['recall@10']:.5f} | {cm['ndcg@10']:.5f} | {cm['repeat_recall@10_micro']:.5f} | "
+            f"{cm['new_hits@10']} ({cm['new_recall@10']*100:.2f}%) | {cm['conditional_new_recall@10']*100:.2f}% | "
+            f"{cm['new_targets_in_slate']} | {cm['recall@10']:.5f} | {cm['ndcg@10']:.5f} | {cm['new_hits@10']} |"
+        )
+    for cfg, d in raw["downstream"].items():
+        dm = d["discovery_selection"]["metrics"]
+        nm = d["ndcg_selection"]["metrics"]
+        de = d["discovery_selection"]["epoch"]
+        ne = d["ndcg_selection"]["epoch"]
+        lines.append(
+            f"| {cfg} | {d['settings']['selector_type']} | {de} / {ne} | "
+            f"{dm['recall@5']:.5f} | {dm['recall@10']:.5f} | {dm['ndcg@10']:.5f} | {dm['repeat_recall@10_micro']:.5f} | "
+            f"{dm['new_hits@10']} ({dm['new_recall@10']*100:.2f}%) | {dm['conditional_new_recall@10']*100:.2f}% | "
+            f"{dm['new_targets_in_slate']} | {nm['recall@10']:.5f} | {nm['ndcg@10']:.5f} | {nm['new_hits@10']} |"
+        )
+
+    lines.extend([
+        "",
+        "## 3. Warm Single-Request Latency (`U0_t1_fam_clean` Cached Vectors -> 100-Item Slate -> `UPS-CANR`)",
+        "",
+        "| Device | Pipeline | E2E Median (ms) | E2E p95 (ms) | Selector (ms) | Select100 (ms) | Ranker (ms) |",
+        "|---|---|---:|---:|---:|---:|---:|",
+    ])
+    for dev_name, pipes in raw.get("latency", {}).items():
+        for pname, vals in pipes.items():
+            lines.append(
+                f"| {dev_name} | {pname} | {vals['end_to_end_median_ms']:.3f} | {vals['end_to_end_p95_ms']:.3f} | "
+                f"{vals['selector_median_ms']:.3f} | {vals['selection_median_ms']:.3f} | {vals['ranker_median_ms']:.3f} |"
+            )
+
+    (EVIDENCE_ROOT / "stage1_mlp_v3_COMPARISON.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("Wrote stage1_mlp_v3_summary.json and stage1_mlp_v3_COMPARISON.md to", EVIDENCE_ROOT, flush=True)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--campaign", choices=("v1", "clean_v2"), default="v1")
+    parser.add_argument("--campaign", choices=("v1", "clean_v2", "stage1_mlp_v3"), default="v1")
     args = parser.parse_args()
     if args.campaign == "clean_v2":
         summarize_clean_v2()
+    elif args.campaign == "stage1_mlp_v3":
+        summarize_stage1_mlp_v3()
     else:
         main()

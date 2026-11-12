@@ -1,5 +1,6 @@
 """Synthetic unit and adversarial tests for the static enrichment campaign."""
 
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
@@ -16,7 +17,11 @@ from recommender.experiments.static_enrichment.data import (
     prepare_static_enrichment_bundle,
 )
 from recommender.experiments.static_enrichment.evaluate import paired_stage1_intervals, stage1_cohort_metrics
+from recommender.experiments.dynamic_selector.model import select_candidates
+import recommender.experiments.static_enrichment.train as se_train
 from recommender.experiments.static_enrichment.train import (
+    _make_downstream_ranker,
+    _resolve_stage1_customer_tabular_contract,
     make_variant_model,
     run_downstream_for_stage1,
     train_stage1_variant,
@@ -32,6 +37,7 @@ from recommender.experiments.static_enrichment.metadata import (
     load_enriched_companies,
 )
 from recommender.experiments.static_enrichment.model import (
+    CompactStage1Selector,
     PrecomputedEmbeddingMLPRanker,
     StaticEnrichedRetriever,
     TransferredStatsDynamicRanker,
@@ -420,3 +426,180 @@ def test_point_in_time_customer_stats_and_47_feature_rankers():
     )
     assert out_mlp.scores.shape == (B, C) and out_mlp.attn_weights is None
     out_mlp.scores.sum().backward()
+
+
+def test_compact_stage1_selector_recipes_chunking_and_downstream_compat():
+    B, P, D = 3, 120, 128
+    u = torch.randn(B, D)
+    v = torch.randn(P, D)
+    f41 = torch.rand(B, P, 41)
+    stats_6 = torch.rand(B, 6, requires_grad=True)
+    ref = torch.randn(B, P)
+
+    sel_303 = CompactStage1Selector(recipe="uv_47")
+    assert sel_303.input_dim == 303
+    assert sel_303.input_contract()["ordered_input_blocks"] == [
+        {"name": "u", "dim": 128},
+        {"name": "v", "dim": 128},
+        {"name": "features_41", "dim": 41},
+        {"name": "customer_stats_6", "dim": 6},
+    ]
+    sel_303.eval()
+    with torch.no_grad():
+        full_303 = sel_303(u=u, v=v, features_41=f41, customer_stats_6=stats_6)
+        chunked_303 = sel_303(u=u, v=v, features_41=f41, customer_stats_6=stats_6, product_chunk_size=37)
+    assert full_303.shape == (B, P)
+    assert torch.allclose(full_303, chunked_303, atol=1e-6)
+
+    sel_304 = CompactStage1Selector(recipe="uv_47_ref")
+    assert sel_304.input_dim == 304
+    assert sel_304.input_contract()["ordered_input_blocks"] == [
+        {"name": "u", "dim": 128},
+        {"name": "v", "dim": 128},
+        {"name": "features_41", "dim": 41},
+        {"name": "customer_stats_6", "dim": 6},
+        {"name": "reference_score_over_10", "dim": 1},
+    ]
+    sel_304.train()
+    scores_304 = sel_304(u=u, v=v, features_41=f41, customer_stats_6=stats_6, reference_scores=ref)
+    assert scores_304.shape == (B, P)
+    scores_304.sum().backward()
+    assert stats_6.grad is not None and stats_6.grad.abs().sum().item() > 0.0
+
+    # Verify compatibility with quota100_50 candidate selection and Stage 2 UPS-CANR (dynamic_features).
+    allowed = torch.ones(B, P, dtype=torch.bool)
+    unseen = torch.ones(B, P, dtype=torch.bool)
+    unseen[:, :40] = False
+    cand = select_candidates(scores_304.detach(), allowed, unseen, policy="quota100_50")
+    assert cand.shape == (B, 100)
+
+    base = UPSCANRRanker(
+        text_dim=16,
+        memory_dim=16,
+        hidden_dim=16,
+        num_cities=4,
+        num_regions=4,
+        num_industries=4,
+        num_products=10,
+        num_categories=4,
+        num_subcategories=4,
+        num_business_lines=4,
+        statistics_attention=True,
+        excluded_statistics=("history_repeat",),
+        cached_only=True,
+    )
+    ranker = CandidateContextRanker(base, mode="dynamic_features")
+    cand_pf = torch.gather(f41, 1, cand.unsqueeze(-1).expand(-1, -1, 41))
+    out = ranker(
+        text_embedding=torch.randn(B, 16),
+        city_id=torch.zeros(B, dtype=torch.long),
+        region_id=torch.zeros(B, dtype=torch.long),
+        industry_id=torch.zeros(B, dtype=torch.long),
+        tabular_features=torch.rand(B, 8),
+        sequence=torch.rand(B, 4, 9),
+        attention_mask=torch.tensor([[1, 1, 0, 0], [1, 0, 0, 0], [1, 1, 1, 0]]),
+        seq_product_ids=torch.ones(B, 4, dtype=torch.long),
+        seq_category_ids=torch.zeros(B, 4, dtype=torch.long),
+        seq_subcategory_ids=torch.zeros(B, 4, dtype=torch.long),
+        seq_business_line_ids=torch.zeros(B, 4, dtype=torch.long),
+        seq_purchase_dates=torch.zeros(B, 4),
+        prediction_day=torch.full((B,), 100.0),
+        candidate_vectors=torch.randn(B, 100, 16),
+        pairwise_features=cand_pf,
+    )
+    assert out.logits.shape == (B, 100) and torch.isfinite(out.logits).all()
+
+
+def test_make_downstream_ranker_u0_64d_metadata_and_missing_meta_rejection(tmp_path, monkeypatch):
+    profile_names = [
+        "distinct_orders",
+        "total_quantity",
+        "distinct_products",
+        "distinct_categories",
+        "median_order_gap",
+        "median_purchase_quantity",
+    ]
+    ref_ckpt = tmp_path / "ref.pt"
+    torch.save({"config": {"profile_features": profile_names}}, ref_ckpt)
+
+    def _fake_base():
+        return UPSCANRRanker(
+            text_dim=16,
+            memory_dim=16,
+            hidden_dim=16,
+            num_cities=3,
+            num_regions=3,
+            num_industries=3,
+            num_products=8,
+            num_categories=3,
+            num_subcategories=3,
+            num_business_lines=3,
+            statistics_attention=True,
+            excluded_statistics=("history_repeat",),
+            cached_only=True,
+        )
+
+    monkeypatch.setattr(se_train, "DEFAULT_RETRIEVER", ref_ckpt)
+    monkeypatch.setattr(se_train.UPSCANRRanker, "from_retriever_checkpoint", lambda *args, **kwargs: _fake_base())
+
+    u0_state = {
+        "customer_tower.text_proj.0.weight": torch.full((16, 16), 0.25),
+        "customer_tower.text_proj.0.bias": torch.full((16,), 0.1),
+        "customer_tower.city_embedding.weight": torch.full((3, 16), 0.2),
+        "customer_tower.region_embedding.weight": torch.full((3, 16), 0.3),
+        "customer_tower.industry_embedding.weight": torch.full((3, 16), 0.4),
+        "customer_tower.tabular_proj.0.weight": torch.cat(
+            [torch.full((16, 48), 2.5), torch.full((16, 16), 99.0)], dim=1
+        ),
+        "customer_tower.tabular_proj.0.bias": torch.full((16,), -0.5),
+    }
+
+    # Explicit U0 64D metadata (customer_tabular_features=0, sales_branch=16D) -> only :48 copied; 48: untouched!
+    u0_ckpt = tmp_path / "u0_64d.pt"
+    torch.save(
+        {
+            "settings": {
+                "spec": {
+                    "customer_tabular_features": 0,
+                    "customer_embeddings": ["sales_branch"],
+                }
+            },
+            "model_state_dict": u0_state,
+        },
+        u0_ckpt,
+    )
+    scratch = _make_downstream_ranker("dynamic_features", 42, init_mode="scratch")
+    ranker = _make_downstream_ranker("dynamic_features", 42, u0_ckpt, is_control_stage1=False)
+    w_copied = ranker.base.tabular_proj[0].weight.detach()
+    w_scratch = scratch.base.tabular_proj[0].weight.detach()
+    assert torch.allclose(w_copied[:, :48], torch.full((16, 48), 2.5))
+    assert torch.allclose(w_copied[:, 48:], w_scratch[:, 48:])
+    assert not torch.any(w_copied[:, 48:] == 99.0)
+
+    # Missing metadata on 64D checkpoint MUST raise ValueError rather than silently copying 58:64.
+    bad_ckpt = tmp_path / "u0_64d_no_meta.pt"
+    torch.save({"model_state_dict": u0_state}, bad_ckpt)
+    with pytest.raises(ValueError, match="without explicit customer_tabular_features"):
+        _make_downstream_ranker("dynamic_features", 42, bad_ckpt, is_control_stage1=False)
+
+    num_tab, prof_names, cust_embs = _resolve_stage1_customer_tabular_contract(
+        torch.load(u0_ckpt, map_location="cpu"), 64, profile_names, u0_ckpt
+    )
+    assert num_tab == 0 and prof_names == [] and cust_embs == ["sales_branch"]
+
+
+@pytest.mark.local_artifact
+def test_make_downstream_ranker_real_u0_checkpoint():
+    u0_real = Path("checkpoints/static-enrichment-v1/clean_v2/runs/stage1-U0_t1_fam_clean-seed42/best.pt")
+    if not u0_real.is_file():
+        pytest.skip("Real U0_t1_fam_clean checkpoint not present.")
+    scratch = _make_downstream_ranker("dynamic_features", 42, init_mode="scratch")
+    ranker = _make_downstream_ranker("dynamic_features", 42, u0_real, is_control_stage1=False)
+    state = torch.load(u0_real, map_location="cpu")["model_state_dict"]
+    src_w = state["customer_tower.tabular_proj.0.weight"]
+    dst_w = ranker.base.tabular_proj[0].weight.detach()
+    scr_w = scratch.base.tabular_proj[0].weight.detach()
+    assert src_w.shape[1] == 64
+    assert torch.allclose(dst_w[:, :48], src_w[:, :48])
+    assert torch.allclose(dst_w[:, 48:], scr_w[:, 48:])
+

@@ -11,6 +11,8 @@ import torch
 
 from recommender.artifacts import atomic_json
 from recommender.experiment_retrieval_data import prepare_retrieval_data
+from recommender.experiments.dynamic_selector.data import make_slates
+from recommender.experiments.dynamic_selector.evaluate import ranking_metrics
 from recommender.experiments.static_enrichment.config import (
     ARTIFACT_ROOT,
     CLEAN_V2_ROOT,
@@ -20,8 +22,13 @@ from recommender.experiments.static_enrichment.config import (
 )
 from recommender.experiments.static_enrichment.data import prepare_static_enrichment_bundle
 from recommender.experiments.static_enrichment.train import (
+    _load_stage1_campaign_data,
+    fit_compact_stage1_selector,
+    measure_v3_warm_latency,
     run_clean_v2_downstream,
     run_downstream_for_stage1,
+    run_v3_stage2_ranker,
+    slate_coverage_summary,
     train_stage1_variant,
 )
 from recommender.train_retriever import get_device
@@ -41,7 +48,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--phase",
-        choices=("all", "prep", "c0", "screen", "repeat", "downstream", "clean_v2"),
+        choices=("all", "prep", "c0", "screen", "repeat", "downstream", "clean_v2", "stage1_mlp_v3"),
         default="all",
     )
     parser.add_argument("--device", default=None)
@@ -118,6 +125,164 @@ def main() -> None:
             v2_results["downstream"][f"{cfg_key}-seed{seed}"] = res
         atomic_json(v2_results, v2_path)
         print(f"Clean v2 campaign complete (best_clean={best_clean}).", flush=True)
+        return
+
+    if args.phase == "stage1_mlp_v3":
+        v3_root = ARTIFACT_ROOT / "stage1_mlp_v3"
+        v3_root.mkdir(parents=True, exist_ok=True)
+        v3_path = EVIDENCE_ROOT / "stage1_mlp_v3_results.json"
+        if v3_path.is_file():
+            v3_results = json.loads(v3_path.read_text(encoding="utf-8"))
+        else:
+            v3_results = {"stage1": {}, "dot_baseline": {}, "selectors": {}, "downstream": {}, "latency": {}}
+
+        v2_specs = build_clean_v2_variant_specs()
+        seed = 42
+        stage1_dirs = {}
+        for vname in ("C0_clean", "P_t1_fam_clean", "U0_t1_fam_clean"):
+            res = train_stage1_variant(
+                v2_specs[vname],
+                seed,
+                train,
+                val,
+                info,
+                train_source,
+                val_source,
+                enrichment,
+                CLEAN_V2_ROOT,
+                epochs=args.stage1_epochs,
+                device=str(device),
+                save_train_cache=True,
+            )
+            v3_results["stage1"][vname] = res
+            s1_dir = CLEAN_V2_ROOT / "runs" / f"stage1-{vname}-seed{seed}"
+            stage1_dirs[vname] = s1_dir
+            cdata, _, _, _ = _load_stage1_campaign_data(
+                v2_specs[vname], s1_dir, train, val, info, train_source, val_source, enrichment, device
+            )
+            va = cdata["val"]
+            dot_pred = v3_root / f"dot_baseline_{vname}_val_predictions.npz"
+            dot_metrics = ranking_metrics(va["dot_scores"], va, None, dot_pred)
+            dot_slate = make_slates(va, va["dot_scores"], info["product_ids"], "quota100_50")
+            dot_cov = slate_coverage_summary(dot_slate["candidate_indices"], va["target"], va["unseen"])
+            v3_results["dot_baseline"][vname] = {
+                "full_pool": dot_metrics,
+                "quota100_50_coverage": dot_cov,
+                "predictions": str(dot_pred),
+            }
+            atomic_json(v3_results, v3_path)
+
+        u0_spec = v2_specs["U0_t1_fam_clean"]
+        u0_dir = stage1_dirs["U0_t1_fam_clean"]
+        c0_ckpt = stage1_dirs["C0_clean"] / "best.pt"
+        c0_dir = stage1_dirs["C0_clean"]
+        p_spec = v2_specs["P_t1_fam_clean"]
+        p_dir = stage1_dirs["P_t1_fam_clean"]
+
+        sel_results = {}
+        for recipe in ("uv_47", "uv_47_ref"):
+            sel_res = fit_compact_stage1_selector(
+                "U0_t1_fam_clean",
+                u0_spec,
+                recipe,
+                seed,
+                train,
+                val,
+                info,
+                train_source,
+                val_source,
+                enrichment,
+                u0_dir,
+                v3_root,
+                epochs=args.ranker_epochs,
+                device=str(device),
+            )
+            sel_results[recipe] = sel_res
+            v3_results["selectors"][f"U0_t1_fam_clean-{recipe}"] = sel_res
+            atomic_json(v3_results, v3_path)
+
+        ranker_specs = [
+            ("U0-dot100_41", "U0_t1_fam_clean", u0_spec, u0_dir, "dot", None, "stage1_copied", None, None, None),
+            (
+                "U0-mlp303_100_41",
+                "U0_t1_fam_clean",
+                u0_spec,
+                u0_dir,
+                "uv_47",
+                Path(sel_results["uv_47"]["selected_checkpoint"]).parent,
+                "stage1_copied",
+                None,
+                None,
+                None,
+            ),
+            (
+                "U0-mlp304_100_41",
+                "U0_t1_fam_clean",
+                u0_spec,
+                u0_dir,
+                "uv_47_ref",
+                Path(sel_results["uv_47_ref"]["selected_checkpoint"]).parent,
+                "stage1_copied",
+                None,
+                None,
+                None,
+            ),
+            ("P-dot100_41", "P_t1_fam_clean", p_spec, p_dir, "dot", None, "stage1_copied", None, None, None),
+            ("P-dot100_41-init_c0", "P_t1_fam_clean", p_spec, p_dir, "dot", None, "common_checkpoint", c0_ckpt, None, None),
+            (
+                "P-c0_slate_init_c0-41",
+                "P_t1_fam_clean",
+                p_spec,
+                p_dir,
+                "dot",
+                None,
+                "common_checkpoint",
+                c0_ckpt,
+                c0_dir,
+                v2_specs["C0_clean"],
+            ),
+        ]
+        u0_rankers = {}
+        for cfg_name, vname, sp, s1d, sel_t, sel_d, init_m, init_c, sl_over, sl_sp in ranker_specs:
+            res = run_v3_stage2_ranker(
+                f"ranker-{cfg_name}-seed{seed}",
+                vname,
+                sp,
+                s1d,
+                v3_root,
+                seed,
+                train,
+                val,
+                info,
+                train_source,
+                val_source,
+                enrichment,
+                selector_type=sel_t,
+                selector_dir=sel_d,
+                init_mode=init_m,
+                init_checkpoint_path=init_c,
+                slate_override_stage1_dir=sl_over,
+                slate_override_spec=sl_sp,
+                epochs=args.ranker_epochs,
+                device=str(device),
+            )
+            v3_results["downstream"][cfg_name] = res
+            if cfg_name in ("U0-dot100_41", "U0-mlp303_100_41", "U0-mlp304_100_41"):
+                u0_rankers[cfg_name] = res
+            atomic_json(v3_results, v3_path)
+
+        v3_results["latency"] = measure_v3_warm_latency(
+            u0_spec,
+            u0_dir,
+            u0_rankers,
+            sel_results,
+            val,
+            info,
+            val_source,
+            enrichment,
+        )
+        atomic_json(v3_results, v3_path)
+        print("Stage 1 MLP v3 campaign complete.", flush=True)
         return
 
     results_path = EVIDENCE_ROOT / "raw_results.json"
