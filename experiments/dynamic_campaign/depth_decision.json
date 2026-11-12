@@ -1,0 +1,11 @@
+{
+  "purpose": "separate wider slates, learned selection, and added scalar information",
+  "depth": 100,
+  "repeat_quota": 50,
+  "seeds": [
+    42,
+    17,
+    2026
+  ],
+  "selection": "unchanged simultaneous quality floors"
+}

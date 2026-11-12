@@ -1,0 +1,17 @@
+{
+  "declared_at": "seed-42 downstream screening, before repeated downstream seeds",
+  "reason": "Avoid treating a 0.0002-0.0004 miss of the screening recall tolerance as evidence a configuration is settled; repeat to measure its tradeoff, not to accept it.",
+  "screen": "qualifying selected checkpoint; >=10 additional new hits@10; recall no more than 0.003 below control; NDCG no more than 0.002 below control",
+  "seeds": [
+    42,
+    17,
+    2026
+  ],
+  "selection": "same original checkpoint selection for every fit; no reselection",
+  "final_acceptance": "unchanged: all runs qualify; mean new-hit gain >=10; no mean recall/NDCG loss; paired interval lower bound >0; no promotion",
+  "later_review_control": "cheap cached-embedding pointwise ranker trained on the same original 50-item slates",
+  "pretrained_residual": "attach zero-init residual attention to the clean selected production50 control, compare identical 10-epoch fine-tuning at lr0.0001; seed42 screen then repeat paired controls if original screen passes; never load legacy learned ranker weights",
+  "depth_factorial": "at depth100 and repeat quota50, repeat dot+control, dot+added-ranker-signals and dynamic-MLP+added-ranker-signals for all three seeds; compare with the existing dynamic-MLP+control to separate selection from width and feature routing",
+  "pointwise_low_cost_screen": "also repeat if qualifying and within5 new hits /0.001 recall /0.001 NDCG of control, to assess cheaper noninferior architecture",
+  "fine_tuning_budget_screen": "repeat clean fine-tuned controls if they independently pass the original +5-hit screening against fresh controls, even if residual attention fails"
+}

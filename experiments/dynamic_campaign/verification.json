@@ -1,0 +1,313 @@
+{
+  "heldout_access": false,
+  "default_promoted": false,
+  "original_artifact_hashes_unchanged": {
+    "checkpoints/retriever-discovery-reference/best_retriever.pt": "2dcfbc7eab6795ded6f25a6cb0ffe1f9e606f13c9885d4ee020b724d0a2b5ab7",
+    "checkpoints/retriever/best_retriever.pt": "863cb700afc7e8d4284b20d34f5f4f5345538146557375f1141cf9d5d77fae79",
+    "checkpoints/ranker/best_ranker.pt": "1701becf092e38e71a06152b124a832cabfa58172d6d497f305fe499757b0b17",
+    "checkpoints/ranker/best_discovery_ranker.pt": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+    "checkpoints/ranker/best_ndcg_ranker.pt": "2ff3e43dcd531d6604c536d93be1bbfce140f118e8f48fad88dbe99e1616701e",
+    "data/interim/ranker_train_slates_v3_repeat_0.5_rolling_v1.pt": "aaf0153b53d7dac35459562cbb87226fb0af6a7e5cbd103e198a0e108864c663",
+    "data/interim/ranker_val_slates_v3_repeat_0.5_rolling_v1.pt": "43aa986ed5c0ead13b1f4f3b321e28444fd846074b6a1192bd00b712789cad27"
+  },
+  "reference_report_unchanged": true,
+  "upstream_full_cache_replay": {
+    "train": {
+      "max_customer_difference": 0.0,
+      "max_score_difference": 0.0,
+      "cache_sha256": "80eeb9c07579f7068bedae23d8dc5658294dc41a498e26f9f4cc0bc76a4fc6e2"
+    },
+    "val": {
+      "max_customer_difference": 0.0,
+      "max_score_difference": 0.0,
+      "cache_sha256": "84f404ad4063a903a189b674274accf2b6b2895a70a5b9eae0425b2d53f78950"
+    }
+  },
+  "request_feature_exact_rows": 8,
+  "feature_payload_sha256": {
+    "train": "9e6aec1d2fdf6ea878bb4dd579130398c5af6453adb495bc5433acc917d1468d",
+    "val": "7edef2699ac73b6527ae0ea6a5d2f97097cea62638bcd71c94a3cb9bc6a5b09f"
+  },
+  "feature_manifest_sha256": "0ff89dfe37c3c58f3e7e0faa92cf120d6787050d2e1b65b799de4d43b355d92c",
+  "run_checkpoint_checks": {
+    "selectors/static-42": {
+      "sha256": "da2d837738c48f1db37671a745aeca5f32b6ed636d2b692957a118a42e269761",
+      "qualified": true
+    },
+    "selectors/dynamic-42": {
+      "sha256": "0b9976e3c1f392780872f1292907e2ad348e5bf143f2c9c611bdf71debf4ba39",
+      "qualified": true
+    },
+    "selectors/relations-42": {
+      "sha256": "6918359275f824f9ff99b30590bdd144577033c3b906ae2e0c738a7d669a0965",
+      "qualified": true
+    },
+    "selectors/static-17": {
+      "sha256": "7d6cfd463bb013ca7bc00835b715b0a77e854af2254e007ed9baa22eadd0feac",
+      "qualified": true
+    },
+    "selectors/dynamic-17": {
+      "sha256": "6405fd7e7a566ee224a92d6dcd5525bdc6d1df00daf321d5912cc4f875b78bf0",
+      "qualified": true
+    },
+    "selectors/relations-17": {
+      "sha256": "c31dce8fac32a4cb0c3cce2320db61b2ceb44bc892e7c91f46653f6afdfdb06b",
+      "qualified": true
+    },
+    "selectors/static-2026": {
+      "sha256": "5532e96598a95a6699a7d30d5620f98ed93a00562bfa45329c850ff88aa65ee5",
+      "qualified": true
+    },
+    "selectors/dynamic-2026": {
+      "sha256": "994d587387687dd974429e0814f8832e29b4d5072f47f78e0cd677ea1293b67c",
+      "qualified": true
+    },
+    "selectors/relations-2026": {
+      "sha256": "190482fa2f18ce902e31ae930669132460ee04bc779688df45ebb432ef09a982",
+      "qualified": true
+    },
+    "rankers/production50-control-42": {
+      "sha256": "132f8623639d61ff8bec3d770a50bad98ea3df0f4043fe22aa0358424e1dca7d",
+      "qualified": true
+    },
+    "rankers/fixed50-control-42": {
+      "sha256": "caa26086ddb1b0b8d02da037dfb3692e84629ae9b2ad403ab1f63cedfe091284",
+      "qualified": false
+    },
+    "rankers/production50-no_repeat_flag-42": {
+      "sha256": "109babfd563384b25d918a880371a1eb67687abd014e111a66f148cb0feaed33",
+      "qualified": true
+    },
+    "rankers/production50-no_repeat_group-42": {
+      "sha256": "58802064965777e6a7470d49d42356390a1f41ae23b396a29112e1a0b2e0f55d",
+      "qualified": false
+    },
+    "rankers/production50-experts-42": {
+      "sha256": "7354ebbf3bd49b9f6361cfd8cdad25443f3dc8ae4455d6dbc0998aec3f234bba",
+      "qualified": true
+    },
+    "rankers/production50-group_gate-42": {
+      "sha256": "6c68b648340631cd03cbf0c0a63ee4a7826b39a56e30427b77f88c1d90c1db3c",
+      "qualified": false
+    },
+    "rankers/production50-recent_sku-42": {
+      "sha256": "addbed732081a54d715378855658d78e0a6a809f944aeebceb67c227d2e6c3ea",
+      "qualified": true
+    },
+    "rankers/production50-hierarchy-42": {
+      "sha256": "4c4cb2a6a72952758f1ef20f13c6998f86252acdd4119a17b510cbb245db62e5",
+      "qualified": true
+    },
+    "rankers/production50-complements-42": {
+      "sha256": "dde62d0147daf9addccce64feede884a25d77849cccf12049984aa0ce13ff9ef",
+      "qualified": true
+    },
+    "rankers/production50-dynamic_features-42": {
+      "sha256": "f28b7e5b3e1da9f482832ce4d9b53ae55a2a0433a058cc334587cb46a28ebc1d",
+      "qualified": true
+    },
+    "rankers/production50-values_only-42": {
+      "sha256": "f3d1440f1b463a7a56aa3a880df57c4d46b1e3c017541cfd796f6966f1631c3b",
+      "qualified": false
+    },
+    "rankers/production50-bias_and_values-42": {
+      "sha256": "49249c9dab4031ff3dc9b9f46124f18bddacd74fff76d899efd2eb80dd7e624c",
+      "qualified": false
+    },
+    "rankers/production50-context_direct-42": {
+      "sha256": "b8cba5fcec60de14236ef707df8b9ebf0bd057aefd2f4a3403b81f7eb4cc74fa",
+      "qualified": false
+    },
+    "rankers/production50-context_dot-42": {
+      "sha256": "1ffd5dce69410494fa79b8a8cfb93e86436a20492f0b4aeb91040cc958a049cc",
+      "qualified": false
+    },
+    "rankers/production50-context_residual-42": {
+      "sha256": "0abf9fd6b60ed18a0429c576f93ee946e592a6e4e42c08e75f1045d597ed2df8",
+      "qualified": true
+    },
+    "rankers/production50-control-17": {
+      "sha256": "9dd4d70037b7e1a90c0a054103ecff1280b6c68448e0a7890615f4f2af8b4309",
+      "qualified": true
+    },
+    "rankers/production50-hierarchy-17": {
+      "sha256": "bfb1754d08c90de2e40812d2fbfc0a599682ee42afc8395dd471c98bfd85dc02",
+      "qualified": true
+    },
+    "rankers/production50-complements-17": {
+      "sha256": "c800dbc69af5eed707ef9762640b2210b61ff3a80ebce0b27bca51838fd342cb",
+      "qualified": true
+    },
+    "rankers/production50-control-2026": {
+      "sha256": "e8896f06a7fd92a804927775d28f46a404bf1612e396a11d0950d52087a12b97",
+      "qualified": false
+    },
+    "rankers/production50-hierarchy-2026": {
+      "sha256": "71d900c3c71b8ff79de51492bfc1df7a0b8a48bf992f5efed5e43597c684c01a",
+      "qualified": true
+    },
+    "rankers/production50-complements-2026": {
+      "sha256": "1d1ba82d532b6f0e2ca950073eaa82e1f15d496927d41a8a4dc6fd04aaf053ea",
+      "qualified": true
+    },
+    "rankers/static-quota50_25-control-42": {
+      "sha256": "e03b3eb272ee725596ae3b4a1f6f8149de4058d27055ddc1209c699ff8935424",
+      "qualified": true
+    },
+    "rankers/dynamic-quota50_25-control-42": {
+      "sha256": "039baf29074d28ddc51760583b00d2f2e946337665e9b7cf284441336ea5b799",
+      "qualified": true
+    },
+    "rankers/relations-quota50_25-control-42": {
+      "sha256": "10846c4246a345b350f44ed83e7e70d8c143069f5e6adf6cf804e4759f2e7dd7",
+      "qualified": true
+    },
+    "rankers/dynamic-quota50_10-control-42": {
+      "sha256": "ad6f912be6c8db6aab1f048b9a0e100055c7b384ed8dde6416107ad22de6e9e5",
+      "qualified": false
+    },
+    "rankers/dynamic-top50-control-42": {
+      "sha256": "612d8091e5875e28425daf6e7c936175202e88d366592aa4be60fb0ef26e056e",
+      "qualified": true
+    },
+    "rankers/dynamic-quota100_50-control-42": {
+      "sha256": "100eb92b6e2bbed8448da2bb5f3ecac46050a6da3cfcaac01f26f651e3761a06",
+      "qualified": true
+    },
+    "rankers/combined-control-42": {
+      "sha256": "6629b823a957670be615e70a00f6fc5ed87dea866eacf1a6f63056393559875b",
+      "qualified": true
+    },
+    "rankers/combined-combined_direct-42": {
+      "sha256": "047ad26e4ab69fa3f80ca913074e8fee7533a8a0df788a4921be938898c7a06d",
+      "qualified": false
+    },
+    "rankers/combined-control-17": {
+      "sha256": "e8326c982176fa0b334c0497094802d9485971400922d19cd6d8ab353c95979b",
+      "qualified": true
+    },
+    "rankers/combined-combined_direct-17": {
+      "sha256": "46af7699d6e8b062f80cc5cea68700d6794ebc3ca710d111f0c34ac2fea45b3e",
+      "qualified": false
+    },
+    "rankers/combined-control-2026": {
+      "sha256": "be8b0ba526dab17576b491ca0f2c3d9fba091fa72f051c7493a2b57f0b648157",
+      "qualified": true
+    },
+    "rankers/combined-combined_direct-2026": {
+      "sha256": "52393c704e75ebdbdf9b7c64e0f02c84bd92d89ab989645c89e24eca504ebfa7",
+      "qualified": false
+    },
+    "rankers/static-quota50_25-control-17": {
+      "sha256": "6876114c34e9a5ed153ecd9b3af71970fb43bf4cc0f8e9e59c6eb8d12eb0d299",
+      "qualified": true
+    },
+    "rankers/static-quota50_25-control-2026": {
+      "sha256": "d65508478b8ef814dac6e861ae9d05fd923d69d519056200571681ab2fd40f62",
+      "qualified": true
+    },
+    "rankers/dynamic-quota50_25-control-17": {
+      "sha256": "77507474e7b0b5b254008cdc3bb46ccedf621156a0f3320227bf194613e2e0b4",
+      "qualified": true
+    },
+    "rankers/dynamic-quota50_25-control-2026": {
+      "sha256": "40a5836538e8c1aad1dbf669bc1dd9cd27d07b2f57265d920d1cbc149827a6a3",
+      "qualified": true
+    },
+    "rankers/relations-quota50_25-control-17": {
+      "sha256": "0e929e34f0dbb044ef3c9ea861228dc8fa4e4d69eaa370bfb00b4af7a00a114c",
+      "qualified": true
+    },
+    "rankers/relations-quota50_25-control-2026": {
+      "sha256": "457c994d5463e470ea93297cb7b87f6d97f789aed7f69fc7fa48aed11f00bc35",
+      "qualified": true
+    },
+    "rankers/dynamic-top50-control-17": {
+      "sha256": "fa594d41cbbf00e066ed140dc403046a06fc7dea197133b0d42983d17a9e4c3d",
+      "qualified": true
+    },
+    "rankers/dynamic-top50-control-2026": {
+      "sha256": "596345de3738640912c5d4324f9616a7e6badb443565e5815ea6ff0e803e0e95",
+      "qualified": true
+    },
+    "rankers/dynamic-quota100_50-control-17": {
+      "sha256": "28084b9ceea4f8f79d9af0a001e32a471d845e80ddf84a222742b23a28ec4518",
+      "qualified": true
+    },
+    "rankers/dynamic-quota100_50-control-2026": {
+      "sha256": "b20ff972c2cc743313a0ffdf9b9e9182c77f84a64ed6dcbcdd08199548d29799",
+      "qualified": true
+    },
+    "rankers/dot100-control-42": {
+      "sha256": "0f7538e5706e86bf0809275d5cabcaa08461496b0fd70be6ba41d9c4c31bfa65",
+      "qualified": true
+    },
+    "rankers/dot100-control-17": {
+      "sha256": "5bdb29e9276d9670b012683c3a70927d43f7b100134cc29bf2db1709c196abac",
+      "qualified": true
+    },
+    "rankers/dot100-control-2026": {
+      "sha256": "0b39827e7041a8e457d706a9495531b5d2eedcec5cc3603c09d6c4fba2c6767b",
+      "qualified": true
+    },
+    "rankers/dot100-dynamic_features-42": {
+      "sha256": "201079eacab2b75ca58dd3561d964b22f8dba115183005fbba60b6799943d0f0",
+      "qualified": true
+    },
+    "rankers/dot100-dynamic_features-17": {
+      "sha256": "863892036a9e6e76ab386c97d77887f3af7825c2737232cde0d96ec59b0815bc",
+      "qualified": true
+    },
+    "rankers/dot100-dynamic_features-2026": {
+      "sha256": "e226fc46ddf2d885e5338caec6c55d187b268da16cf19f4122d921df6e1ce3f1",
+      "qualified": true
+    },
+    "rankers/dynamic100-dynamic_features-42": {
+      "sha256": "31b7871964b6d5e1424515f75269834a6b140eb692bddbc1c9b18d2a06c5c14c",
+      "qualified": true
+    },
+    "rankers/dynamic100-dynamic_features-17": {
+      "sha256": "14c7fb4dad17d8858b09c612ab60093f2e4cb7174f97bf44cbded427f2413111",
+      "qualified": true
+    },
+    "rankers/dynamic100-dynamic_features-2026": {
+      "sha256": "e08e8bf00fdc2a02c971e4c0e00e2edce04a394a3b306eeb3e857c1e323f6a1e",
+      "qualified": true
+    },
+    "rankers/production50-experts-17": {
+      "sha256": "b432f983003ba421b2e634366648797b5403fbab379dbd52979f3b82c5cf02a5",
+      "qualified": true
+    },
+    "rankers/production50-experts-2026": {
+      "sha256": "0c1d536923f224ee628fad1d981953cef6ffcb63734e3144119850e3e58aa29b",
+      "qualified": true
+    },
+    "rankers/production50-dynamic_features-17": {
+      "sha256": "40e46be1cf68b192317422e7e3f2f5966814ca077d464bf1329738244ef107c0",
+      "qualified": true
+    },
+    "rankers/production50-dynamic_features-2026": {
+      "sha256": "01fdce974da65645973dbc4dc8dc2cbc905b53e34cb789538954e6bcf6a45b88",
+      "qualified": true
+    },
+    "rankers/production50-pointwise-42": {
+      "sha256": "0c42e57ca82732936182cbd996dc12e807b7b817fbd427d2f307a34f0d9ce8a7",
+      "qualified": false
+    },
+    "rankers/finetune50-control-42": {
+      "sha256": "9ca5e0bd0b5db9bef3f9bf00d0b1456ec011820d3126dcb09fb509eb2eefe0e0",
+      "qualified": false
+    },
+    "rankers/finetune50-context_residual-42": {
+      "sha256": "aa3a5648897b3788ae7407092bc964912e56f7c44b88fa06bae14558810d6a48",
+      "qualified": true
+    }
+  },
+  "input_artifact_sha256": {
+    "checkpoints/e1-e5/retrieval-v1/S0-seed42/best.pt": "e03f44da90377c39f7fadabb52542ca69556a738080b63547a0efdfb4e38beee",
+    "checkpoints/e1-e5/retrieval-v1/S0-seed42/stage2_train.pt": "0f2ef1be213dd664947778185a2b2a9ce2d5b6df52bf28ed6b3f980b744b46d3",
+    "checkpoints/e1-e5/retrieval-v1/S0-seed42/stage2_val.pt": "81cf19f4181e5d890602b719884bf9419ce34aab426f655651e7930ef0fd55f0",
+    "data/interim/shared_stage1_v1/train.pt": "588570edd2807725e348ae8599525b3800043b150e02c855a617df72178bb5ed",
+    "data/interim/shared_stage1_v1/val.pt": "22b72e4e3bb7c1d7ef3fff59293de6c690ff56a893a7afa1d1cfa0795177157d"
+  }
+}

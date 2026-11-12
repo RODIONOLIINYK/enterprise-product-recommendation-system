@@ -1,0 +1,52 @@
+{
+  "historical_replay_exact": true,
+  "preserved_report_sha256": "908e2ece085e9f154da3382093ce9eefb3251389580de3afbafe20128c69927b",
+  "demand_free": {
+    "42": {
+      "sha256": "e03f44da90377c39f7fadabb52542ca69556a738080b63547a0efdfb4e38beee",
+      "epoch": 13,
+      "metrics": {
+        "val_recall@10": 0.3535370974163704,
+        "val_ndcg@10": 0.21619375978142394,
+        "new_hits@10": 321,
+        "new_recall@10": 0.172859450726979,
+        "new_hits@25": 707,
+        "new_hits@50": 1005,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3807215939687668,
+        "stage1_new_recall@50": 0.5411954765751211
+      }
+    },
+    "17": {
+      "sha256": "6f93840f15984b4e13fe8311231f11eb65dfca584d4752f2b50717ced67d6f65",
+      "epoch": 20,
+      "metrics": {
+        "val_recall@10": 0.3742407615621279,
+        "val_ndcg@10": 0.22185459358186171,
+        "new_hits@10": 345,
+        "new_recall@10": 0.18578352180936994,
+        "new_hits@25": 735,
+        "new_hits@50": 976,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.39579967689822293,
+        "stage1_new_recall@50": 0.5255788906838987
+      }
+    },
+    "2026": {
+      "sha256": "a1c3c42e372f943aebfe7b7773ff3383072073e9304fd3acfabdc957768326b7",
+      "epoch": 21,
+      "metrics": {
+        "val_recall@10": 0.3605235328836652,
+        "val_ndcg@10": 0.21157776598199163,
+        "new_hits@10": 330,
+        "new_recall@10": 0.1777059773828756,
+        "new_hits@25": 715,
+        "new_hits@50": 959,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.3850296176628972,
+        "stage1_new_recall@50": 0.5164243403338719
+      }
+    }
+  },
+  "heldout_access": false
+}

@@ -1,0 +1,9 @@
+{
+  "reason": "later review requested a cheap matched-50-item scoring control",
+  "screen_seed": 42,
+  "promising_repeated": false,
+  "supplementary_near_miss_repeats": [
+    "experts",
+    "dynamic_features"
+  ]
+}

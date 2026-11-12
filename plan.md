@@ -8,6 +8,8 @@ Audit prerequisite (2026-11-10): resolve the artifact mismatch and fixed train-c
 
 Follow-up (2026-11-12): [hardening implementation](HARDENING_REPORT.md) preserves/replays the references, defaults new Stage 1 training to versioned demand-free inputs, and introduces validated v4 base caches and provenance-bound isolated runs. This does not retroactively repair the historical retriever or establish a new architecture winner. Effective-date metadata and basket-aware encoding remain separate work; the completed E1–E5 results remain in their report.
 
+Completed P0–P7 (2026-11-12): [68-fit dynamic-selector/candidate-context campaign](DYNAMIC_SELECTOR_EXPERIMENTS.md) provides paired seeds, full denominator metrics, depth-matched controls, ablations and latency/cache costs. Wider dot-selected slates provide the clearest conservative improvement; additional MLP selection and candidate attention do not establish a reliable incremental benefit. Added scalar ranker features improve means but remain optional pending a retention decision. Existing default aliases remain unchanged. This supersedes speculative priorities below where those hypotheses have now been tested.
+
 ## 1. Current Baseline & Core Objective
 
 ### Active Reference Baseline (Verified on Validation: `6,191` Baskets, `1,857` New-to-Customer Targets)

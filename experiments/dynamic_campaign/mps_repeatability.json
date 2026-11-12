@@ -1,0 +1,20 @@
+{
+  "synthetic_only": true,
+  "device": "mps",
+  "deterministic_algorithms": false,
+  "initial_weights_equal": true,
+  "initial_mps_rng_equal": true,
+  "batch": 64,
+  "candidates": 100,
+  "history": 32,
+  "updates": 5,
+  "train_logit_max_abs_differences": [
+    0.0,
+    7.152557373046875e-07,
+    8.344650268554688e-07,
+    9.5367431640625e-07,
+    1.0132789611816406e-06
+  ],
+  "after_five_updates_parameter_max_abs_difference": 9.00051963981241e-05,
+  "note": "Repeated-index synthetic training diverged numerically despite identical initial weights and RNG state. Saved checkpoint replay is verified separately; seeded training is not claimed bitwise deterministic."
+}

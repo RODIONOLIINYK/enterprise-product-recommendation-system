@@ -471,6 +471,7 @@ class UPSCANRRanker(nn.Module):
         seq_purchase_dates: Optional[torch.Tensor] = None,
         prediction_day: Optional[torch.Tensor] = None,
         return_diagnostics: bool = True,
+        memory_value_statistics: bool = False,
     ) -> RankerFeatures:
         """Forward pass of Stage 2 UPS-CANR ranker."""
         b_size = text_embedding.size(0)
@@ -502,8 +503,8 @@ class UPSCANRRanker(nn.Module):
             city_id=city_id,
             region_id=region_id,
             industry_id=industry_id,
-            tabular_features=torch.zeros_like(tabular_features) if statistics_in_scores else tabular_features,
-            sequence=torch.zeros_like(sequence) if statistics_in_scores else sequence,
+            tabular_features=torch.zeros_like(tabular_features) if statistics_in_scores and not memory_value_statistics else tabular_features,
+            sequence=torch.zeros_like(sequence) if statistics_in_scores and not memory_value_statistics else sequence,
             attention_mask=attention_mask,
             seq_product_ids=seq_product_ids,
             seq_category_ids=seq_category_ids,

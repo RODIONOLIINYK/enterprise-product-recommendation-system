@@ -12,6 +12,8 @@ The 2026-11-10 [audit](AUDIT_REPORT.md) found that local checkpoint selections d
 
 The [2026-11-12 follow-up](HARDENING_REPORT.md) implements versioned demand-free training, validated caches, provenance-bound isolated runs, and compatible scoring/preprocessing refactors. Historical default aliases remain unchanged.
 
+[DYNAMIC_SELECTOR_EXPERIMENTS.md](DYNAMIC_SELECTOR_EXPERIMENTS.md) records the completed 68-fit P0–P7 campaign. A wider dot-selected slate provides the clearest conservative gain; full-pool MLP selection and candidate attention do not establish a reliable incremental benefit. Scalar scoring features remain an optional accuracy-oriented candidate. All default aliases are preserved.
+
 ## Active Pipeline
 
 ```text

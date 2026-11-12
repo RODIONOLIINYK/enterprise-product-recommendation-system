@@ -1,0 +1,135 @@
+{
+  "warm_local": true,
+  "network_storage_serialization_included": false,
+  "devices": {
+    "cpu": {
+      "feature_generation": {
+        "median_ms": 7.246624503750354,
+        "p95_ms": 7.392310448631179,
+        "samples": 50
+      },
+      "feature_generation_no_unused_relationships": {
+        "median_ms": 7.039520496618934,
+        "p95_ms": 7.565602448448772,
+        "samples": 50
+      },
+      "selector_scoring": {
+        "median_ms": 0.3375209926161915,
+        "p95_ms": 0.3505728491290938,
+        "samples": 50
+      },
+      "ranker_forward": {
+        "control": {
+          "median_ms": 0.5354375025490299,
+          "p95_ms": 0.5795035060145892,
+          "samples": 50
+        },
+        "combined_direct": {
+          "median_ms": 0.6036045015207492,
+          "p95_ms": 0.6245753007533494,
+          "samples": 50
+        }
+      },
+      "complete_request": {
+        "control": {
+          "median_ms": 8.507687503879424,
+          "p95_ms": 8.790649856382515,
+          "samples": 50
+        },
+        "combined_direct": {
+          "median_ms": 8.764541496930178,
+          "p95_ms": 8.919425142812543,
+          "samples": 50
+        }
+      },
+      "depth_matched_dot_complete_request": {
+        "control": {
+          "median_ms": 1.3951669970992953,
+          "p95_ms": 1.4870190505462233,
+          "samples": 50
+        },
+        "dynamic_features": {
+          "median_ms": 1.8450409988872707,
+          "p95_ms": 1.9440397962171119,
+          "samples": 50
+        }
+      }
+    },
+    "mps": {
+      "feature_generation": {
+        "median_ms": 7.231313007650897,
+        "p95_ms": 7.502564554306446,
+        "samples": 50
+      },
+      "feature_generation_no_unused_relationships": {
+        "median_ms": 7.12537499202881,
+        "p95_ms": 7.366812501277309,
+        "samples": 50
+      },
+      "selector_scoring": {
+        "median_ms": 0.9092709951801226,
+        "p95_ms": 1.0328293516067788,
+        "samples": 50
+      },
+      "ranker_forward": {
+        "control": {
+          "median_ms": 1.2218539995956235,
+          "p95_ms": 1.3170060992706567,
+          "samples": 50
+        },
+        "combined_direct": {
+          "median_ms": 1.3692084976355545,
+          "p95_ms": 1.4122665466857143,
+          "samples": 50
+        }
+      },
+      "complete_request": {
+        "control": {
+          "median_ms": 10.63427099143155,
+          "p95_ms": 10.942612348299008,
+          "samples": 50
+        },
+        "combined_direct": {
+          "median_ms": 11.21347899606917,
+          "p95_ms": 11.963191152608488,
+          "samples": 50
+        }
+      },
+      "depth_matched_dot_complete_request": {
+        "control": {
+          "median_ms": 3.1154790049185976,
+          "p95_ms": 3.2907873508520424,
+          "samples": 50
+        },
+        "dynamic_features": {
+          "median_ms": 3.482936997897923,
+          "p95_ms": 3.7228046530799475,
+          "samples": 50
+        }
+      }
+    }
+  },
+  "eligibility_and_seen_masks": "resident versioned masks; sorting, quota construction and candidate feature building timed",
+  "eligibility_mask_bytes_per_date": 841,
+  "unseen_mask_bytes_per_customer": 841,
+  "customer_vector_bytes": 512,
+  "product_vector_bytes": 430592,
+  "feature_cache_bytes": 2237403384,
+  "features_per_customer_product": 41,
+  "dynamic_features_cached_per_request": false,
+  "feature_float32_bytes_per_eligible_request": 123328,
+  "global_periodic_scalar_bytes_per_snapshot": 23548,
+  "upstream_digest": "e03f44da90377c39f7fadabb52542ca69556a738080b63547a0efdfb4e38beee",
+  "ranker_purchase_input_bytes": 6712,
+  "purchase_tensor_cache_bytes_including_stage1_vector": 7224,
+  "global_relationship_array_bytes": 11560896,
+  "global_relationship_bytes_simple_pipeline": 0,
+  "global_cache_max_dates": 512,
+  "global_cache_max_numeric_bytes": 12056576,
+  "customer_facts_serialized_bytes": {
+    "median": 4664.0,
+    "p95": 52331.0,
+    "sample_rows": 256,
+    "note": "serialized strictly prior events plus snapshot, excludes Python allocator overhead"
+  }
+}

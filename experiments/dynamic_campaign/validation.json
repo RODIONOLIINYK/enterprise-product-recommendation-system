@@ -1,0 +1,27 @@
+{
+  "fits": 68,
+  "full_suite": {
+    "passed": 489,
+    "skipped": 6,
+    "subtests": 70
+  },
+  "synthetic_source_checkout": {
+    "passed": 483,
+    "skipped": 12,
+    "subtests": 70,
+    "private_directories_absent": [
+      "data",
+      "checkpoints"
+    ],
+    "fresh_dependency_install": false
+  },
+  "reference_linux_ci": "https://github.com/RODIONOLIINYK/enterprise-product-recommendation-system/actions/runs/43216294894",
+  "protected_test_authorization_used": false,
+  "default_promoted": false,
+  "fresh_output_namespace_p0_smoke": {
+    "passed": true,
+    "outputs": "temporary model/evidence namespaces",
+    "training_started": false,
+    "reference_replay_exact": true
+  }
+}

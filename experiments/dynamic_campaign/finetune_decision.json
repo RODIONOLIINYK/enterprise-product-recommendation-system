@@ -1,0 +1,8 @@
+{
+  "initialization": "same clean matched selected ranker, never legacy learned weights",
+  "budget": "matched additional 10 epochs at learning rate 0.0001",
+  "promising_repeated": false,
+  "budget_effect_repeated": false,
+  "pointwise_low_cost_repeated": false,
+  "checkpoint_selection": "unchanged simultaneous quality floors"
+}

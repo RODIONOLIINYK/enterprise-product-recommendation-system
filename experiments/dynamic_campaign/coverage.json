@@ -1,0 +1,1247 @@
+{
+  "identity": "4bfac23007baed936c286567c7af2e7669d7d4e3add33e5749966fafcc441889",
+  "direct_selector_metrics_before_UPSCANR": {
+    "dot-personal-repeat": {
+      "recall@5": 0.24221472229531468,
+      "recall@10": 0.3546411608003562,
+      "ndcg@10": 0.21723493905957741,
+      "mrr": 0.22213338558735593,
+      "new_hits@10": 323,
+      "new_targets": 1857,
+      "new_recall@10": 0.17393645665051158,
+      "conditional_new_recall@10": 0.3872901678657074,
+      "repeat_recall@10_micro": 0.37724195272597694,
+      "repeat_recall@10_macro": 0.39634373539959156,
+      "mixed_coverage_macro": 0.8806497223703015,
+      "mixed_coverage_micro": 0.8867263526664072,
+      "new_targets_in_slate": 834,
+      "new_slate_coverage": 0.4491114701130856,
+      "new_reachable_lost_at10": 511,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.37456050520566647,
+          "new_hits@10": 133,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.3992449981802858,
+          "new_hits@10": 110,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.32315241689486524,
+          "new_hits@10": 80,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 83
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 240
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 10
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 313
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 144
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 179
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "dot-quota50_25": {
+      "recall@5": 0.2407343026897941,
+      "recall@10": 0.3535370974163704,
+      "ndcg@10": 0.21619375978142394,
+      "mrr": 0.21965999510717343,
+      "new_hits@10": 321,
+      "new_targets": 1857,
+      "new_recall@10": 0.172859450726979,
+      "conditional_new_recall@10": 0.3635334088335221,
+      "repeat_recall@10_micro": 0.3759353842499109,
+      "repeat_recall@10_macro": 0.39527765324054465,
+      "mixed_coverage_macro": 0.8674399821293869,
+      "mixed_coverage_micro": 0.862008563643441,
+      "new_targets_in_slate": 883,
+      "new_slate_coverage": 0.4754981152396338,
+      "new_reachable_lost_at10": 562,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.37456050520566647,
+          "new_hits@10": 133,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.3992449981802858,
+          "new_hits@10": 110,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.3210602049541685,
+          "new_hits@10": 78,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 83
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 238
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 10
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 311
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 143
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 178
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "dot-quota50_10": {
+      "recall@5": 0.2407343026897941,
+      "recall@10": 0.3535370974163704,
+      "ndcg@10": 0.21619375978142394,
+      "mrr": 0.21690531329538376,
+      "new_hits@10": 321,
+      "new_targets": 1857,
+      "new_recall@10": 0.172859450726979,
+      "conditional_new_recall@10": 0.3425827107790822,
+      "repeat_recall@10_micro": 0.3759353842499109,
+      "repeat_recall@10_macro": 0.39527765324054465,
+      "mixed_coverage_macro": 0.7331314224220097,
+      "mixed_coverage_micro": 0.6814908524717789,
+      "new_targets_in_slate": 937,
+      "new_slate_coverage": 0.5045772751750135,
+      "new_reachable_lost_at10": 616,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.37456050520566647,
+          "new_hits@10": 133,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.3992449981802858,
+          "new_hits@10": 110,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.3210602049541685,
+          "new_hits@10": 78,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 83
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 238
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 10
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 311
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 143
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 178
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "dot-top50": {
+      "recall@5": 0.2407343026897941,
+      "recall@10": 0.3535370974163704,
+      "ndcg@10": 0.21619375978142394,
+      "mrr": 0.2165153184022162,
+      "new_hits@10": 321,
+      "new_targets": 1857,
+      "new_recall@10": 0.172859450726979,
+      "conditional_new_recall@10": 0.34891304347826085,
+      "repeat_recall@10_micro": 0.3759353842499109,
+      "repeat_recall@10_macro": 0.39527765324054465,
+      "mixed_coverage_macro": 0.6907563518112363,
+      "mixed_coverage_micro": 0.6807123394316855,
+      "new_targets_in_slate": 920,
+      "new_slate_coverage": 0.49542272482498656,
+      "new_reachable_lost_at10": 599,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.37456050520566647,
+          "new_hits@10": 133,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.3992449981802858,
+          "new_hits@10": 110,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.3210602049541685,
+          "new_hits@10": 78,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 83
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 238
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 10
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 311
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 143
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 178
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "dot-quota100_50": {
+      "recall@5": 0.2407343026897941,
+      "recall@10": 0.3535370974163704,
+      "ndcg@10": 0.21619375978142394,
+      "mrr": 0.21891995523626126,
+      "new_hits@10": 321,
+      "new_targets": 1857,
+      "new_recall@10": 0.172859450726979,
+      "conditional_new_recall@10": 0.25375494071146243,
+      "repeat_recall@10_micro": 0.3759353842499109,
+      "repeat_recall@10_macro": 0.39527765324054465,
+      "mixed_coverage_macro": 0.934308011873812,
+      "mixed_coverage_micro": 0.9394706111327364,
+      "new_targets_in_slate": 1265,
+      "new_slate_coverage": 0.6812062466343565,
+      "new_reachable_lost_at10": 944,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.37456050520566647,
+          "new_hits@10": 133,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.3992449981802858,
+          "new_hits@10": 110,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.3210602049541685,
+          "new_hits@10": 78,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 83
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 238
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 10
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 311
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 143
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 178
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "static-quota50_25": {
+      "recall@5": 0.6105343098848102,
+      "recall@10": 0.7344549616693391,
+      "ndcg@10": 0.5556265839779378,
+      "mrr": 0.5320025968505163,
+      "new_hits@10": 175,
+      "new_targets": 1857,
+      "new_recall@10": 0.0942380183091007,
+      "conditional_new_recall@10": 0.20138089758342922,
+      "repeat_recall@10_micro": 0.8549708991566695,
+      "repeat_recall@10_macro": 0.8866204083250856,
+      "mixed_coverage_macro": 0.8844608284449862,
+      "mixed_coverage_micro": 0.8889645776566758,
+      "new_targets_in_slate": 869,
+      "new_slate_coverage": 0.46795907377490575,
+      "new_reachable_lost_at10": 694,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.6910266257040449,
+          "new_hits@10": 118,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7826383701107154,
+          "new_hits@10": 51,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7226246649063333,
+          "new_hits@10": 6,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 53
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 122
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 3
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 172
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 72
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 103
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "static-quota50_10": {
+      "recall@5": 0.6105343098848102,
+      "recall@10": 0.7344549616693391,
+      "ndcg@10": 0.5556265839779378,
+      "mrr": 0.5291797565610756,
+      "new_hits@10": 175,
+      "new_targets": 1857,
+      "new_recall@10": 0.0942380183091007,
+      "conditional_new_recall@10": 0.1906318082788671,
+      "repeat_recall@10_micro": 0.8549708991566695,
+      "repeat_recall@10_macro": 0.8866204083250856,
+      "mixed_coverage_macro": 0.813688957427959,
+      "mixed_coverage_micro": 0.7917477617750097,
+      "new_targets_in_slate": 918,
+      "new_slate_coverage": 0.49434571890145396,
+      "new_reachable_lost_at10": 743,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.6910266257040449,
+          "new_hits@10": 118,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7826383701107154,
+          "new_hits@10": 51,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7226246649063333,
+          "new_hits@10": 6,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 53
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 122
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 3
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 172
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 72
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 103
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "static-top50": {
+      "recall@5": 0.6105343098848102,
+      "recall@10": 0.7344549616693391,
+      "ndcg@10": 0.5556265839779378,
+      "mrr": 0.5321266974467495,
+      "new_hits@10": 175,
+      "new_targets": 1857,
+      "new_recall@10": 0.0942380183091007,
+      "conditional_new_recall@10": 0.20734597156398105,
+      "repeat_recall@10_micro": 0.8549708991566695,
+      "repeat_recall@10_macro": 0.8866204083250856,
+      "mixed_coverage_macro": 0.890671798022345,
+      "mixed_coverage_micro": 0.8979174776177501,
+      "new_targets_in_slate": 844,
+      "new_slate_coverage": 0.4544964997307485,
+      "new_reachable_lost_at10": 669,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.6910266257040449,
+          "new_hits@10": 118,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7826383701107154,
+          "new_hits@10": 51,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7226246649063333,
+          "new_hits@10": 6,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 53
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 122
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 3
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 172
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 72
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 103
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "static-quota100_50": {
+      "recall@5": 0.6105343098848102,
+      "recall@10": 0.7344549616693391,
+      "ndcg@10": 0.5556265839779378,
+      "mrr": 0.5326402080614954,
+      "new_hits@10": 175,
+      "new_targets": 1857,
+      "new_recall@10": 0.0942380183091007,
+      "conditional_new_recall@10": 0.13855898653998416,
+      "repeat_recall@10_micro": 0.8549708991566695,
+      "repeat_recall@10_macro": 0.8866204083250856,
+      "mixed_coverage_macro": 0.9354659849870427,
+      "mixed_coverage_micro": 0.9406383806928766,
+      "new_targets_in_slate": 1263,
+      "new_slate_coverage": 0.6801292407108239,
+      "new_reachable_lost_at10": 1088,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.6910266257040449,
+          "new_hits@10": 118,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7826383701107154,
+          "new_hits@10": 51,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7226246649063333,
+          "new_hits@10": 6,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 53
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 122
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 3
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 172
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 72
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 103
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "dynamic-quota50_25": {
+      "recall@5": 0.638958295983243,
+      "recall@10": 0.7523370330179238,
+      "ndcg@10": 0.577623562740306,
+      "mrr": 0.5526117239259308,
+      "new_hits@10": 189,
+      "new_targets": 1857,
+      "new_recall@10": 0.10177705977382875,
+      "conditional_new_recall@10": 0.2116461366181411,
+      "repeat_recall@10_micro": 0.8793205843924456,
+      "repeat_recall@10_macro": 0.9067788107288492,
+      "mixed_coverage_macro": 0.8885076655074912,
+      "mixed_coverage_micro": 0.894024912417283,
+      "new_targets_in_slate": 893,
+      "new_slate_coverage": 0.4808831448572967,
+      "new_reachable_lost_at10": 704,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.7002858849633042,
+          "new_hits@10": 129,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7905015707006857,
+          "new_hits@10": 54,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7489968423532534,
+          "new_hits@10": 6,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 63
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 126
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 5
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 184
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 74
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 115
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "dynamic-quota50_10": {
+      "recall@5": 0.638958295983243,
+      "recall@10": 0.7523370330179238,
+      "ndcg@10": 0.577623562740306,
+      "mrr": 0.5502473924679956,
+      "new_hits@10": 189,
+      "new_targets": 1857,
+      "new_recall@10": 0.10177705977382875,
+      "conditional_new_recall@10": 0.19978858350951373,
+      "repeat_recall@10_micro": 0.8793205843924456,
+      "repeat_recall@10_macro": 0.9067788107288492,
+      "mixed_coverage_macro": 0.8313338230472823,
+      "mixed_coverage_micro": 0.8139353834176722,
+      "new_targets_in_slate": 946,
+      "new_slate_coverage": 0.5094238018309101,
+      "new_reachable_lost_at10": 757,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.7002858849633042,
+          "new_hits@10": 129,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7905015707006857,
+          "new_hits@10": 54,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7489968423532534,
+          "new_hits@10": 6,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 63
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 126
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 5
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 184
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 74
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 115
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "dynamic-top50": {
+      "recall@5": 0.638958295983243,
+      "recall@10": 0.7523370330179238,
+      "ndcg@10": 0.577623562740306,
+      "mrr": 0.5527490654228121,
+      "new_hits@10": 189,
+      "new_targets": 1857,
+      "new_recall@10": 0.10177705977382875,
+      "conditional_new_recall@10": 0.21875,
+      "repeat_recall@10_micro": 0.8793205843924456,
+      "repeat_recall@10_macro": 0.9067788107288492,
+      "mixed_coverage_macro": 0.8945986131892669,
+      "mixed_coverage_micro": 0.9020046710782406,
+      "new_targets_in_slate": 864,
+      "new_slate_coverage": 0.46526655896607433,
+      "new_reachable_lost_at10": 675,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.7002858849633042,
+          "new_hits@10": 129,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7905015707006857,
+          "new_hits@10": 54,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7489968423532534,
+          "new_hits@10": 6,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 63
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 126
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 5
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 184
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 74
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 115
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "dynamic-quota100_50": {
+      "recall@5": 0.638958295983243,
+      "recall@10": 0.7523370330179238,
+      "ndcg@10": 0.577623562740306,
+      "mrr": 0.5532260185673377,
+      "new_hits@10": 189,
+      "new_targets": 1857,
+      "new_recall@10": 0.10177705977382875,
+      "conditional_new_recall@10": 0.14788732394366197,
+      "repeat_recall@10_micro": 0.8793205843924456,
+      "repeat_recall@10_macro": 0.9067788107288492,
+      "mixed_coverage_macro": 0.9367316791718937,
+      "mixed_coverage_micro": 0.9425846632931102,
+      "new_targets_in_slate": 1278,
+      "new_slate_coverage": 0.6882067851373183,
+      "new_reachable_lost_at10": 1089,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.7002858849633042,
+          "new_hits@10": 129,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7905015707006857,
+          "new_hits@10": 54,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7489968423532534,
+          "new_hits@10": 6,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 63
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 126
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 5
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 184
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 74
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 115
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "relations-quota50_25": {
+      "recall@5": 0.6254860039937487,
+      "recall@10": 0.7421740323830796,
+      "ndcg@10": 0.5704716679457986,
+      "mrr": 0.5495868201355895,
+      "new_hits@10": 200,
+      "new_targets": 1857,
+      "new_recall@10": 0.10770059235325795,
+      "conditional_new_recall@10": 0.2229654403567447,
+      "repeat_recall@10_micro": 0.8645919942986103,
+      "repeat_recall@10_macro": 0.8925088826905604,
+      "mixed_coverage_macro": 0.8879045533250703,
+      "mixed_coverage_micro": 0.8925652004671079,
+      "new_targets_in_slate": 897,
+      "new_slate_coverage": 0.48303715670436187,
+      "new_reachable_lost_at10": 697,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.7055128861580473,
+          "new_hits@10": 138,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7859569541815117,
+          "new_hits@10": 57,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7304673646682249,
+          "new_hits@10": 5,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 62
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 138
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 3
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 197
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 79
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 121
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "relations-quota50_10": {
+      "recall@5": 0.6254860039937487,
+      "recall@10": 0.7421740323830796,
+      "ndcg@10": 0.5704716679457986,
+      "mrr": 0.5467463930418672,
+      "new_hits@10": 200,
+      "new_targets": 1857,
+      "new_recall@10": 0.10770059235325795,
+      "conditional_new_recall@10": 0.20964360587002095,
+      "repeat_recall@10_micro": 0.8645919942986103,
+      "repeat_recall@10_macro": 0.8925088826905604,
+      "mixed_coverage_macro": 0.821357711886408,
+      "mixed_coverage_micro": 0.8029388867263527,
+      "new_targets_in_slate": 954,
+      "new_slate_coverage": 0.5137318255250404,
+      "new_reachable_lost_at10": 754,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.7055128861580473,
+          "new_hits@10": 138,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7859569541815117,
+          "new_hits@10": 57,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7304673646682249,
+          "new_hits@10": 5,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 62
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 138
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 3
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 197
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 79
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 121
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "relations-top50": {
+      "recall@5": 0.6254860039937487,
+      "recall@10": 0.7421740323830796,
+      "ndcg@10": 0.5704716679457986,
+      "mrr": 0.5497313897036294,
+      "new_hits@10": 200,
+      "new_targets": 1857,
+      "new_recall@10": 0.10770059235325795,
+      "conditional_new_recall@10": 0.22727272727272727,
+      "repeat_recall@10_micro": 0.8645919942986103,
+      "repeat_recall@10_macro": 0.8925088826905604,
+      "mixed_coverage_macro": 0.8956655741900028,
+      "mixed_coverage_micro": 0.903075126508369,
+      "new_targets_in_slate": 880,
+      "new_slate_coverage": 0.47388260635433493,
+      "new_reachable_lost_at10": 680,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.7055128861580473,
+          "new_hits@10": 138,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7859569541815117,
+          "new_hits@10": 57,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7304673646682249,
+          "new_hits@10": 5,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 62
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 138
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 3
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 197
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 79
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 121
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    },
+    "relations-quota100_50": {
+      "recall@5": 0.6254860039937487,
+      "recall@10": 0.7421740323830796,
+      "ndcg@10": 0.5704716679457986,
+      "mrr": 0.5502056015940594,
+      "new_hits@10": 200,
+      "new_targets": 1857,
+      "new_recall@10": 0.10770059235325795,
+      "conditional_new_recall@10": 0.15661707126076743,
+      "repeat_recall@10_micro": 0.8645919942986103,
+      "repeat_recall@10_macro": 0.8925088826905604,
+      "mixed_coverage_macro": 0.9372510641283648,
+      "mixed_coverage_micro": 0.9424873491630985,
+      "new_targets_in_slate": 1277,
+      "new_slate_coverage": 0.687668282175552,
+      "new_reachable_lost_at10": 1077,
+      "history_cohorts": {
+        "cold_0": {
+          "rows": 0,
+          "recall@10": null,
+          "new_hits@10": 0,
+          "new_targets": 0
+        },
+        "light_1_8": {
+          "rows": 1116,
+          "recall@10": 0.7055128861580473,
+          "new_hits@10": 138,
+          "new_targets": 574
+        },
+        "warm_9_31": {
+          "rows": 1808,
+          "recall@10": 0.7859569541815117,
+          "new_hits@10": 57,
+          "new_targets": 594
+        },
+        "truncated_32": {
+          "rows": 3267,
+          "recall@10": 0.7304673646682249,
+          "new_hits@10": 5,
+          "new_targets": 689
+        }
+      },
+      "new_target_cohorts": {
+        "first_snapshot_family": {
+          "targets": 681,
+          "hits@10": 62
+        },
+        "known_snapshot_family": {
+          "targets": 1176,
+          "hits@10": 138
+        },
+        "sku_rare_frozen90d": {
+          "targets": 439,
+          "hits@10": 3
+        },
+        "sku_frequent_frozen90d": {
+          "targets": 1418,
+          "hits@10": 197
+        },
+        "sparse_transition": {
+          "targets": 1254,
+          "hits@10": 79
+        },
+        "supported_transition": {
+          "targets": 603,
+          "hits@10": 121
+        },
+        "unrepresented_catalogue": {
+          "targets": 0,
+          "hits@10": 0
+        }
+      }
+    }
+  },
+  "heldout_access": false
+}

@@ -1,0 +1,21 @@
+{
+  "selector_screen_promising": [
+    "dynamic",
+    "relations"
+  ],
+  "selector_repeated": [
+    "dynamic",
+    "relations",
+    "static"
+  ],
+  "selector_screen_winner": "dynamic",
+  "ranker_promising_repeated": [
+    "hierarchy",
+    "complements"
+  ],
+  "combined_selector": "dynamic",
+  "combined_policy": "quota100_50",
+  "status": "complete",
+  "promotion": false,
+  "test_access": false
+}
