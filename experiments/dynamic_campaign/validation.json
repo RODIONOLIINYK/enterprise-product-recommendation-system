@@ -23,5 +23,16 @@
     "outputs": "temporary model/evidence namespaces",
     "training_started": false,
     "reference_replay_exact": true
+  },
+  "campaign_linux_ci": {
+    "implementation_commit": "39d975317259ac9a4ec2fee7981ab8dc3e1704bb",
+    "conclusion": "success",
+    "url": "https://github.com/RODIONOLIINYK/enterprise-product-recommendation-system/actions/runs/43290177692",
+    "passed": 482,
+    "skipped": 13,
+    "subtests": 70,
+    "seconds": 9.68,
+    "private_artifacts_present": false,
+    "fresh_cpu_dependency_install": true
   }
 }

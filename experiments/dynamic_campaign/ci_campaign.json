@@ -1,0 +1,99 @@
+{
+  "conclusion": "success",
+  "headSha": "39d975317259ac9a4ec2fee7981ab8dc3e1704bb",
+  "jobs": [
+    {
+      "completedAt": "2026-11-12T19:27:41Z",
+      "conclusion": "success",
+      "databaseId": 131434017063,
+      "name": "synthetic",
+      "startedAt": "2026-11-12T19:26:31Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-12T19:26:33Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-12T19:26:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-12T19:26:34Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-11-12T19:26:33Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-12T19:26:39Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-python@v7",
+          "number": 3,
+          "startedAt": "2026-11-12T19:26:34Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-12T19:27:27Z",
+          "conclusion": "success",
+          "name": "Install tested CPU runtime",
+          "number": 4,
+          "startedAt": "2026-11-12T19:26:39Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-12T19:27:27Z",
+          "conclusion": "success",
+          "name": "Check undefined symbols",
+          "number": 5,
+          "startedAt": "2026-11-12T19:27:27Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-12T19:27:38Z",
+          "conclusion": "success",
+          "name": "Run without private data, checkpoints or embedding downloads",
+          "number": 6,
+          "startedAt": "2026-11-12T19:27:27Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-12T19:27:38Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-python@v7",
+          "number": 11,
+          "startedAt": "2026-11-12T19:27:38Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-12T19:27:38Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 12,
+          "startedAt": "2026-11-12T19:27:38Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-12T19:27:39Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "startedAt": "2026-11-12T19:27:38Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/RODIONOLIINYK/enterprise-product-recommendation-system/actions/runs/43290177692/job/131434017063"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/RODIONOLIINYK/enterprise-product-recommendation-system/actions/runs/43290177692",
+  "test_results": {
+    "passed": 482,
+    "skipped": 13,
+    "subtests": 70,
+    "seconds": 9.68,
+    "private_artifacts_present": false,
+    "fresh_cpu_dependency_install": true
+  }
+}
