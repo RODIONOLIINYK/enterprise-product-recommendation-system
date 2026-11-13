@@ -9,6 +9,12 @@ This document guides coding agents working in this repository. Source behavior a
 > - **Validation-Only Metrics (`6,191` queries, `10,276` total targets, `1,857` new targets, `2025-10-01`..`2026-02-18`):** Recall@5 `0.64335`, Recall@10 `0.75411`, Recall@25 `0.84850`, Recall@50 `0.89542`, Recall@100 `0.93733`, NDCG@10 `0.58633`, ordinary new hits@10 `194/1,857`, unseen hits@25 `726/1,857`, @50 `1,029/1,857`, @100 `1,337/1,857`. Tradeoffs vs `no-brand-v1`: higher NDCG@10 / Recall@5 / unseen@100, lower Recall@10 (`-0.245 pp`) and ordinary top-10 discovery (`-20`); single seed (`seed=42`), selected epochs (`16`/`5`), pending normalization and category work — do not claim statistical superiority.
 > - **Narrow Scope:** Use as the default baseline **only for future Stage 1 MLP selector experiments**. It is **NOT** a Stage 2 (`UPS-CANR`) or production retriever default; preserve all historical `checkpoints/retriever-discovery-reference/` and `checkpoints/ranker/` aliases.
 
+> **Stage 2 decision (2026-11-13):** Exclude the per-item Stage 1 MLP score from Stage 2 attention and scoring; retain the existing Stage 2 reference and the `repeat-no-month-v1` Stage 1 selector. The user instructed not to run training yet. See [experiments/stage2_mlp_score_v1/DECISION.md](experiments/stage2_mlp_score_v1/DECISION.md).
+
+> **Rolling Statistics Policy (`rolling_observed_v2`, 2026-11-13):**
+> - Historical feature builders/caches (`dynamic_campaign_v1`, `frozen_train_cutoff_v1`) freeze global popularity, relationship/co-occurrence tables, and `PointInTimeFeatureStore` globals at `TRAIN_CUTOFF` during validation. **Do NOT accidentally select `frozen_train_cutoff_v1` for new MLP or Stage 2 experiments.**
+> - New feature preparation and request-time inference default to **`rolling_observed_v2`** ([`recommender/experiments/rolling_candidate_v2/`](recommender/experiments/rolling_candidate_v2/)), which rolls market/relationship counts strictly prior to prediction date (`< as_of_date`, never `>= as_of_date` and never held-out `>= 2026-02-19`) with sealed v3 cache identities. Legacy `frozen_train_cutoff_v1` remains selectable only for historical reproduction. Existing frozen weights (`repeat-no-month-v1`, `no-brand-v1`) were not retrained for rolling inputs.
+
 ---
 
 ## 1. Environment & Non-Negotiable Rules

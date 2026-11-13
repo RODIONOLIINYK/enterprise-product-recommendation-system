@@ -1,14 +1,23 @@
 """Shared cheap features for full-pool selection and downstream ablations.
 
-Global observations freeze before validation; customer state keeps incorporating
-strictly earlier purchases. Snapshot metadata is explicit, not effective-dated.
+Supports two explicit statistics policies:
+- `frozen_train_cutoff_v1`: historical legacy policy where global and relationship
+  observations freeze at `TRAIN_CUTOFF` during validation (preserved for historical replay).
+- `rolling_observed_v2`: strictly causal rolling statistics incorporating prior observed
+  purchases (`< as_of_date`, never `>= as_of_date` and never `>= TEST_START`).
+Snapshot metadata is explicit, not effective-dated.
 """
 from bisect import bisect_left
 from collections import OrderedDict
 import math
 import numpy as np
 import pandas as pd
-from recommender.candidates import PointInTimeFeatureStore
+from recommender.candidates import (
+    PointInTimeFeatureStore,
+    STATISTICS_POLICY_FROZEN,
+    STATISTICS_POLICY_ROLLING,
+    VALID_STATISTICS_POLICIES,
+)
 from recommender.split import TRAIN_CUTOFF, TEST_START
 from .feature_schema import NAMES
 
@@ -28,6 +37,13 @@ class RelationshipTable:
         self.observations = observations
         self.cursor = 0
         self.alpha = alpha
+
+    def reset(self):
+        self.pairs.fill(0.0)
+        self.source.fill(0.0)
+        self.dest.fill(0.0)
+        self.total = 0
+        self.cursor = 0
 
     def advance(self, day):
         while self.cursor < len(self.observations) and self.observations[self.cursor][0] < day:
@@ -58,87 +74,140 @@ class RelationshipTable:
 
 
 class DynamicFeatureBuilder:
-    def __init__(self, purchases, catalogue, companies, product_ids, *, relationships=True):
-        if not purchases.purchase_date.lt(TEST_START).all():
+    def __init__(
+        self,
+        purchases,
+        catalogue,
+        companies,
+        product_ids,
+        *,
+        relationships=True,
+        statistics_policy: str = STATISTICS_POLICY_FROZEN,
+        allow_non_monotonic: bool = False,
+    ):
+        if statistics_policy not in VALID_STATISTICS_POLICIES:
+            raise ValueError(
+                f'Unknown statistics_policy {statistics_policy!r}; expected one of {VALID_STATISTICS_POLICIES}.'
+            )
+        if purchases.purchase_date.isna().any() or not purchases.purchase_date.lt(TEST_START).all():
             raise ValueError('Development purchases only')
+        self.statistics_policy = statistics_policy
+        self.allow_non_monotonic = bool(allow_non_monotonic)
         self.product_ids = list(product_ids)
         self.relationships_enabled = relationships
         self.index = {sku: i for i, sku in enumerate(product_ids)}
-        self.store = PointInTimeFeatureStore(purchases, catalogue, companies)
+        self.store = PointInTimeFeatureStore(
+            purchases,
+            catalogue,
+            companies,
+            statistics_policy=statistics_policy,
+        )
         # Fixed declared scale: future training-count maxima cannot affect an earlier row.
         self.store._popularity_scale = math.log1p(1000)
         master = catalogue.set_index('product_id').reindex(product_ids)
         self.attrs = {name: master[name].fillna('').astype(str).to_numpy() if name in master else np.full(len(product_ids), '')
                       for name in ('product_category', 'product_family', 'business_line')}
+        cat_vals = self.attrs['product_category']
+        unique_cats = sorted(set(cat_vals))
+        cat_lookup = {cat: idx for idx, cat in enumerate(unique_cats)}
+        self._cat_indices = np.array([cat_lookup[c] for c in cat_vals], dtype=np.int64)
+        self._num_cats = len(unique_cats)
+
         maps = {'sku': np.arange(len(product_ids)) + 1}
         for name, values in self.attrs.items():
             vocabulary = {s: i + 1 for i, s in enumerate(sorted(set(values) - {''}))}
             maps[name] = np.array([vocabulary.get(s, 0) for s in values])
         self.histories, self.basket_dates = {}, {}
         observations, complements = [], []
+        is_frozen = self.statistics_policy == STATISTICS_POLICY_FROZEN
         for cid, group in purchases.groupby('customer_id', sort=False):
             baskets = []
             for date, rows in group.groupby('purchase_date', sort=True):
                 ids = sorted({self.index[str(s)] for s in rows.product_id if str(s) in self.index})
                 baskets.append((pd.Timestamp(date), ids))
-                if relationships and date < TRAIN_CUTOFF:
-                    # A basket's source/target co-occurrences are observed at its date.
+                if relationships and (not is_frozen or date < TRAIN_CUTOFF):
+                    # A basket's source/target co-occurrences are observed strictly after its date.
                     for sku in ids:
                         other = [p for p in ids if p != sku]
                         if other: complements.append((pd.Timestamp(date), [sku], other))
             self.histories[str(cid)] = baskets
             self.basket_dates[str(cid)] = [date for date, _ in baskets]
             if relationships:
-                observations.extend((date, prev, ids) for (_, prev), (date, ids) in zip(baskets, baskets[1:]) if date < TRAIN_CUTOFF)
+                if is_frozen:
+                    observations.extend((date, prev, ids) for (_, prev), (date, ids) in zip(baskets, baskets[1:]) if date < TRAIN_CUTOFF)
+                else:
+                    observations.extend((date, prev, ids) for (_, prev), (date, ids) in zip(baskets, baskets[1:]))
         observations.sort(key=lambda x: x[0]); complements.sort(key=lambda x: x[0])
         self.tables = {name: RelationshipTable(mapping, observations) for name, mapping in maps.items()} if relationships else {}
         self.complements = RelationshipTable(maps['sku'], complements) if relationships else None
-        train = purchases.loc[purchases.purchase_date < TRAIN_CUTOFF].sort_values('purchase_date')
-        self.sales = {str(sku): rows for sku, rows in train.groupby('product_id', sort=False)}
+        sales_source = (
+            purchases.loc[purchases.purchase_date < TRAIN_CUTOFF]
+            if is_frozen
+            else purchases
+        ).sort_values('purchase_date')
+        self.sales = {str(sku): rows for sku, rows in sales_source.groupby('product_id', sort=False)}
+        self._sales_dates = {
+            sku: rows.purchase_date.to_numpy(dtype='datetime64[ns]')
+            for sku, rows in self.sales.items()
+        }
+        self._sales_cids = {
+            sku: rows.customer_id.astype(str).to_numpy()
+            for sku, rows in self.sales.items()
+        }
         self.global_cache = OrderedDict()
         self.last_date = None
 
     def global_features(self, date):
-        cutoff = min(pd.Timestamp(date), TRAIN_CUTOFF)
+        date_ts = pd.Timestamp(date)
+        if pd.isna(date_ts) or date_ts >= TEST_START:
+            raise ValueError('Development predictions only')
+        cutoff = min(date_ts, TRAIN_CUTOFF) if self.statistics_policy == STATISTICS_POLICY_FROZEN else date_ts
         if cutoff in self.global_cache:
             self.global_cache.move_to_end(cutoff)
             return self.global_cache[cutoff]
         result = np.zeros((len(self.product_ids), 7), dtype=np.float32)
         result[:, 6] = 1  # Never sold: identical whether or not a future sale exists.
         counts = np.zeros(len(result))
+        cutoff_64 = cutoff.to_datetime64()
+        start_64s = [(cutoff - pd.Timedelta(days=d)).to_datetime64() for d in (7, 30, 60, 90)]
         for i, sku in enumerate(self.product_ids):
-            rows = self.sales.get(sku)
-            if rows is None: continue
-            dates = rows.purchase_date.to_numpy()
-            stop = dates.searchsorted(cutoff.to_datetime64(), side='left')
-            starts = [dates.searchsorted((cutoff - pd.Timedelta(days=d)).to_datetime64(), side='left') for d in (7, 30, 60, 90)]
-            n7, n30, n60, n90 = [stop - k for k in starts]
-            buyers = rows.customer_id.iloc[starts[1]:stop].nunique()
+            dates = self._sales_dates.get(sku)
+            if dates is None:
+                continue
+            stop = int(dates.searchsorted(cutoff_64, side='left'))
+            s7, s30, s60, s90 = (int(dates.searchsorted(st, side='left')) for st in start_64s)
+            n7, n30, n60, n90 = stop - s7, stop - s30, stop - s60, stop - s90
+            buyers = len(set(self._sales_cids[sku][s30:stop])) if stop > s30 else 0
             result[i, :4] = log_count([n7, n30, n90, buyers])
             result[i, 4] = np.clip(np.log((n30 + 1) / (n60 - n30 + 1)) / 5, -1, 1)
             counts[i] = n30
             result[i, 6] = min((cutoff - pd.Timestamp(dates[stop - 1])).days / 365, 1) if stop else 1
-        cats = self.attrs['product_category']
-        totals = {cat: counts[cats == cat].sum() for cat in set(cats)}
-        result[:, 5] = [counts[i] / max(totals[cat], 1) for i, cat in enumerate(cats)]
+        cat_totals = np.bincount(self._cat_indices, weights=counts, minlength=self._num_cats)
+        result[:, 5] = counts / np.maximum(cat_totals[self._cat_indices], 1.0)
         self.global_cache[cutoff] = result
         while len(self.global_cache) > 512: self.global_cache.popitem(last=False)
         return result
 
     def build(self, customer_id, as_of_date, *, include_relationships=None, candidate_ids=None):
         date = pd.Timestamp(as_of_date)
-        if include_relationships is None:include_relationships=self.relationships_enabled
-        if include_relationships and not self.relationships_enabled:raise ValueError('Relationship tables were omitted from this provider')
-        if date >= TEST_START: raise ValueError('Development predictions only')
-        if include_relationships and self.last_date is not None and date < self.last_date:
-            raise ValueError('Relationship features must be built chronologically')
+        if pd.isna(date) or date >= TEST_START:
+            raise ValueError('Development predictions only')
+        if include_relationships is None: include_relationships = self.relationships_enabled
+        if include_relationships and not self.relationships_enabled: raise ValueError('Relationship tables were omitted from this provider')
         if include_relationships:
+            rel_cutoff = min(date, TRAIN_CUTOFF) if self.statistics_policy == STATISTICS_POLICY_FROZEN else date
+            if self.last_date is not None and date < self.last_date:
+                if not self.allow_non_monotonic:
+                    raise ValueError('Relationship features must be built chronologically')
+                for table in (*self.tables.values(), self.complements):
+                    table.reset()
             self.last_date = date
-            for table in (*self.tables.values(), self.complements): table.advance(min(date, TRAIN_CUTOFF))
+            for table in (*self.tables.values(), self.complements):
+                table.advance(rel_cutoff)
         cid = str(customer_id)
-        candidates=self.product_ids if candidate_ids is None else list(candidate_ids)
-        if len(candidates)!=len(set(candidates)):raise ValueError('Duplicate candidate IDs')
-        indices=np.array([self.index[sku] for sku in candidates],dtype=int)
+        candidates = self.product_ids if candidate_ids is None else list(candidate_ids)
+        if len(candidates) != len(set(candidates)): raise ValueError('Duplicate candidate IDs')
+        indices = np.array([self.index[sku] for sku in candidates], dtype=int)
         baskets = self.histories.get(cid, [])[:bisect_left(self.basket_dates.get(cid, []), date)]
         x = np.zeros((len(candidates), len(NAMES)), dtype=np.float32)
         x[:, :13] = self.store.compute_slate_pairwise_features(cid, date, candidates).numpy()
@@ -157,7 +226,7 @@ class DynamicFeatureBuilder:
                 observed = {}
                 for d, skus in baskets:
                     for value in set(values[skus]) - {''}: observed.setdefault(value, []).append(d)
-                candidate_values=values[indices]
+                candidate_values = values[indices]
                 for value in set(candidate_values):
                     positions = candidate_values == value
                     history = observed.get(value, [])

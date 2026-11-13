@@ -1,0 +1,24 @@
+{
+  "training_executed": false,
+  "heldout_access": false,
+  "metrics_verified": {
+    "recall@10": 0.7584465401836118,
+    "ndcg@10": 0.5882245040591186,
+    "new_hits@10": 206,
+    "new_hits@25": 757,
+    "new_hits@50": 1041,
+    "new_hits@100": 1357
+  },
+  "slate_indices_match_recomputed_rolling_score_selection": true,
+  "v3_feature_hashes_match_independently_audited_v2_values": true,
+  "preserved_hashes_matched": 17,
+  "observed_source_digest": "e1ffa78c9820a22adf3fd8e0839bfcdc07cc6413e9eeac407fa959deb1cb2349",
+  "full_tests": {
+    "passed": 544,
+    "skipped": 6
+  },
+  "synthetic_tests": {
+    "passed": 535,
+    "skipped": 15
+  }
+}

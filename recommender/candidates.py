@@ -209,12 +209,19 @@ class CustomerSnapshot:
     # }
 
 
+STATISTICS_POLICY_FROZEN = "frozen_train_cutoff_v1"
+STATISTICS_POLICY_ROLLING = "rolling_observed_v2"
+VALID_STATISTICS_POLICIES = (STATISTICS_POLICY_FROZEN, STATISTICS_POLICY_ROLLING)
+
+
 class PointInTimeFeatureStore:
     """Pre-aggregates customer historical statistics and industry affinities strictly point-in-time.
 
     Guarantees:
     - Purchase statistics use strictly prior events; snapshot metadata is an explicit assumption.
     - observed_only_v1 excludes unverifiable master attributes from pairwise features.
+    - statistics_policy='frozen_train_cutoff_v1' freezes global/industry counts at train_cutoff (legacy).
+    - statistics_policy='rolling_observed_v2' rolls global/industry counts strictly < as_of_date while keeping train-fitted _popularity_scale fixed.
     - Sub-millisecond pairwise feature extraction per candidate slate via indexed snapshot lookups.
     - All 13 pairwise features bounded strictly in [0.0, 1.0] with zero NaNs.
     """
@@ -225,14 +232,23 @@ class PointInTimeFeatureStore:
         catalogue_df: Optional[pd.DataFrame] = None,
         companies_df: Optional[pd.DataFrame] = None,
         train_cutoff: Union[str, pd.Timestamp] = TRAIN_CUTOFF,
-        *, metadata_policy: str = "snapshot_unverified", max_snapshots: int = 1024,
-        max_prefixes: int = 128, max_cached_dates: int = 512,
+        *,
+        metadata_policy: str = "snapshot_unverified",
+        statistics_policy: str = STATISTICS_POLICY_FROZEN,
+        max_snapshots: int = 1024,
+        max_prefixes: int = 128,
+        max_cached_dates: int = 512,
     ):
         if metadata_policy not in ("snapshot_unverified", "observed_only_v1"):
             raise ValueError("Unknown pairwise metadata policy")
+        if statistics_policy not in VALID_STATISTICS_POLICIES:
+            raise ValueError(
+                f"Unknown statistics_policy {statistics_policy!r}; expected one of {VALID_STATISTICS_POLICIES}."
+            )
         if min(max_snapshots, max_prefixes, max_cached_dates) < 0:
             raise ValueError("Cache capacities must be nonnegative")
         self.metadata_policy = metadata_policy
+        self.statistics_policy = statistics_policy
         self.max_snapshots, self.max_prefixes, self.max_cached_dates = max_snapshots, max_prefixes, max_cached_dates
         self._prefix_states = OrderedDict()
         self._observed_metadata = {}
@@ -325,18 +341,21 @@ class PointInTimeFeatureStore:
         self._popularity_rankings = OrderedDict()
 
     def _index_training_sales(self, df: pd.DataFrame) -> None:
-        """Fit the popularity scale and index training events for as-of counts."""
+        """Fit the popularity scale on training rows and index sales history for as-of counts."""
         if df.empty:
             return
 
-        train = df.loc[df["purchase_date"] < self.train_cutoff].sort_values("purchase_date")
-        self._sku_sale_dates = train.groupby("product_id")["purchase_date"].agg(list).to_dict()
-        maximum = max(map(len, self._sku_sale_dates.values()), default=1)
+        train = df.loc[df["purchase_date"] < self.train_cutoff].sort_values("purchase_date", kind="stable")
+        train_sku_counts = train.groupby("product_id")["purchase_date"].size()
+        maximum = int(train_sku_counts.max()) if not train_sku_counts.empty else 1
         self._popularity_scale = math.log1p(maximum)
 
+        source = train if self.statistics_policy == STATISTICS_POLICY_FROZEN else df.sort_values("purchase_date", kind="stable")
+        self._sku_sale_dates = source.groupby("product_id")["purchase_date"].agg(list).to_dict()
+
         industries = {cid: meta["industry_branch"] for cid, meta in self.customer_metadata.items()}
-        train = train.assign(industry=train["customer_id"].map(industries).fillna(""))
-        known = train.loc[train["industry"] != ""]
+        source = source.assign(industry=source["customer_id"].map(industries).fillna(""))
+        known = source.loc[source["industry"] != ""]
         self._industry_sale_dates = known.groupby("industry")["purchase_date"].agg(list).to_dict()
         self._industry_sku_sale_dates = (
             known.groupby(["industry", "product_id"])["purchase_date"].agg(list).to_dict()
@@ -400,9 +419,13 @@ class PointInTimeFeatureStore:
         return self.get_product_attribute(product_id, "brand", as_of_date)
 
     def sku_population_statistics(self, customer_id: str, as_of: pd.Timestamp, sku: str) -> tuple[float, float]:
-        """Training-history popularity and share of this industry's purchases."""
+        """Point-in-time popularity (train-fitted scale) and share of this industry's purchases."""
         count = bisect_left(self._sku_sale_dates.get(sku, ()), as_of)
-        popularity = math.log1p(count) / self._popularity_scale
+        popularity = (
+            min(1.0, math.log1p(count) / self._popularity_scale)
+            if self._popularity_scale > 0.0
+            else 0.0
+        )
         industry = self.get_customer_industry(customer_id)
         industry_count = bisect_left(self._industry_sale_dates.get(industry, ()), as_of)
         if not industry_count:
@@ -490,8 +513,9 @@ class PointInTimeFeatureStore:
         return rank_personal_repeat(stats, popularity, limit)
 
     def popularity_candidates(self, as_of_date, eligible_products, *, include_zero_sales=False):
-        """Order candidates by paid sales before the query and the training cutoff."""
-        cutoff = min(pd.Timestamp(as_of_date), self.train_cutoff)
+        """Order candidates by prior paid sales subject to the configured statistics policy."""
+        as_of_ts = pd.Timestamp(as_of_date)
+        cutoff = min(as_of_ts, self.train_cutoff) if self.statistics_policy == STATISTICS_POLICY_FROZEN else as_of_ts
         if cutoff not in self._popularity_rankings:
             counts = {sku: bisect_left(dates, cutoff) for sku, dates in self._sku_sale_dates.items()}
             self._popularity_rankings[cutoff] = sorted(
@@ -602,18 +626,82 @@ class PointInTimeFeatureStore:
         as_of_date: Union[str, pd.Timestamp],
         product_ids: Sequence[str],
     ) -> torch.Tensor:
-        """Fast batch extraction of pairwise features for a candidate slate (shape C x 13).
-
-        Executes in ~0.03 milliseconds for 50 candidates.
-        """
+        """Fast batch extraction of pairwise features for a candidate slate (shape C x 13)."""
         c = len(product_ids)
         mat = np.zeros((c, NUM_PAIRWISE_FEATURES), dtype=np.float32)
-        for i in range(c):
-            mat[i] = self.compute_pairwise_features(
-                customer_id=customer_id,
-                as_of_date=as_of_date,
-                product_id=product_ids[i],
-            )
+        if c == 0:
+            return torch.from_numpy(mat)
+
+        cid = str(customer_id).strip()
+        as_of_ts = pd.Timestamp(as_of_date)
+        snap = self.get_customer_snapshot(cid, as_of_ts)
+        sku_stats = snap.sku_stats
+        total_volume = snap.total_volume
+        has_orders = snap.total_orders > 0
+        tot_orders = max(snap.total_orders, 1)
+        cat_orders = snap.cat_orders
+        subcat_orders = snap.subcat_orders
+        brand_orders = snap.brand_orders
+        business_lines = snap.business_lines
+
+        industry = self.get_customer_industry(cid)
+        industry_count = bisect_left(self._industry_sale_dates.get(industry, ()), as_of_ts)
+        pop_scale = self._popularity_scale
+        log1p_50 = math.log1p(50.0)
+        log1p_365 = math.log1p(365.0)
+        observed_mode = self.metadata_policy == "observed_only_v1"
+
+        for i, raw_pid in enumerate(product_ids):
+            pid = str(raw_pid).strip()
+            sku_info = sku_stats.get(pid)
+            if sku_info is not None:
+                mat[i, 0] = 1.0
+                cnt = sku_info["order_count"]
+                vol = sku_info["volume"]
+                last_dt = sku_info["last_date"]
+                med_gap = sku_info["median_gap"]
+                mat[i, 1] = min(1.0, max(0.0, math.log1p(cnt) / log1p_50))
+                mat[i, 2] = min(1.0, max(0.0, vol / total_volume)) if total_volume > 0.0 else 0.0
+                delta_days = max(0.0, (as_of_ts - last_dt).total_seconds() / 86400.0)
+                mat[i, 3] = min(1.0, max(0.0, math.log1p(delta_days) / log1p_365))
+                if cnt >= 2:
+                    safe_gap = max(1.0, med_gap)
+                    mat[i, 4] = min(1.0, max(0.0, (delta_days / safe_gap) / 5.0))
+            else:
+                mat[i, 3] = 1.0
+
+            if observed_mode:
+                cat = self.get_product_attribute(pid, "product_category", as_of_ts)
+                subcat = self.get_product_attribute(pid, "product_subcategory", as_of_ts)
+                brand = self.get_product_attribute(pid, "brand", as_of_ts)
+                line = self.get_product_attribute(pid, "business_line", as_of_ts)
+            else:
+                pmeta = self.product_metadata.get(pid, {})
+                cat = pmeta.get("product_category", "")
+                subcat = pmeta.get("product_subcategory", "")
+                brand = pmeta.get("brand", "")
+                line = pmeta.get("business_line", "")
+
+            if has_orders:
+                if cat and cat in cat_orders:
+                    mat[i, 5] = min(1.0, max(0.0, cat_orders[cat] / tot_orders))
+                if subcat and subcat in subcat_orders:
+                    mat[i, 6] = min(1.0, max(0.0, subcat_orders[subcat] / tot_orders))
+                if brand and brand in brand_orders:
+                    mat[i, 7] = min(1.0, max(0.0, brand_orders[brand] / tot_orders))
+
+            sale_count = bisect_left(self._sku_sale_dates.get(pid, ()), as_of_ts)
+            mat[i, 8] = min(1.0, math.log1p(sale_count) / pop_scale) if pop_scale > 0.0 else 0.0
+            if industry_count:
+                ind_sku_count = bisect_left(self._industry_sku_sale_dates.get((industry, pid), ()), as_of_ts)
+                mat[i, 9] = ind_sku_count / industry_count
+
+            mat[i, 10] = 1.0 if cat in cat_orders else 0.0
+            mat[i, 11] = 1.0 if brand in brand_orders else 0.0
+            mat[i, 12] = 1.0 if line in business_lines else 0.0
+
+        np.nan_to_num(mat, copy=False, nan=0.0, posinf=1.0, neginf=0.0)
+        np.clip(mat, 0.0, 1.0, out=mat)
         return torch.from_numpy(mat)
 
 

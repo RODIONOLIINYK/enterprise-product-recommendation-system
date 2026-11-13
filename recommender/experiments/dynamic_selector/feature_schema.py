@@ -1,7 +1,14 @@
 """Explicit ordered, versioned feature lifecycle contract."""
 import numpy as np
-from recommender.candidates import PAIRWISE_FEATURE_NAMES
+from recommender.candidates import (
+    PAIRWISE_FEATURE_NAMES,
+    STATISTICS_POLICY_FROZEN,
+    STATISTICS_POLICY_ROLLING,
+    VALID_STATISTICS_POLICIES,
+)
 from recommender.artifacts import json_digest
+
+DEFAULT_NEW_STATISTICS_POLICY = STATISTICS_POLICY_ROLLING
 
 DYNAMIC_NAMES = (
     'customer_age', 'customer_overdue_ratio', 'customer_30d_activity', 'customer_90d_activity',
@@ -18,18 +25,51 @@ DYNAMIC_COLUMNS = (*range(13), *range(13, 13 + len(DYNAMIC_NAMES)))
 RELATION_COLUMNS = tuple(range(13 + len(DYNAMIC_NAMES), len(NAMES)))
 
 
-def contract():
-    return {'version': 1, 'names': list(NAMES), 'dtype_on_disk': 'float16', 'compute_dtype': 'float32',
-            'count_scale': 'log1p(x)/log1p(1000), clipped [0,1]', 'age_scale': 'days/365, clipped [0,1]',
-            'ratio_scale': 'days/max(median_basket_gap,1)/4, clipped [0,1]',
-            'lift_scale': 'log_lift/5 clipped [-1,1]', 'missing': 'never flags; missing metadata yields zero',
-            'statistics_policy': 'strictly earlier train; frozen train-cutoff validation globals',
-            'metadata_policy': 'snapshot_unverified', 'customer_embedding_policy': 'last-purchase snapshot only',
-            'product_embedding_policy': 'demand disabled, explicit model/catalogue version refresh'}
+def contract(statistics_policy: str = STATISTICS_POLICY_FROZEN):
+    if statistics_policy not in VALID_STATISTICS_POLICIES:
+        raise ValueError(
+            f'Unknown statistics_policy {statistics_policy!r}; expected one of {VALID_STATISTICS_POLICIES}.'
+        )
+    if statistics_policy == STATISTICS_POLICY_FROZEN:
+        return {'version': 1, 'names': list(NAMES), 'dtype_on_disk': 'float16', 'compute_dtype': 'float32',
+                'count_scale': 'log1p(x)/log1p(1000), clipped [0,1]', 'age_scale': 'days/365, clipped [0,1]',
+                'ratio_scale': 'days/max(median_basket_gap,1)/4, clipped [0,1]',
+                'lift_scale': 'log_lift/5 clipped [-1,1]', 'missing': 'never flags; missing metadata yields zero',
+                'statistics_policy': 'strictly earlier train; frozen train-cutoff validation globals',
+                'metadata_policy': 'snapshot_unverified', 'customer_embedding_policy': 'last-purchase snapshot only',
+                'product_embedding_policy': 'demand disabled, explicit model/catalogue version refresh'}
+    return {
+        'version': 2,
+        'names': list(NAMES),
+        'dtype_on_disk': 'float16',
+        'compute_dtype': 'float32',
+        'count_scale': 'log1p(x)/log1p(1000), clipped [0,1]',
+        'age_scale': 'days/365, clipped [0,1]',
+        'ratio_scale': 'days/max(median_basket_gap,1)/4, clipped [0,1]',
+        'lift_scale': 'log_lift/5 clipped [-1,1]',
+        'missing': 'never flags; missing metadata yields zero',
+        'statistics_policy_id': STATISTICS_POLICY_ROLLING,
+        'statistics_policy': (
+            'strictly earlier observed purchases (< as_of_date) across train and prior validation months; '
+            'fixed train-fitted popularity normalization; never same-date/future or held-out test'
+        ),
+        'relationship_tables_policy': 'strictly_prior_observed_baskets_rolling',
+        'metadata_policy': 'snapshot_unverified',
+        'customer_embedding_policy': 'last-purchase snapshot only',
+        'product_embedding_policy': 'demand disabled, explicit model/catalogue version refresh',
+    }
 
 
-def schema_digest():
-    return json_digest(contract())
+def rolling_contract():
+    return contract(STATISTICS_POLICY_ROLLING)
+
+
+def schema_digest(statistics_policy: str = STATISTICS_POLICY_FROZEN):
+    return json_digest(contract(statistics_policy))
+
+
+def rolling_schema_digest():
+    return schema_digest(STATISTICS_POLICY_ROLLING)
 
 
 def quantize_features(values):

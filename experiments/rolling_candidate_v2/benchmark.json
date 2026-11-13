@@ -1,0 +1,586 @@
+{
+  "training_executed": false,
+  "heldout_access": false,
+  "promoted": false,
+  "active_reference_id": "repeat-no-month-v1",
+  "statistics_policy": "rolling_observed_v2",
+  "hardware": {
+    "platform": "macOS-27.2.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_brand": "Apple M5",
+    "cpu_count": 10,
+    "torch_num_threads": 4,
+    "torch_version": "2.14.1",
+    "mps_available": true
+  },
+  "cold_artifact_load_ms": 1867.831333016511,
+  "cache_parity_check_non_timed": {
+    "max_abs_product_vector_diff": 2.086162567138672e-07,
+    "max_abs_val_customer_vector_diff": 2.682209014892578e-07
+  },
+  "universe_counts": {
+    "products": 841,
+    "dev_unique_customers": 2571,
+    "train_unique_customers": 2319,
+    "val_unique_customers": 1676,
+    "train_all_transitions": 26263,
+    "val_all_transitions": 6191
+  },
+  "devices": {
+    "cpu": {
+      "device": "cpu",
+      "active_model_transfer_ms": 13.68254199041985,
+      "active_e_no_brand_12d_0d": {
+        "product_tower_all_841": {
+          "items": 841,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.5661250033881515,
+          "p90_ms": 0.5700748064555228,
+          "mean_ms": 0.5664276657626033,
+          "min_ms": 0.5604579928331077,
+          "max_ms": 0.5717079911846668,
+          "per_item_us": 0.6731569600334739
+        },
+        "product_tower_single_1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.035083998227491975,
+          "p90_ms": 0.03629140555858612,
+          "mean_ms": 0.035230532133330904,
+          "min_ms": 0.03404199378564954,
+          "max_ms": 0.03679099609144032,
+          "per_item_us": 35.083998227491975
+        },
+        "customer_tower_dev_unique_2571_bs256": {
+          "items": 2571,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 130.22687498596497,
+          "p90_ms": 134.86552461399697,
+          "mean_ms": 132.40822493680753,
+          "min_ms": 129.62954200338572,
+          "max_ms": 152.04979199916124,
+          "per_item_us": 50.65222675455658
+        },
+        "customer_tower_train_unique_2319_bs256": {
+          "items": 2319,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 117.16191700543277,
+          "p90_ms": 118.5661667957902,
+          "mean_ms": 117.41359726487038,
+          "min_ms": 116.86624999856576,
+          "max_ms": 119.2600000067614,
+          "per_item_us": 50.52260327961741
+        },
+        "customer_tower_val_unique_1676_bs256": {
+          "items": 1676,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 85.78983397455886,
+          "p90_ms": 93.21918340865523,
+          "mean_ms": 87.66656120230134,
+          "min_ms": 85.51850001094863,
+          "max_ms": 101.91604201099835,
+          "per_item_us": 51.18725177479646
+        },
+        "customer_tower_val_all_transitions_6191_bs256": {
+          "items": 6191,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 331.15091698709875,
+          "p90_ms": 336.23981659766287,
+          "mean_ms": 333.00402779714204,
+          "min_ms": 329.78770800400525,
+          "max_ms": 353.229750005994,
+          "per_item_us": 53.48908366775945
+        },
+        "customer_tower_single_1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.39870900218375027,
+          "p90_ms": 0.40477460133843124,
+          "mean_ms": 0.4008193325717002,
+          "min_ms": 0.3927919897250831,
+          "max_ms": 0.4292079829610884,
+          "per_item_us": 398.7090021837503
+        },
+        "end_to_end_full_dev_recompute_841p_2571c_encode_only": {
+          "items": 3412,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 130.6344160111621,
+          "p90_ms": 132.5144832022488,
+          "mean_ms": 131.29394426747845,
+          "min_ms": 130.02137502189726,
+          "max_ms": 139.27474999218248,
+          "per_item_us": 38.286757330352316
+        },
+        "end_to_end_dev_unique_2571_plus_dot_scoring_841": {
+          "items": 2571,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 136.42591700772755,
+          "p90_ms": 136.63234119303524,
+          "mean_ms": 136.4223999378737,
+          "min_ms": 136.11491600750014,
+          "max_ms": 136.65862497873604,
+          "per_item_us": 53.06336717531215
+        },
+        "single_customer_encode_plus_dot_841": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.41945799603126943,
+          "p90_ms": 0.43220798834227026,
+          "mean_ms": 0.4212694669452806,
+          "min_ms": 0.4102500097360462,
+          "max_ms": 0.4342079919297248,
+          "per_item_us": 419.45799603126943
+        }
+      },
+      "shape_only_probe_with_tower_stats_18d_6d": {
+        "shape_only_untrained_latency_probe": true,
+        "trained": false,
+        "product_demand_features": 18,
+        "customer_tabular_features": 6,
+        "product_tower_all_841": {
+          "items": 841,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.5886669969186187,
+          "p90_ms": 0.5945918150246143,
+          "mean_ms": 0.5859416036400944,
+          "min_ms": 0.5682080227416009,
+          "max_ms": 0.5972909857518971,
+          "per_item_us": 0.6999607573348617
+        },
+        "product_tower_single_1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.04325000918470323,
+          "p90_ms": 0.044291786616668105,
+          "mean_ms": 0.04358886702296635,
+          "min_ms": 0.03999998443759978,
+          "max_ms": 0.05137498374097049,
+          "per_item_us": 43.25000918470323
+        },
+        "customer_tower_dev_unique_2571_bs256": {
+          "items": 2571,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 129.99087499338202,
+          "p90_ms": 130.19666660111398,
+          "mean_ms": 129.98960286689302,
+          "min_ms": 129.65049999183975,
+          "max_ms": 130.2190409915056,
+          "per_item_us": 50.56043368081759
+        },
+        "customer_tower_single_1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.40333298966288567,
+          "p90_ms": 0.4116003983654082,
+          "mean_ms": 0.4043805335337917,
+          "min_ms": 0.39812500472180545,
+          "max_ms": 0.41870801942422986,
+          "per_item_us": 403.33298966288567
+        },
+        "end_to_end_full_dev_recompute_841p_2571c_encode_only": {
+          "items": 3412,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 130.45645799138583,
+          "p90_ms": 130.53925822023302,
+          "mean_ms": 130.43979146750644,
+          "min_ms": 130.19162500859238,
+          "max_ms": 130.654415988829,
+          "per_item_us": 38.23460081810839
+        }
+      },
+      "stage1_active_selector_301d": {
+        "batch1_x_841": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.29258301947265863,
+          "p90_ms": 0.29555020737461746,
+          "mean_ms": 0.2925221963475148,
+          "min_ms": 0.288125011138618,
+          "max_ms": 0.2965829917229712,
+          "per_item_us": 292.58301947265863
+        },
+        "batch256_x_841": {
+          "items": 256,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 75.5396659951657,
+          "p90_ms": 75.91006720904261,
+          "mean_ms": 75.40007493225858,
+          "min_ms": 74.30237499647774,
+          "max_ms": 76.1412079737056,
+          "per_item_us": 295.07682029361604
+        }
+      },
+      "stage2_rolling_ranker_slate100": {
+        "control_pointwise_425d_batch1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.660250021610409,
+          "p90_ms": 0.6967920111492276,
+          "mean_ms": 0.6660361386214694,
+          "min_ms": 0.6422909791581333,
+          "max_ms": 0.7124580151867121,
+          "per_item_us": 660.250021610409
+        },
+        "treatment_cand_attn_425d_batch1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.9423749870620668,
+          "p90_ms": 0.9599838114809245,
+          "mean_ms": 0.9445392080427458,
+          "min_ms": 0.9263340034522116,
+          "max_ms": 0.973999995039776,
+          "per_item_us": 942.3749870620668
+        },
+        "control_pointwise_425d_batch64": {
+          "items": 64,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 10.122750012669712,
+          "p90_ms": 10.149125201860443,
+          "mean_ms": 10.117475067575773,
+          "min_ms": 10.039540997240692,
+          "max_ms": 10.181625024415553,
+          "per_item_us": 158.16796894796425
+        },
+        "treatment_cand_attn_425d_batch64": {
+          "items": 64,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 18.18862499203533,
+          "p90_ms": 18.236133601749316,
+          "mean_ms": 18.182249867822975,
+          "min_ms": 18.036791996564716,
+          "max_ms": 18.325874989386648,
+          "per_item_us": 284.197265500552
+        }
+      }
+    },
+    "mps": {
+      "device": "mps",
+      "active_model_transfer_ms": 44.3307499808725,
+      "active_e_no_brand_12d_0d": {
+        "product_tower_all_841": {
+          "items": 841,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.5189579969737679,
+          "p90_ms": 0.5422916146926582,
+          "mean_ms": 0.531249939619253,
+          "min_ms": 0.5125830066390336,
+          "max_ms": 0.6451250228565186,
+          "per_item_us": 0.6170725291007941
+        },
+        "product_tower_single_1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.4507080011535436,
+          "p90_ms": 0.5025585938710719,
+          "mean_ms": 0.45934746934411425,
+          "min_ms": 0.41766700451262295,
+          "max_ms": 0.5542500002775341,
+          "per_item_us": 450.7080011535436
+        },
+        "customer_tower_dev_unique_2571_bs256": {
+          "items": 2571,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 46.91483301576227,
+          "p90_ms": 47.242324793478474,
+          "mean_ms": 46.98178053561909,
+          "min_ms": 46.82420799508691,
+          "max_ms": 47.488790994975716,
+          "per_item_us": 18.24769856700205
+        },
+        "customer_tower_train_unique_2319_bs256": {
+          "items": 2319,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 42.507250007474795,
+          "p90_ms": 42.68190041184425,
+          "mean_ms": 42.54580560761193,
+          "min_ms": 42.4004579836037,
+          "max_ms": 42.969124973751605,
+          "per_item_us": 18.32999137881621
+        },
+        "customer_tower_val_unique_1676_bs256": {
+          "items": 1676,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 30.408334016101435,
+          "p90_ms": 30.506866809446365,
+          "mean_ms": 30.41404999870186,
+          "min_ms": 30.295457981992513,
+          "max_ms": 30.69058299297467,
+          "per_item_us": 18.14339738430873
+        },
+        "customer_tower_val_all_transitions_6191_bs256": {
+          "items": 6191,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 111.64175000158139,
+          "p90_ms": 111.79419119725935,
+          "mean_ms": 111.622727602177,
+          "min_ms": 111.28558299969882,
+          "max_ms": 112.12550001800992,
+          "per_item_us": 18.03291067704432
+        },
+        "customer_tower_single_1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.8716669981367886,
+          "p90_ms": 0.9190330049023032,
+          "mean_ms": 0.8896832664807638,
+          "min_ms": 0.8523750002495944,
+          "max_ms": 1.04674999602139,
+          "per_item_us": 871.6669981367886
+        },
+        "end_to_end_full_dev_recompute_841p_2571c_encode_only": {
+          "items": 3412,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 47.38358402391896,
+          "p90_ms": 47.418883588397875,
+          "mean_ms": 47.37135840308232,
+          "min_ms": 47.24487499333918,
+          "max_ms": 47.49883300974034,
+          "per_item_us": 13.887334121898874
+        },
+        "end_to_end_dev_unique_2571_plus_dot_scoring_841": {
+          "items": 2571,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 51.06358401826583,
+          "p90_ms": 51.09995880629867,
+          "mean_ms": 51.059830600085355,
+          "min_ms": 50.96000002231449,
+          "max_ms": 51.23670800821856,
+          "per_item_us": 19.861370679994486
+        },
+        "single_customer_encode_plus_dot_841": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.9039170108735561,
+          "p90_ms": 0.9261665807571262,
+          "mean_ms": 0.9076721985669186,
+          "min_ms": 0.8962499850895256,
+          "max_ms": 0.9335000067949295,
+          "per_item_us": 903.9170108735561
+        }
+      },
+      "shape_only_probe_with_tower_stats_18d_6d": {
+        "shape_only_untrained_latency_probe": true,
+        "trained": false,
+        "product_demand_features": 18,
+        "customer_tabular_features": 6,
+        "product_tower_all_841": {
+          "items": 841,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.49808298354037106,
+          "p90_ms": 0.5117747932672501,
+          "mean_ms": 0.5033249287710836,
+          "min_ms": 0.4856669984292239,
+          "max_ms": 0.5835829942952842,
+          "per_item_us": 0.5922508722239846
+        },
+        "product_tower_single_1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.4706250037997961,
+          "p90_ms": 0.5287577921990305,
+          "mean_ms": 0.4811664674586306,
+          "min_ms": 0.4410840047057718,
+          "max_ms": 0.5672909901477396,
+          "per_item_us": 470.6250037997961
+        },
+        "customer_tower_dev_unique_2571_bs256": {
+          "items": 2571,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 47.126541001489386,
+          "p90_ms": 47.33583319466561,
+          "mean_ms": 47.1541553347682,
+          "min_ms": 46.96558299474418,
+          "max_ms": 47.52633298630826,
+          "per_item_us": 18.330043174441613
+        },
+        "customer_tower_single_1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.8448750013485551,
+          "p90_ms": 0.8679497928824276,
+          "mean_ms": 0.8487583293269078,
+          "min_ms": 0.8286669908557087,
+          "max_ms": 0.8885829884093255,
+          "per_item_us": 844.8750013485551
+        },
+        "end_to_end_full_dev_recompute_841p_2571c_encode_only": {
+          "items": 3412,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 47.41216701222584,
+          "p90_ms": 47.50684140017256,
+          "mean_ms": 47.401202869756766,
+          "min_ms": 47.26912500336766,
+          "max_ms": 47.53937499481253,
+          "per_item_us": 13.895711316596083
+        }
+      },
+      "stage1_active_selector_301d": {
+        "batch1_x_841": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 0.3407500043977052,
+          "p90_ms": 0.35765799111686647,
+          "mean_ms": 0.3424193962321927,
+          "min_ms": 0.31437500729225576,
+          "max_ms": 0.3690419835038483,
+          "per_item_us": 340.7500043977052
+        },
+        "batch256_x_841": {
+          "items": 256,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 29.769084008876234,
+          "p90_ms": 30.243982980027795,
+          "mean_ms": 29.938069459361333,
+          "min_ms": 29.47574999416247,
+          "max_ms": 31.555333000142127,
+          "per_item_us": 116.28548440967279
+        }
+      },
+      "stage2_rolling_ranker_slate100": {
+        "control_pointwise_425d_batch1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 1.6371669771615416,
+          "p90_ms": 2.0290998043492436,
+          "mean_ms": 1.656213930497567,
+          "min_ms": 1.3510420103557408,
+          "max_ms": 2.1785839926451445,
+          "per_item_us": 1637.1669771615416
+        },
+        "treatment_cand_attn_425d_batch1": {
+          "items": 1,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 2.0514579955488443,
+          "p90_ms": 2.4147248128429055,
+          "mean_ms": 2.077380472716565,
+          "min_ms": 1.7135830130428076,
+          "max_ms": 2.4797920195851475,
+          "per_item_us": 2051.4579955488443
+        },
+        "control_pointwise_425d_batch64": {
+          "items": 64,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 5.036584014305845,
+          "p90_ms": 5.411024804925546,
+          "mean_ms": 5.110894603421912,
+          "min_ms": 4.975666000973433,
+          "max_ms": 5.5831669887993485,
+          "per_item_us": 78.69662522352883
+        },
+        "treatment_cand_attn_425d_batch64": {
+          "items": 64,
+          "warmup": 3,
+          "repeats": 15,
+          "median_ms": 7.960624992847443,
+          "p90_ms": 8.322766789933667,
+          "mean_ms": 7.9753582637446625,
+          "min_ms": 7.295791001524776,
+          "max_ms": 8.646000002045184,
+          "per_item_us": 124.38476551324129
+        }
+      }
+    }
+  },
+  "cpu_rolling_feature_adapter": {
+    "cold_adapter_init_ms": 4794.206041027792,
+    "single_request_841_skus_cold_date": {
+      "items": 841,
+      "warmup": 2,
+      "repeats": 10,
+      "median_ms": 8.534208493074402,
+      "p90_ms": 8.65225860325154,
+      "mean_ms": 8.549749894882552,
+      "min_ms": 8.46300000557676,
+      "max_ms": 8.666582987643778,
+      "per_item_us": 10.147691430528422
+    },
+    "single_request_841_skus_warm_date": {
+      "items": 841,
+      "warmup": 3,
+      "repeats": 15,
+      "median_ms": 2.320875006262213,
+      "p90_ms": 2.3418247990775853,
+      "mean_ms": 2.3243611329235137,
+      "min_ms": 2.303582994500175,
+      "max_ms": 2.3543339921161532,
+      "per_item_us": 2.7596611251631544
+    },
+    "global_features_841_skus_cold_date": {
+      "items": 841,
+      "warmup": 2,
+      "repeats": 10,
+      "median_ms": 5.989479512209073,
+      "p90_ms": 6.057258712826297,
+      "mean_ms": 5.982975306687877,
+      "min_ms": 5.902917007915676,
+      "max_ms": 6.065959023544565,
+      "per_item_us": 7.121854354588671
+    }
+  },
+  "preserved_hashes": {
+    "stage1_mlp_ref_pointer": "341ee03beee9a74b19263dc5f5de9061772cbaf4187aba3950379bc0c726b6c1",
+    "stage1_mlp_ref_manifest": "7f8d8d1e01fc210b0247851cea0364dc95dc45556d0dadea57d5ceec0389ab53",
+    "stage1_mlp_ref_retriever": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+    "stage1_mlp_ref_selector": "977241cf9fe8a36ae5c0b5afede6c8018e55eb3202e39d88fa7e3693bc0bc22a",
+    "embedding_ablation_ref_pointer": "148da7db8f7b50090e166b8863329b0b7830d6f1c289143c578ab194d0a5211f",
+    "source_selector_best": "977241cf9fe8a36ae5c0b5afede6c8018e55eb3202e39d88fa7e3693bc0bc22a",
+    "source_train_scores": "0cb99fa57b1d46ff295ba4d410ce95e2b45db34ff8344b2006e74a2e79d9e5cc",
+    "source_val_scores": "bf7bb5ea75ba22260048f6894f54eba447d56ef99e409763e6e105b7a285e31d",
+    "upstream_retriever_best": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+    "upstream_train_purchase_cache": "e7308f97608a0363027a930ee1ff958f83c326cdac1dcf156b52475c554056a6",
+    "upstream_val_purchase_cache": "22329d61cb9a2ed58ce21e6dff72f1bd1914706bb7b85ef0bec59fada0f957c1",
+    "default_retriever": "2dcfbc7eab6795ded6f25a6cb0ffe1f9e606f13c9885d4ee020b724d0a2b5ab7",
+    "default_discovery_ranker": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+    "default_best_ranker": "1701becf092e38e71a06152b124a832cabfa58172d6d497f305fe499757b0b17",
+    "default_ndcg_ranker": "2ff3e43dcd531d6604c536d93be1bbfce140f118e8f48fad88dbe99e1616701e",
+    "legacy_ranker_train_slates": "aaf0153b53d7dac35459562cbb87226fb0af6a7e5cbd103e198a0e108864c663",
+    "legacy_ranker_val_slates": "43aa986ed5c0ead13b1f4f3b321e28444fd846074b6a1192bd00b712789cad27"
+  },
+  "limitations": [
+    "Inference-only latency benchmark; training_executed=false, heldout_access=false, promoted=false.",
+    "Steady-state tower timings measure pre-materialized device inputs after warmup and sync(); cold disk load is reported separately.",
+    "shape_only_probe_with_tower_stats_18d_6d uses untrained weights strictly to measure forward-pass latency if 6D demand/6D customer stats were added; zero quality claims.",
+    "Snapshot metadata (snapshot_unverified) caveat remains: product/company attributes are not effective-dated."
+  ]
+}
