@@ -1,0 +1,30 @@
+{
+  "checked_on": "2026-11-13",
+  "scope": "training_and_validation_only",
+  "training_cutoff_exclusive": "2025-10-01",
+  "heldout_start_excluded": "2026-02-19",
+  "training_purchase_events": 50414,
+  "validation_purchase_events": 10634,
+  "development_purchase_events": 61048,
+  "development_distinct_purchased_skus": 841,
+  "cached_skus": 841,
+  "reference_training_skus": 790,
+  "additional_development_skus": 51,
+  "checked_purchase_dates": 549,
+  "rolling_eligible_union_across_development_dates": 841,
+  "rolling_eligible_skus_missing_from_cache": 0,
+  "dates_with_missing_eligible_skus": 0,
+  "validation_candidate_count_min": 735,
+  "validation_candidate_count_max": 771,
+  "cached_training_transitions": 26263,
+  "mlp_training_transitions_at_least_100_eligible": 26253,
+  "mlp_training_transitions_excluded_below_100_eligible": 10,
+  "validation_transitions": 6191,
+  "interpretation": "841 is all merchandise SKUs observed in paid development purchases, not a random sample. Full rolling eligibility was reconstructed from catalogue and date-gated development purchases on all 549 observed dates; no eligible SKU falls outside the cached product universe. Never-sold products are excluded by the existing prior-sale business rule. Validation retains all transitions.",
+  "description_coverage_scope": {
+    "development_skus_with_nonempty_description": 155,
+    "development_skus": 841,
+    "percentage": 18.430439952437574
+  },
+  "heldout_purchase_records_materialized": false
+}

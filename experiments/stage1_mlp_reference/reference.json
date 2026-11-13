@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "active_reference_id": "repeat-no-month-v1",
+  "scope": "stage1_feature_ablated_selector_mlp_reference_only",
+  "is_stage2_default": false,
+  "is_production_retriever_default": false,
+  "preserves_historical_aliases": true,
+  "selection_authority": "explicit_user_override",
+  "selection_date": "2026-11-13",
+  "selection_note": "User explicitly overrode prior PROMOTION_DECISION.md ('not promoted') with: 'okay, save the Repeat restored, 301D as the new reference, commit and push'. Retains is_repeat_sku while omitting ONLY month_sin and month_cos (39 context + 6 customer stats + 256 u/v = 301D), over frozen no-brand E_no_brand Stage 1 towers. Accepts higher NDCG@10 / Recall@5 / unseen@100 and lower Recall@10 / top-10 discovery vs no-brand-v1 on single seed=42; do not claim statistical superiority.",
+  "campaign": "mlp_repeat_restored_v1",
+  "variant": "repeat_no_month",
+  "upstream_variant": "E_no_brand",
+  "selector_recipe": "uv_45",
+  "selector_input_dim": 301,
+  "seed": 42,
+  "validation_only": true,
+  "heldout_access": false,
+  "stage2_executed": false,
+  "metadata_policy": "snapshot_unverified",
+  "validation_split": {
+    "date_range": "2025-10-01..2026-02-18",
+    "queries": 6191,
+    "rows": 6191,
+    "total_targets": 10276,
+    "new_targets": 1857
+  },
+  "reference_dir": "checkpoints/stage1-mlp-reference/repeat-no-month-v1",
+  "manifest": {
+    "path": "checkpoints/stage1-mlp-reference/repeat-no-month-v1/manifest.json",
+    "sha256": "7f8d8d1e01fc210b0247851cea0364dc95dc45556d0dadea57d5ceec0389ab53"
+  },
+  "model_resolution": {
+    "model_class": "FeatureAblatedStage1Selector",
+    "model_module": "recommender.experiments.mlp_feature_ablation.model",
+    "loader_module": "recommender.experiments.mlp_feature_ablation.model",
+    "loader_function": "load_ablated_selector_checkpoint",
+    "schema_module": "recommender.experiments.mlp_feature_ablation.schema",
+    "spec_builder_function": "build_feature_ablation_spec",
+    "spec_validator_function": "validate_input_contract",
+    "config_module": "recommender.experiments.mlp_feature_ablation.config",
+    "config_constants": {
+      "variant_name": "REPEAT_RESTORED_VARIANT_NAME",
+      "recipe": "REPEAT_RESTORED_RECIPE_NAME",
+      "omitted_context_features": "REPEAT_RESTORED_OMITTED_CONTEXT_FEATURES",
+      "expected_omitted_source_indices": "REPEAT_RESTORED_EXPECTED_OMITTED_SOURCE_INDICES"
+    },
+    "strict_loading_required": true,
+    "contract_digest": "8761650f542b7bdd7605065e686b3e61048c3656a313d3223c8ba4a0027535c2",
+    "upstream_retriever_class": "StaticEnrichedRetriever",
+    "upstream_retriever_module": "recommender.experiments.static_enrichment.model",
+    "upstream_variant_spec_module": "recommender.experiments.embedding_ablation.config",
+    "upstream_variant_spec_builder": "build_ablation_specs",
+    "upstream_variant_name": "E_no_brand"
+  },
+  "retriever": {
+    "path": "checkpoints/stage1-mlp-reference/repeat-no-month-v1/best_retriever.pt",
+    "sha256": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+    "bytes": 3432974,
+    "selected_epoch": 16,
+    "model_class": "StaticEnrichedRetriever",
+    "model_module": "recommender.experiments.static_enrichment.model",
+    "source_path": "checkpoints/embedding-ablation-v1/runs/stage1-E_no_brand-seed42/best.pt",
+    "copied_from_no_brand_v1_path": "checkpoints/stage1-mlp-reference/no-brand-v1/best_retriever.pt"
+  },
+  "selector": {
+    "path": "checkpoints/stage1-mlp-reference/repeat-no-month-v1/best_selector.pt",
+    "sha256": "977241cf9fe8a36ae5c0b5afede6c8018e55eb3202e39d88fa7e3693bc0bc22a",
+    "bytes": 198789,
+    "selected_epoch": 5,
+    "model_class": "FeatureAblatedStage1Selector",
+    "loader_module": "recommender.experiments.mlp_feature_ablation.model",
+    "loader_function": "load_ablated_selector_checkpoint",
+    "upstream_digest": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+    "contract_digest": "8761650f542b7bdd7605065e686b3e61048c3656a313d3223c8ba4a0027535c2",
+    "source_path": "checkpoints/mlp-repeat-restored-v1/runs/selector-E_no_brand-repeat_no_month-uv_45-seed42/best.pt",
+    "source_candidate_path": "checkpoints/mlp-repeat-restored-v1/candidate/best_selector.pt"
+  },
+  "architecture_summary": {
+    "text_recipe": "t1_fam",
+    "descriptions_included": false,
+    "product_embeddings": [
+      "category",
+      "subcategory",
+      "business_line",
+      "tier",
+      "unit",
+      "country_of_origin"
+    ],
+    "omitted_product_embeddings": [
+      "brand"
+    ],
+    "customer_embeddings": [
+      "sales_branch"
+    ],
+    "customer_tabular_features": 0,
+    "product_demand_features": 12,
+    "demand_policy": "disabled_v1",
+    "brand_retained_in": [
+      "t1_fam_product_text",
+      "user_brand_order_share",
+      "is_repeat_brand",
+      "stage1_familiarity_brand"
+    ],
+    "selector_ordered_input_blocks": [
+      {
+        "name": "u",
+        "dim": 128
+      },
+      {
+        "name": "v",
+        "dim": 128
+      },
+      {
+        "name": "features_39",
+        "dim": 39
+      },
+      {
+        "name": "customer_stats_6",
+        "dim": 6
+      }
+    ],
+    "is_repeat_sku_present": true,
+    "is_repeat_sku_source_index": 0,
+    "is_repeat_sku_mlp_column": 256,
+    "omitted_context_features": [
+      "month_sin",
+      "month_cos"
+    ],
+    "omitted_context_indices": [
+      31,
+      32
+    ],
+    "retained_context_dim": 39,
+    "customer_stats_dim": 6,
+    "scalar_feature_count": 45
+  },
+  "normalization_status": {
+    "legacy_normalization_unchanged": true,
+    "all_inputs_unit_interval_0_1": false,
+    "pending_work": "Numeric normalization (8 signed lift/growth features in [-1, 1] plus unit-norm [-1, 1] u/v) and category-feature work remain pending."
+  },
+  "validation_metrics": {
+    "queries": 6191,
+    "total_targets": 10276,
+    "new_targets": 1857,
+    "recall@5": 0.6433487017869908,
+    "recall@10": 0.7541143634118156,
+    "recall@25": 0.8484980867737246,
+    "recall@50": 0.8954239515850599,
+    "recall@100": 0.9373286642503843,
+    "ndcg@10": 0.5863305569182167,
+    "mrr": 0.5661479149010309,
+    "new_hits@10": 194,
+    "new_recall@10": 0.10446957458266021,
+    "new_hits@25": 726,
+    "new_recall@25": 0.39095315024232635,
+    "new_hits@50": 1029,
+    "new_recall@50": 0.5541195476575121,
+    "new_hits@100": 1337,
+    "new_recall@100": 0.7199784598815293
+  },
+  "previous_reference": {
+    "reference_id": "no-brand-v1",
+    "frozen_pointer_path": "experiments/embedding_ablation_v1/reference.json",
+    "frozen_pointer_sha256": "148da7db8f7b50090e166b8863329b0b7830d6f1c289143c578ab194d0a5211f",
+    "frozen_note": "Pinned historical reference for prior campaign reproduction (mlp_feature_ablation, description_cleaning, mlp_repeat_restored); kept byte-for-byte unchanged.",
+    "variant": "E_no_brand",
+    "selector_recipe": "uv_47",
+    "selector_input_dim": 303,
+    "retriever_sha256": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+    "retriever_selected_epoch": 16,
+    "selector_sha256": "d083a5562d968e8e606f69d86e142e370567fa4f506f650e9e2234c53d66dad5",
+    "selector_selected_epoch": 1,
+    "validation_metrics": {
+      "new_hits@10": 214,
+      "new_recall@10": 0.11523963381798599,
+      "new_hits@25": 741,
+      "new_recall@25": 0.3990306946688207,
+      "new_hits@50": 1037,
+      "new_recall@50": 0.5584275713516424,
+      "new_hits@100": 1324,
+      "new_recall@100": 0.7129779213785676,
+      "new_targets": 1857,
+      "recall@10": 0.7565593823119603,
+      "ndcg@10": 0.5782861484383223
+    }
+  },
+  "historical_campaign_evidence": {
+    "summary_json_path": "experiments/mlp_repeat_restored_v1/summary.json",
+    "summary_json_sha256": "637800b581ea7f46199a0ae520c4ae1258e3572f6727b7aa05cf2b8956c0e918",
+    "candidate_manifest_path": "checkpoints/mlp-repeat-restored-v1/candidate/manifest.json",
+    "candidate_manifest_sha256": "f11bc21eed8767132e51b413ce1e42dc10626c4d2bb2d076f68af6e85d0837d5",
+    "historical_promoted_flag": false,
+    "promotion_decision_doc": "experiments/mlp_repeat_restored_v1/PROMOTION_DECISION.md"
+  }
+}

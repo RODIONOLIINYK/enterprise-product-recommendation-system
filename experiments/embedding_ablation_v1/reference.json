@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "active_reference_id": "no-brand-v1",
+  "scope": "stage1_compact_selector_mlp_reference_only",
+  "is_stage2_default": false,
+  "is_production_retriever_default": false,
+  "preserves_historical_aliases": true,
+  "selection_authority": "explicit_user_selection",
+  "selection_date": "2026-11-13",
+  "selection_note": "User explicitly selected 'remove brand and save this as the reference' from embedding_ablation_v1 (learned brand categorical embedding removed only; brand retained in t1_fam text and scalar/familiarity features), despite single-seed exploratory uncertainty.",
+  "campaign": "embedding_ablation_v1",
+  "variant": "E_no_brand",
+  "selector_recipe": "uv_47",
+  "selector_input_dim": 303,
+  "seed": 42,
+  "validation_only": true,
+  "heldout_access": false,
+  "stage2_executed": false,
+  "validation_split": {
+    "date_range": "2025-10-01..2026-02-18",
+    "rows": 6191,
+    "new_targets": 1857
+  },
+  "reference_dir": "checkpoints/stage1-mlp-reference/no-brand-v1",
+  "manifest": {
+    "path": "checkpoints/stage1-mlp-reference/no-brand-v1/manifest.json",
+    "sha256": "4e223d3de158a79a1dfd08e65b372d699652239edb0d9462250a987e92e0be86"
+  },
+  "retriever": {
+    "path": "checkpoints/stage1-mlp-reference/no-brand-v1/best_retriever.pt",
+    "sha256": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+    "bytes": 3432974,
+    "selected_epoch": 16,
+    "source_path": "checkpoints/embedding-ablation-v1/runs/stage1-E_no_brand-seed42/best.pt"
+  },
+  "selector": {
+    "path": "checkpoints/stage1-mlp-reference/no-brand-v1/best_selector.pt",
+    "sha256": "d083a5562d968e8e606f69d86e142e370567fa4f506f650e9e2234c53d66dad5",
+    "bytes": 198661,
+    "selected_epoch": 1,
+    "upstream_digest": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+    "source_path": "checkpoints/embedding-ablation-v1/runs/selector-E_no_brand-uv_47-seed42/best.pt"
+  },
+  "architecture_summary": {
+    "text_recipe": "t1_fam",
+    "product_embeddings": [
+      "category",
+      "subcategory",
+      "business_line",
+      "tier",
+      "unit",
+      "country_of_origin"
+    ],
+    "omitted_product_embeddings": [
+      "brand"
+    ],
+    "customer_embeddings": [
+      "sales_branch"
+    ],
+    "customer_tabular_features": 0,
+    "product_demand_features": 12,
+    "demand_policy": "disabled_v1",
+    "brand_retained_in": [
+      "t1_fam_product_text",
+      "user_brand_order_share",
+      "is_repeat_brand",
+      "stage1_familiarity_brand"
+    ]
+  },
+  "normalization_status": {
+    "legacy_uv47_unchanged": true,
+    "all_inputs_unit_interval_0_1": false,
+    "pending_work": "Numeric normalization (10 signed dynamic/lift features in [-1, 1] plus unit-norm [-1, 1] u/v) and category-feature work remain pending."
+  },
+  "validation_metrics": {
+    "new_hits@10": 214,
+    "new_recall@10": 0.11523963381798599,
+    "new_hits@25": 741,
+    "new_recall@25": 0.3990306946688207,
+    "new_hits@50": 1037,
+    "new_recall@50": 0.5584275713516424,
+    "new_hits@100": 1324,
+    "new_recall@100": 0.7129779213785676,
+    "new_targets": 1857,
+    "recall@10": 0.7565593823119603,
+    "ndcg@10": 0.5782861484383223
+  },
+  "previous_baseline": {
+    "variant": "U0_t1_fam_clean",
+    "stage1_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-U0_t1_fam_clean-seed42/best.pt",
+    "stage1_sha256": "f3cfaf9f770273afdf2a6580c3e74e6dced23fc30933b6b0d32aaef54e2b993e",
+    "stage1_selected_epoch": 26,
+    "selector_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-U0_t1_fam_clean-uv_47-seed42/best.pt",
+    "selector_sha256": "0d88a12c948e2f24f176ef675f770d47339d52719bf1b355c5b1fb5f70d66c07",
+    "selector_selected_epoch": 1,
+    "validation_metrics": {
+      "new_hits@10": 196,
+      "new_recall@10": 0.10554658050619278,
+      "new_hits@25": 737,
+      "new_recall@25": 0.39687668282175553,
+      "new_hits@50": 1012,
+      "new_recall@50": 0.5449649973074852,
+      "new_hits@100": 1320,
+      "new_recall@100": 0.7108239095315024,
+      "new_targets": 1857,
+      "recall@10": 0.7505190641169014,
+      "ndcg@10": 0.5771271981708025
+    }
+  }
+}

@@ -1,0 +1,1189 @@
+{
+  "campaign": "embedding_ablation_v1",
+  "baseline_target": "U0_t1_fam_clean",
+  "selector_recipe": "uv_47",
+  "seed": 42,
+  "heldout_access": false,
+  "stage2_executed": false,
+  "promoted": false,
+  "metric_semantics": {
+    "evaluation_split": "validation (2025-10-01 to 2026-02-18, 6,191 transitions, 1,857 new-to-customer target instances)",
+    "training_split": "train (< 2025-10-01; Stage 1 discovery rows=8,465; Selector uv_47 cohort=26,253 rows with >=100 eligible SKUs)",
+    "pool": "Full rolling eligible pool per query (~735-771 active SKUs per validation date inside 841 development SKUs)",
+    "new_target_metrics": "new_hits@K and new_recall@K over unseen eligible products (~seen & allowed), micro-averaged over all 1,857 new-to-customer target instances (unrepresented targets outside 841 pool count as misses)",
+    "overall_metrics": "recall@10 and ndcg@10 over all eligible products (allowed), macro-averaged across all 6,191 validation transitions against full positive_pids",
+    "bootstrap": "Paired customer-clustered 95% bootstrap intervals (2,000 resamples, rng seed=123) within seed=42; reflects validation customer-query sampling uncertainty only"
+  },
+  "inapplicable": {
+    "text_ablations": {
+      "unit": "unit is not an explicit field in t1_fam text rendering; do not invent a text-unit ablation."
+    },
+    "embedding_ablations": {
+      "product_family": "There is no product_family categorical embedding in the U0_t1_fam_clean baseline."
+    }
+  },
+  "individual": {
+    "U0_t1_fam_clean": {
+      "name": "U0_t1_fam_clean",
+      "group": "baseline",
+      "ablated_target": "none",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam",
+        "omitted_fields": [],
+        "recipe_hash": "98134e2f7fe45c60baaf2721cfee866005ac035ef410cc80e011047eab66b8e0",
+        "content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+        "changed_text_count": 0,
+        "changed_trained_text_count": 0,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.json",
+        "reused_from_baseline_cache": "data/interim/static_enrichment_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet"
+      },
+      "upstream": {
+        "reused_baseline_upstream": true,
+        "selected_epoch": 26,
+        "parameters": 855469,
+        "training_seconds": 49.35520591700333,
+        "new_hits@25": 737,
+        "new_recall@25": 0.39687668282175553,
+        "new_hits@50": 1009,
+        "new_recall@50": 0.5433494884221863,
+        "new_hits@100": 1341,
+        "new_recall@100": 0.7221324717285945,
+        "recall@10": 0.3733275757941232,
+        "ndcg@10": 0.22103630421018844,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-U0_t1_fam_clean-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 251.79767745899153,
+        "new_hits@25": 737,
+        "new_recall@25": 0.39687668282175553,
+        "new_hits@50": 1012,
+        "new_recall@50": 0.5449649973074852,
+        "new_hits@100": 1320,
+        "new_recall@100": 0.7108239095315024,
+        "recall@10": 0.7505190641169014,
+        "ndcg@10": 0.5771271981708025,
+        "new_hits@10": 196,
+        "new_recall@10": 0.10554658050619278,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-U0_t1_fam_clean-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-U0_t1_fam_clean-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": null,
+        "upstream_stage1": null
+      }
+    },
+    "T_no_base_name": {
+      "name": "T_no_base_name",
+      "group": "text_deletion",
+      "ablated_target": "base_name",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam_no_base_name",
+        "omitted_fields": [
+          "base_name"
+        ],
+        "recipe_hash": "7c4a2e578bb3b45c565a1378c077b2841f630c48fb3eecde83f7e3042b700eaa",
+        "content_hash": "cf337d4352a094fc7eb9336867a54b90c38b11fefba5edae685b3b948235a2b2",
+        "changed_text_count": 47,
+        "changed_trained_text_count": 46,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_base_name_7c4a2e578bb3b45c.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_base_name_7c4a2e578bb3b45c.json",
+        "reused_from_baseline_cache": null
+      },
+      "upstream": {
+        "reused_baseline_upstream": false,
+        "selected_epoch": 24,
+        "parameters": 855469,
+        "training_seconds": 48.162471165996976,
+        "new_hits@25": 744,
+        "new_recall@25": 0.40064620355411956,
+        "new_hits@50": 1028,
+        "new_recall@50": 0.5535810446957459,
+        "new_hits@100": 1346,
+        "new_recall@100": 0.724824986537426,
+        "recall@10": 0.37102126596054535,
+        "ndcg@10": 0.21950497588347626,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-T_no_base_name-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 143.26261887500004,
+        "new_hits@25": 740,
+        "new_recall@25": 0.3984921917070544,
+        "new_hits@50": 1010,
+        "new_recall@50": 0.5438879913839526,
+        "new_hits@100": 1321,
+        "new_recall@100": 0.7113624124932687,
+        "recall@10": 0.7502438309956014,
+        "ndcg@10": 0.57693130312792,
+        "new_hits@10": 196,
+        "new_recall@10": 0.10554658050619278,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-T_no_base_name-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-T_no_base_name-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": {
+          "recall@10_delta": [
+            -0.0015675868307425786,
+            -0.0002724695831112968,
+            0.0010228413931165122
+          ],
+          "ndcg@10_delta": [
+            -0.0010631134931545735,
+            -0.00019460170973531065,
+            0.0006528628705837344
+          ],
+          "new_recall@10_delta": [
+            -0.0032102728731942215,
+            0.0,
+            0.003670831533976988
+          ],
+          "new_recall@25_delta": [
+            -0.005282969929356147,
+            0.0015902474935934902,
+            0.008488079914207492
+          ],
+          "new_recall@50_delta": [
+            -0.006336722556795337,
+            -0.0010660980810234541,
+            0.004136665315322793
+          ],
+          "new_recall@100_delta": [
+            -0.004553883501093019,
+            0.0005418586146858219,
+            0.005972421044405525
+          ]
+        },
+        "upstream_stage1": {
+          "new_recall@25_delta": [
+            -0.005723228904348794,
+            0.0037363226573660074,
+            0.012896882424080852
+          ],
+          "new_recall@50_delta": [
+            0.0011389817911557042,
+            0.010159373310908179,
+            0.018805309734513276
+          ]
+        }
+      }
+    },
+    "T_no_subcategory": {
+      "name": "T_no_subcategory",
+      "group": "text_deletion",
+      "ablated_target": "product_subcategory",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam_no_subcategory",
+        "omitted_fields": [
+          "product_subcategory"
+        ],
+        "recipe_hash": "00bbe682a675370182e7e7e280933f0372ff77433cb6293f42dce5c1d8810aee",
+        "content_hash": "98dce013a173dc161c4cbded7f1d3a2c8de60b9fbae37842c6eb5861e0aeb743",
+        "changed_text_count": 833,
+        "changed_trained_text_count": 783,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_subcategory_00bbe682a6753701.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_subcategory_00bbe682a6753701.json",
+        "reused_from_baseline_cache": null
+      },
+      "upstream": {
+        "reused_baseline_upstream": false,
+        "selected_epoch": 24,
+        "parameters": 855469,
+        "training_seconds": 49.68994387501152,
+        "new_hits@25": 740,
+        "new_recall@25": 0.3984921917070544,
+        "new_hits@50": 1004,
+        "new_recall@50": 0.5406569736133549,
+        "new_hits@100": 1350,
+        "new_recall@100": 0.7269789983844911,
+        "recall@10": 0.36765961746886944,
+        "ndcg@10": 0.21978664844276383,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-T_no_subcategory-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 120.33266483299667,
+        "new_hits@25": 734,
+        "new_recall@25": 0.39526117393645666,
+        "new_hits@50": 1022,
+        "new_recall@50": 0.5503500269251481,
+        "new_hits@100": 1324,
+        "new_recall@100": 0.7129779213785676,
+        "recall@10": 0.7515023142521464,
+        "ndcg@10": 0.5768055782068751,
+        "new_hits@10": 197,
+        "new_recall@10": 0.10608508346795907,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-T_no_subcategory-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-T_no_subcategory-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": {
+          "recall@10_delta": [
+            -0.0009665449827167756,
+            0.0009893744246034543,
+            0.002943948134069207
+          ],
+          "ndcg@10_delta": [
+            -0.0013439396335074658,
+            -0.00030698191639691176,
+            0.0007813575645977524
+          ],
+          "new_recall@10_delta": [
+            -0.00531131207665508,
+            0.000541272028819403,
+            0.0064337625841354214
+          ],
+          "new_recall@25_delta": [
+            -0.011508034902870746,
+            -0.0016565433462175593,
+            0.0077803861076682634
+          ],
+          "new_recall@50_delta": [
+            -0.0015839493136219642,
+            0.005353320591971796,
+            0.012467694467694466
+          ],
+          "new_recall@100_delta": [
+            -0.0033897237109212436,
+            0.0021935839324036914,
+            0.00811359607988798
+          ]
+        },
+        "upstream_stage1": {
+          "new_recall@25_delta": [
+            -0.010001889168765743,
+            0.0016242555495397943,
+            0.013912099876605936
+          ],
+          "new_recall@50_delta": [
+            -0.015051429822001751,
+            -0.0027917364600781687,
+            0.009961786537843534
+          ]
+        }
+      }
+    },
+    "T_no_family": {
+      "name": "T_no_family",
+      "group": "text_deletion",
+      "ablated_target": "product_family",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam_no_family",
+        "omitted_fields": [
+          "product_family"
+        ],
+        "recipe_hash": "1221cce13abe233ad6a7851d8b7faf78f7f115d6e858b4db42c71f59c38f1ece",
+        "content_hash": "54b4acab8840135d2544251229c8c567e683cd1f9f1863e21faa00c1db1d81f4",
+        "changed_text_count": 171,
+        "changed_trained_text_count": 156,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_family_1221cce13abe233a.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_family_1221cce13abe233a.json",
+        "reused_from_baseline_cache": null
+      },
+      "upstream": {
+        "reused_baseline_upstream": false,
+        "selected_epoch": 20,
+        "parameters": 855469,
+        "training_seconds": 45.82463670799916,
+        "new_hits@25": 739,
+        "new_recall@25": 0.3979536887452881,
+        "new_hits@50": 1016,
+        "new_recall@50": 0.5471190091545504,
+        "new_hits@100": 1337,
+        "new_recall@100": 0.7199784598815293,
+        "recall@10": 0.3749125698843668,
+        "ndcg@10": 0.22358186607578334,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-T_no_family-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 113.65963395799918,
+        "new_hits@25": 737,
+        "new_recall@25": 0.39687668282175553,
+        "new_hits@50": 1015,
+        "new_recall@50": 0.5465805061927841,
+        "new_hits@100": 1323,
+        "new_recall@100": 0.7124394184168013,
+        "recall@10": 0.7508828893474686,
+        "ndcg@10": 0.5770377650293497,
+        "new_hits@10": 198,
+        "new_recall@10": 0.10662358642972536,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-T_no_family-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-T_no_family-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": {
+          "recall@10_delta": [
+            -0.0015330619989017994,
+            0.0004155291481405221,
+            0.002285601952233688
+          ],
+          "ndcg@10_delta": [
+            -0.001104185236186382,
+            -8.170391325233277e-05,
+            0.0010059252553403669
+          ],
+          "new_recall@10_delta": [
+            -0.00431046107205297,
+            0.0011185696322108015,
+            0.006704659912568229
+          ],
+          "new_recall@25_delta": [
+            -0.008737215957677265,
+            0.0,
+            0.008028123107151824
+          ],
+          "new_recall@50_delta": [
+            -0.0052087415099268545,
+            0.0016538042512068485,
+            0.008474800941819292
+          ],
+          "new_recall@100_delta": [
+            -0.00486013830390315,
+            0.0016189962223421479,
+            0.008270049507218397
+          ]
+        },
+        "upstream_stage1": {
+          "new_recall@25_delta": [
+            -0.011105522582569118,
+            0.0010692329018483638,
+            0.013386233335997713
+          ],
+          "new_recall@50_delta": [
+            -0.00815235375792745,
+            0.0037735947754965393,
+            0.01590971536758623
+          ]
+        }
+      }
+    },
+    "T_no_category": {
+      "name": "T_no_category",
+      "group": "text_deletion",
+      "ablated_target": "product_category",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam_no_category",
+        "omitted_fields": [
+          "product_category"
+        ],
+        "recipe_hash": "8c6b714a5ebac28d291be6bc82eefc0a5730f2cbf401003f5d6ef135d3909d93",
+        "content_hash": "c2cfc8ceecaa48a9680b912cd4745ee0e26650c0905845cb6599bce8216f8298",
+        "changed_text_count": 833,
+        "changed_trained_text_count": 783,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_category_8c6b714a5ebac28d.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_category_8c6b714a5ebac28d.json",
+        "reused_from_baseline_cache": null
+      },
+      "upstream": {
+        "reused_baseline_upstream": false,
+        "selected_epoch": 26,
+        "parameters": 855469,
+        "training_seconds": 45.38133829100116,
+        "new_hits@25": 740,
+        "new_recall@25": 0.3984921917070544,
+        "new_hits@50": 1017,
+        "new_recall@50": 0.5476575121163166,
+        "new_hits@100": 1335,
+        "new_recall@100": 0.7189014539579968,
+        "recall@10": 0.37037744080554524,
+        "ndcg@10": 0.21838803342493276,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-T_no_category-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 120.8907713330118,
+        "new_hits@25": 731,
+        "new_recall@25": 0.3936456650511578,
+        "new_hits@50": 1013,
+        "new_recall@50": 0.5455035002692514,
+        "new_hits@100": 1313,
+        "new_recall@100": 0.7070543887991384,
+        "recall@10": 0.7509050166145781,
+        "ndcg@10": 0.5764623360014629,
+        "new_hits@10": 198,
+        "new_recall@10": 0.10662358642972536,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-T_no_category-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-T_no_category-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": {
+          "recall@10_delta": [
+            -0.0017832721334374475,
+            0.0003626528516199833,
+            0.002692058262362296
+          ],
+          "ndcg@10_delta": [
+            -0.001786137471273818,
+            -0.0006294717198488148,
+            0.0005285879777702059
+          ],
+          "new_recall@10_delta": [
+            -0.004600115439532755,
+            0.0010914052654273781,
+            0.006704184749988456
+          ],
+          "new_recall@25_delta": [
+            -0.01215076478535047,
+            -0.0032240730789897904,
+            0.005454446536251243
+          ],
+          "new_recall@50_delta": [
+            -0.006868134870757965,
+            0.0005421533407756335,
+            0.008730177266039182
+          ],
+          "new_recall@100_delta": [
+            -0.010544133062029844,
+            -0.003722414514687751,
+            0.0026974215619506143
+          ]
+        },
+        "upstream_stage1": {
+          "new_recall@25_delta": [
+            -0.00832980053240108,
+            0.0016038585209003217,
+            0.011542497376705142
+          ],
+          "new_recall@50_delta": [
+            -0.0068498051454156245,
+            0.004066149588838394,
+            0.01473031718821776
+          ]
+        }
+      }
+    },
+    "T_no_brand": {
+      "name": "T_no_brand",
+      "group": "text_deletion",
+      "ablated_target": "brand",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam_no_brand",
+        "omitted_fields": [
+          "brand"
+        ],
+        "recipe_hash": "b809b9baaf460363ec378e841c88d52204c0f4ce0dd4ccb099b6ead389d8aa72",
+        "content_hash": "c62f5b189a3fddfdba83f5617560003f9a4286b73031e2c30da347aab07cc271",
+        "changed_text_count": 830,
+        "changed_trained_text_count": 781,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_brand_b809b9baaf460363.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_brand_b809b9baaf460363.json",
+        "reused_from_baseline_cache": null
+      },
+      "upstream": {
+        "reused_baseline_upstream": false,
+        "selected_epoch": 18,
+        "parameters": 855469,
+        "training_seconds": 44.769075000003795,
+        "new_hits@25": 715,
+        "new_recall@25": 0.3850296176628972,
+        "new_hits@50": 991,
+        "new_recall@50": 0.5336564351103931,
+        "new_hits@100": 1320,
+        "new_recall@100": 0.7108239095315024,
+        "recall@10": 0.36241652575369177,
+        "ndcg@10": 0.21606602352033183,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-T_no_brand-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 114.0178285830043,
+        "new_hits@25": 733,
+        "new_recall@25": 0.3947226709746904,
+        "new_hits@50": 1020,
+        "new_recall@50": 0.5492730210016155,
+        "new_hits@100": 1319,
+        "new_recall@100": 0.7102854065697362,
+        "recall@10": 0.7511339538127149,
+        "ndcg@10": 0.5773837501831884,
+        "new_hits@10": 202,
+        "new_recall@10": 0.10877759827679052,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-T_no_brand-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-T_no_brand-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": {
+          "recall@10_delta": [
+            -0.0016774477651223562,
+            0.0006028478089998147,
+            0.0029590574039020253
+          ],
+          "ndcg@10_delta": [
+            -0.001154117987422726,
+            0.00025812428059312435,
+            0.001644835590965096
+          ],
+          "new_recall@10_delta": [
+            -0.0032171581769436996,
+            0.0032644217107132708,
+            0.009772119670126877
+          ],
+          "new_recall@25_delta": [
+            -0.012197566189985791,
+            -0.002165088115277612,
+            0.00841230831523173
+          ],
+          "new_recall@50_delta": [
+            -0.005264204942063381,
+            0.004298764105319721,
+            0.014320431247790715
+          ],
+          "new_recall@100_delta": [
+            -0.009067151256012828,
+            -0.0005480954097572699,
+            0.008192356590951822
+          ]
+        },
+        "upstream_stage1": {
+          "new_recall@25_delta": [
+            -0.02580738736899415,
+            -0.011996775678100268,
+            0.0016474690877491536
+          ],
+          "new_recall@50_delta": [
+            -0.02359303004112281,
+            -0.00963658125634265,
+            0.003442616756404714
+          ]
+        }
+      }
+    },
+    "T_no_business_line": {
+      "name": "T_no_business_line",
+      "group": "text_deletion",
+      "ablated_target": "business_line",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam_no_business_line",
+        "omitted_fields": [
+          "business_line"
+        ],
+        "recipe_hash": "31c76eaf94a501537a1afeecf810cebf12ea14c6b30c66458bdece8b5c55b231",
+        "content_hash": "eeab1710a7cdf8e7c60fc4300b6244c2fa0030958e9075d67b33846ddcf78b80",
+        "changed_text_count": 819,
+        "changed_trained_text_count": 768,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_business_line_31c76eaf94a50153.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_no_business_line_31c76eaf94a50153.json",
+        "reused_from_baseline_cache": null
+      },
+      "upstream": {
+        "reused_baseline_upstream": false,
+        "selected_epoch": 20,
+        "parameters": 855469,
+        "training_seconds": 48.455594375001965,
+        "new_hits@25": 737,
+        "new_recall@25": 0.39687668282175553,
+        "new_hits@50": 1004,
+        "new_recall@50": 0.5406569736133549,
+        "new_hits@100": 1336,
+        "new_recall@100": 0.719439956919763,
+        "recall@10": 0.37550007844716204,
+        "ndcg@10": 0.22260421426330154,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-T_no_business_line-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 119.63377787500212,
+        "new_hits@25": 736,
+        "new_recall@25": 0.3963381798599892,
+        "new_hits@50": 1008,
+        "new_recall@50": 0.5428109854604201,
+        "new_hits@100": 1325,
+        "new_recall@100": 0.7135164243403339,
+        "recall@10": 0.7525431597022149,
+        "ndcg@10": 0.576173874727931,
+        "new_hits@10": 201,
+        "new_recall@10": 0.10823909531502424,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-T_no_business_line-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-T_no_business_line-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": {
+          "recall@10_delta": [
+            -3.0454376338964905e-05,
+            0.0020371753836266595,
+            0.004038275267913534
+          ],
+          "ndcg@10_delta": [
+            -0.0027383166471892963,
+            -0.0008777069491628446,
+            0.000729737814045636
+          ],
+          "new_recall@10_delta": [
+            -0.0035240210707006346,
+            0.0027070933761074605,
+            0.009249793556264534
+          ],
+          "new_recall@25_delta": [
+            -0.009834339415337831,
+            -0.0005546339000976069,
+            0.008791208791208791
+          ],
+          "new_recall@50_delta": [
+            -0.01093280586293385,
+            -0.002145348666621792,
+            0.007278937330811384
+          ],
+          "new_recall@100_delta": [
+            -0.00537151326899494,
+            0.0026392189750719533,
+            0.010875201239950675
+          ]
+        },
+        "upstream_stage1": {
+          "new_recall@25_delta": [
+            -0.013522130226901866,
+            0.0,
+            0.01403221796155785
+          ],
+          "new_recall@50_delta": [
+            -0.016267015768084807,
+            -0.0027159152634437804,
+            0.010899572020144225
+          ]
+        }
+      }
+    },
+    "E_no_category": {
+      "name": "E_no_category",
+      "group": "embedding_deletion",
+      "ablated_target": "category",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam",
+        "omitted_fields": [],
+        "recipe_hash": "98134e2f7fe45c60baaf2721cfee866005ac035ef410cc80e011047eab66b8e0",
+        "content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+        "changed_text_count": 0,
+        "changed_trained_text_count": 0,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.json",
+        "reused_from_baseline_cache": null
+      },
+      "upstream": {
+        "reused_baseline_upstream": false,
+        "selected_epoch": 17,
+        "parameters": 851181,
+        "training_seconds": 44.21856929099886,
+        "new_hits@25": 725,
+        "new_recall@25": 0.39041464728056,
+        "new_hits@50": 994,
+        "new_recall@50": 0.535271943995692,
+        "new_hits@100": 1335,
+        "new_recall@100": 0.7189014539579968,
+        "recall@10": 0.3800091633267338,
+        "ndcg@10": 0.22082424001274212,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-E_no_category-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 4,
+        "parameters": 47617,
+        "training_seconds": 109.27875541600224,
+        "new_hits@25": 706,
+        "new_recall@25": 0.38018309100700054,
+        "new_hits@50": 1029,
+        "new_recall@50": 0.5541195476575121,
+        "new_hits@100": 1311,
+        "new_recall@100": 0.7059773828756059,
+        "recall@10": 0.75513388670157,
+        "ndcg@10": 0.584128117659809,
+        "new_hits@10": 187,
+        "new_recall@10": 0.10070005385029618,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-E_no_category-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-E_no_category-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": {
+          "recall@10_delta": [
+            -0.0005295935642616374,
+            0.004690878291266359,
+            0.010406043924230274
+          ],
+          "ndcg@10_delta": [
+            0.003172297160074378,
+            0.006945710927457794,
+            0.011328969603392141
+          ],
+          "new_recall@10_delta": [
+            -0.016941303906563156,
+            -0.004440752376597494,
+            0.00699161077536145
+          ],
+          "new_recall@25_delta": [
+            -0.03480523068092129,
+            -0.016544512603226612,
+            0.002662584499078036
+          ],
+          "new_recall@50_delta": [
+            -0.011074504055218747,
+            0.00897334951553692,
+            0.02893417411036346
+          ],
+          "new_recall@100_delta": [
+            -0.02159885587531376,
+            -0.004868830005794658,
+            0.01121966704288938
+          ]
+        },
+        "upstream_stage1": {
+          "new_recall@25_delta": [
+            -0.024365848523130604,
+            -0.006479483530583809,
+            0.0114125880681053
+          ],
+          "new_recall@50_delta": [
+            -0.026261882805101288,
+            -0.008081896551724138,
+            0.00913038570476118
+          ]
+        }
+      }
+    },
+    "E_no_subcategory": {
+      "name": "E_no_subcategory",
+      "group": "embedding_deletion",
+      "ablated_target": "subcategory",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam",
+        "omitted_fields": [],
+        "recipe_hash": "98134e2f7fe45c60baaf2721cfee866005ac035ef410cc80e011047eab66b8e0",
+        "content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+        "changed_text_count": 0,
+        "changed_trained_text_count": 0,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.json",
+        "reused_from_baseline_cache": null
+      },
+      "upstream": {
+        "reused_baseline_upstream": false,
+        "selected_epoch": 20,
+        "parameters": 850637,
+        "training_seconds": 43.32333062498947,
+        "new_hits@25": 719,
+        "new_recall@25": 0.3871836295099623,
+        "new_hits@50": 1015,
+        "new_recall@50": 0.5465805061927841,
+        "new_hits@100": 1310,
+        "new_recall@100": 0.7054388799138396,
+        "recall@10": 0.3663414285398448,
+        "ndcg@10": 0.21598506787629626,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-E_no_subcategory-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 109.83717324999452,
+        "new_hits@25": 743,
+        "new_recall@25": 0.40010770059235323,
+        "new_hits@50": 1004,
+        "new_recall@50": 0.5406569736133549,
+        "new_hits@100": 1318,
+        "new_recall@100": 0.7097469036079699,
+        "recall@10": 0.7531442604446499,
+        "ndcg@10": 0.5787840190678375,
+        "new_hits@10": 210,
+        "new_recall@10": 0.11308562197092084,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-E_no_subcategory-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-E_no_subcategory-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": {
+          "recall@10_delta": [
+            -0.0005903219682860873,
+            0.002570082728583596,
+            0.0056997636776225935
+          ],
+          "ndcg@10_delta": [
+            -0.0004848126193113428,
+            0.0016575923462891456,
+            0.003821579245328048
+          ],
+          "new_recall@10_delta": [
+            -0.0005442041636274498,
+            0.0075757597940677044,
+            0.015676600843267503
+          ],
+          "new_recall@25_delta": [
+            -0.010921708956842333,
+            0.0032885724585436193,
+            0.01786753016913924
+          ],
+          "new_recall@50_delta": [
+            -0.016404940911896992,
+            -0.0042138767166387085,
+            0.008060508054687774
+          ],
+          "new_recall@100_delta": [
+            -0.012836185049677765,
+            -0.0010635470041965003,
+            0.010299074300856647
+          ]
+        },
+        "upstream_stage1": {
+          "new_recall@25_delta": [
+            -0.025510689066501127,
+            -0.009327847066962998,
+            0.006547632949529388
+          ],
+          "new_recall@50_delta": [
+            -0.013557972225211398,
+            0.0033416898844785903,
+            0.01988252699804558
+          ]
+        }
+      }
+    },
+    "E_no_brand": {
+      "name": "E_no_brand",
+      "group": "embedding_deletion",
+      "ablated_target": "brand",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam",
+        "omitted_fields": [],
+        "recipe_hash": "98134e2f7fe45c60baaf2721cfee866005ac035ef410cc80e011047eab66b8e0",
+        "content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+        "changed_text_count": 0,
+        "changed_trained_text_count": 0,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.json",
+        "reused_from_baseline_cache": null
+      },
+      "upstream": {
+        "reused_baseline_upstream": false,
+        "selected_epoch": 16,
+        "parameters": 851213,
+        "training_seconds": 43.33934033299738,
+        "new_hits@25": 726,
+        "new_recall@25": 0.39095315024232635,
+        "new_hits@50": 1016,
+        "new_recall@50": 0.5471190091545504,
+        "new_hits@100": 1322,
+        "new_recall@100": 0.711900915455035,
+        "recall@10": 0.36716402787397184,
+        "ndcg@10": 0.22231928329287842,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-E_no_brand-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 109.95399300000281,
+        "new_hits@25": 741,
+        "new_recall@25": 0.3990306946688207,
+        "new_hits@50": 1037,
+        "new_recall@50": 0.5584275713516424,
+        "new_hits@100": 1324,
+        "new_recall@100": 0.7129779213785676,
+        "recall@10": 0.7565593823119603,
+        "ndcg@10": 0.5782861484383223,
+        "new_hits@10": 214,
+        "new_recall@10": 0.11523963381798599,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-E_no_brand-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-E_no_brand-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": {
+          "recall@10_delta": [
+            0.0025549002181292496,
+            0.006039852611505535,
+            0.010064563969231527
+          ],
+          "ndcg@10_delta": [
+            -0.002635846435865713,
+            0.0012802089611028042,
+            0.00419923463974585
+          ],
+          "new_recall@10_delta": [
+            0.0025479046267350646,
+            0.00975609756097561,
+            0.017348368490276347
+          ],
+          "new_recall@25_delta": [
+            -0.01137501780981962,
+            0.0022038734745917065,
+            0.015376575492184137
+          ],
+          "new_recall@50_delta": [
+            0.001616313877782178,
+            0.01346355009820498,
+            0.026344462454163785
+          ],
+          "new_recall@100_delta": [
+            -0.007953937092325215,
+            0.002197802197802198,
+            0.012652718911405864
+          ]
+        },
+        "upstream_stage1": {
+          "new_recall@25_delta": [
+            -0.0241733136045579,
+            -0.005815494008837907,
+            0.012840321854125538
+          ],
+          "new_recall@50_delta": [
+            -0.014188418183597545,
+            0.004044197320146102,
+            0.021031939336108883
+          ]
+        }
+      }
+    },
+    "E_no_unit": {
+      "name": "E_no_unit",
+      "group": "embedding_deletion",
+      "ablated_target": "unit",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam",
+        "omitted_fields": [],
+        "recipe_hash": "98134e2f7fe45c60baaf2721cfee866005ac035ef410cc80e011047eab66b8e0",
+        "content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+        "changed_text_count": 0,
+        "changed_trained_text_count": 0,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.json",
+        "reused_from_baseline_cache": null
+      },
+      "upstream": {
+        "reused_baseline_upstream": false,
+        "selected_epoch": 19,
+        "parameters": 851293,
+        "training_seconds": 43.06374354100262,
+        "new_hits@25": 737,
+        "new_recall@25": 0.39687668282175553,
+        "new_hits@50": 1016,
+        "new_recall@50": 0.5471190091545504,
+        "new_hits@100": 1331,
+        "new_recall@100": 0.7167474421109317,
+        "recall@10": 0.3611574520343828,
+        "ndcg@10": 0.21624931626448535,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-E_no_unit-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 6,
+        "parameters": 47617,
+        "training_seconds": 141.3226373330108,
+        "new_hits@25": 737,
+        "new_recall@25": 0.39687668282175553,
+        "new_hits@50": 1007,
+        "new_recall@50": 0.5422724824986538,
+        "new_hits@100": 1320,
+        "new_recall@100": 0.7108239095315024,
+        "recall@10": 0.7551605124225396,
+        "ndcg@10": 0.5866876956342927,
+        "new_hits@10": 201,
+        "new_recall@10": 0.10823909531502424,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-E_no_unit-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-E_no_unit-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": {
+          "recall@10_delta": [
+            5.8421910423942016e-06,
+            0.004591855740677318,
+            0.00965409139434459
+          ],
+          "ndcg@10_delta": [
+            0.006075555680278045,
+            0.009515398063669522,
+            0.013124886647396162
+          ],
+          "new_recall@10_delta": [
+            -0.009101375532744371,
+            0.0026609906419232774,
+            0.014987537077195343
+          ],
+          "new_recall@25_delta": [
+            -0.02004717192815096,
+            0.0005113784650434705,
+            0.020068637445488677
+          ],
+          "new_recall@50_delta": [
+            -0.021910549249694895,
+            -0.0027800998950100724,
+            0.01656550363669596
+          ],
+          "new_recall@100_delta": [
+            -0.01873801905245033,
+            -0.000520021363332139,
+            0.017354451703028045
+          ]
+        },
+        "upstream_stage1": {
+          "new_recall@25_delta": [
+            -0.018037192187343835,
+            0.0,
+            0.018531702202586743
+          ],
+          "new_recall@50_delta": [
+            -0.014156988185023653,
+            0.003635419616728028,
+            0.021009217640544586
+          ]
+        }
+      }
+    },
+    "E_no_business_line": {
+      "name": "E_no_business_line",
+      "group": "embedding_deletion",
+      "ablated_target": "business_line",
+      "is_noop": false,
+      "text_diagnostics": {
+        "recipe": "t1_fam",
+        "omitted_fields": [],
+        "recipe_hash": "98134e2f7fe45c60baaf2721cfee866005ac035ef410cc80e011047eab66b8e0",
+        "content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+        "changed_text_count": 0,
+        "changed_trained_text_count": 0,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "is_noop": false,
+        "cache_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+        "meta_path": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.json",
+        "reused_from_baseline_cache": null
+      },
+      "upstream": {
+        "reused_baseline_upstream": false,
+        "selected_epoch": 30,
+        "parameters": 851053,
+        "training_seconds": 60.66914570800145,
+        "new_hits@25": 722,
+        "new_recall@25": 0.3887991383952612,
+        "new_hits@50": 1012,
+        "new_recall@50": 0.5449649973074852,
+        "new_hits@100": 1319,
+        "new_recall@100": 0.7102854065697362,
+        "recall@10": 0.35681354077944205,
+        "ndcg@10": 0.21431706669649933,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/stage1-E_no_business_line-seed42/best.pt"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 174.35131595900748,
+        "new_hits@25": 729,
+        "new_recall@25": 0.3925686591276252,
+        "new_hits@50": 995,
+        "new_recall@50": 0.5358104469574583,
+        "new_hits@100": 1330,
+        "new_recall@100": 0.7162089391491653,
+        "recall@10": 0.7526062552688639,
+        "ndcg@10": 0.5791325128824067,
+        "new_hits@10": 203,
+        "new_recall@10": 0.10931610123855681,
+        "selected_checkpoint": "checkpoints/embedding-ablation-v1/runs/selector-E_no_business_line-uv_47-seed42/best.pt",
+        "per_query_predictions": "checkpoints/embedding-ablation-v1/runs/selector-E_no_business_line-uv_47-seed42/mlp_fullpool_predictions.npz"
+      },
+      "paired_vs_baseline": {
+        "mlp_uv47": {
+          "recall@10_delta": [
+            -0.0014336837310360566,
+            0.002098562184485371,
+            0.005630989814968689
+          ],
+          "ndcg@10_delta": [
+            -0.0007080649361031083,
+            0.001924588437194829,
+            0.00517125777027501
+          ],
+          "new_recall@10_delta": [
+            -0.003786552271424424,
+            0.003776639066303164,
+            0.011525954063188884
+          ],
+          "new_recall@25_delta": [
+            -0.016820530853125727,
+            -0.004172106179286336,
+            0.00915957194398808
+          ],
+          "new_recall@50_delta": [
+            -0.022876539996529582,
+            -0.00911100694113827,
+            0.004347442538256114
+          ],
+          "new_recall@100_delta": [
+            -0.005665625960227022,
+            0.005360496631119673,
+            0.016730079538692492
+          ]
+        },
+        "upstream_stage1": {
+          "new_recall@25_delta": [
+            -0.024640686502356395,
+            -0.007982969664715274,
+            0.00949295382278624
+          ],
+          "new_recall@50_delta": [
+            -0.016531214944712803,
+            0.0015596620394395435,
+            0.019352442367204063
+          ]
+        }
+      }
+    }
+  },
+  "exploratory_combined": {},
+  "ablation_manifest_identity": "b06de195e089bf70335d06fdee5dc9bcfb4fb33a7c14360d83ea3d6e3082c6b4",
+  "source_sha256": {
+    "recommender/experiments/embedding_ablation/__init__.py": "0b2cd0743d1c257d047a7ff939a663f4961e4e019e8c641464e39e75ebc42e70",
+    "recommender/experiments/embedding_ablation/config.py": "8cb8c5cfb6babb1ab0ea630a2a7880de872961b5feeea2cbc9c8a35d4baac563",
+    "recommender/experiments/embedding_ablation/data.py": "dd30e9aa0d0530f18688702cdd0b9922af863ae42ec1180b96d49d130a77ea9f",
+    "recommender/experiments/embedding_ablation/evaluate.py": "7e94f86eeb80881cbbe310f5a8943da3ee5ca45fafd0e0bb711988e81c169104",
+    "recommender/experiments/embedding_ablation/text_cache.py": "4a7b494de12003c08bfe89f5e23fb0a4ec4ee0c40e948343043ccf0757dbe37e",
+    "recommender/experiments/embedding_ablation/train.py": "bd790a4cf65042d2fcf2611de1c9b23d24a34ec53714fdebc71b485ff7940004"
+  },
+  "reproduction_commands": [
+    "PYTHONPATH=. ./venv/bin/pytest tests/",
+    "PYTHONPATH=. ./venv/bin/pytest tests/ --synthetic-only",
+    "PYTHONPATH=. ./venv/bin/python experiments/embedding_ablation_v1/run.py",
+    "PYTHONPATH=. ./venv/bin/python experiments/embedding_ablation_v1/summarize.py"
+  ]
+}

@@ -1,0 +1,505 @@
+{
+  "evaluation_type": "single_saved_mlp_validation_replay",
+  "reference_id": "no-brand-v1",
+  "selector_sha256": "d083a5562d968e8e606f69d86e142e370567fa4f506f650e9e2234c53d66dad5",
+  "upstream_sha256": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+  "upstream_cache": "checkpoints/embedding-ablation-v1/runs/stage1-E_no_brand-seed42/val_purchase_cache.pt",
+  "upstream_cache_sha256": "22329d61cb9a2ed58ce21e6dff72f1bd1914706bb7b85ef0bec59fada0f957c1",
+  "selected_mlp_epoch": 1,
+  "input_contract": {
+    "recipe": "uv_47",
+    "input_dim": 303,
+    "ordered_input_blocks": [
+      {
+        "name": "u",
+        "dim": 128
+      },
+      {
+        "name": "v",
+        "dim": 128
+      },
+      {
+        "name": "features_41",
+        "dim": 41
+      },
+      {
+        "name": "customer_stats_6",
+        "dim": 6
+      }
+    ],
+    "features_41_names": [
+      "is_repeat_sku",
+      "user_sku_order_count_norm",
+      "user_sku_qty_share",
+      "days_since_last_sku_buy_norm",
+      "sku_urgency",
+      "user_cat_order_share",
+      "user_subcat_order_share",
+      "user_brand_order_share",
+      "global_sku_popularity_norm",
+      "industry_sku_affinity",
+      "is_repeat_category",
+      "is_repeat_brand",
+      "is_repeat_business_line",
+      "customer_age",
+      "customer_overdue_ratio",
+      "customer_30d_activity",
+      "customer_90d_activity",
+      "category_age",
+      "category_overdue_ratio",
+      "category_never_seen",
+      "family_age",
+      "family_overdue_ratio",
+      "family_never_seen",
+      "family_history_share",
+      "sku_orders_7d",
+      "sku_orders_30d",
+      "sku_orders_90d",
+      "sku_buyers_30d",
+      "sku_growth_30d",
+      "category_relative_share",
+      "global_sale_age",
+      "month_sin",
+      "month_cos",
+      "sku_last_lift",
+      "sku_recent3_lift",
+      "category_last_lift",
+      "family_last_lift",
+      "line_last_lift",
+      "sku_support_confidence",
+      "hierarchical_backoff",
+      "same_basket_lift"
+    ],
+    "customer_stats_6_names": [
+      "distinct_orders",
+      "total_quantity",
+      "distinct_products",
+      "distinct_categories",
+      "median_order_gap",
+      "median_purchase_quantity"
+    ]
+  },
+  "feature_contract": {
+    "version": 1,
+    "names": [
+      "is_repeat_sku",
+      "user_sku_order_count_norm",
+      "user_sku_qty_share",
+      "days_since_last_sku_buy_norm",
+      "sku_urgency",
+      "user_cat_order_share",
+      "user_subcat_order_share",
+      "user_brand_order_share",
+      "global_sku_popularity_norm",
+      "industry_sku_affinity",
+      "is_repeat_category",
+      "is_repeat_brand",
+      "is_repeat_business_line",
+      "customer_age",
+      "customer_overdue_ratio",
+      "customer_30d_activity",
+      "customer_90d_activity",
+      "category_age",
+      "category_overdue_ratio",
+      "category_never_seen",
+      "family_age",
+      "family_overdue_ratio",
+      "family_never_seen",
+      "family_history_share",
+      "sku_orders_7d",
+      "sku_orders_30d",
+      "sku_orders_90d",
+      "sku_buyers_30d",
+      "sku_growth_30d",
+      "category_relative_share",
+      "global_sale_age",
+      "month_sin",
+      "month_cos",
+      "sku_last_lift",
+      "sku_recent3_lift",
+      "category_last_lift",
+      "family_last_lift",
+      "line_last_lift",
+      "sku_support_confidence",
+      "hierarchical_backoff",
+      "same_basket_lift"
+    ],
+    "dtype_on_disk": "float16",
+    "compute_dtype": "float32",
+    "count_scale": "log1p(x)/log1p(1000), clipped [0,1]",
+    "age_scale": "days/365, clipped [0,1]",
+    "ratio_scale": "days/max(median_basket_gap,1)/4, clipped [0,1]",
+    "lift_scale": "log_lift/5 clipped [-1,1]",
+    "missing": "never flags; missing metadata yields zero",
+    "statistics_policy": "strictly earlier train; frozen train-cutoff validation globals",
+    "metadata_policy": "snapshot_unverified",
+    "customer_embedding_policy": "last-purchase snapshot only",
+    "product_embedding_policy": "demand disabled, explicit model/catalogue version refresh"
+  },
+  "feature_ranges_validation_eligible": [
+    {
+      "index": 0,
+      "mlp_column": 256,
+      "name": "is_repeat_sku",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 1,
+      "mlp_column": 257,
+      "name": "user_sku_order_count_norm",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 2,
+      "mlp_column": 258,
+      "name": "user_sku_qty_share",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 3,
+      "mlp_column": 259,
+      "name": "days_since_last_sku_buy_norm",
+      "min": 0.117431640625,
+      "max": 1.0
+    },
+    {
+      "index": 4,
+      "mlp_column": 260,
+      "name": "sku_urgency",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 5,
+      "mlp_column": 261,
+      "name": "user_cat_order_share",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 6,
+      "mlp_column": 262,
+      "name": "user_subcat_order_share",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 7,
+      "mlp_column": 263,
+      "name": "user_brand_order_share",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 8,
+      "mlp_column": 264,
+      "name": "global_sku_popularity_norm",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 9,
+      "mlp_column": 265,
+      "name": "industry_sku_affinity",
+      "min": 0.0,
+      "max": 0.357177734375
+    },
+    {
+      "index": 10,
+      "mlp_column": 266,
+      "name": "is_repeat_category",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 11,
+      "mlp_column": 267,
+      "name": "is_repeat_brand",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 12,
+      "mlp_column": 268,
+      "name": "is_repeat_business_line",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 13,
+      "mlp_column": 269,
+      "name": "customer_age",
+      "min": 0.00273895263671875,
+      "max": 1.0
+    },
+    {
+      "index": 14,
+      "mlp_column": 270,
+      "name": "customer_overdue_ratio",
+      "min": 0.00035119056701660156,
+      "max": 1.0
+    },
+    {
+      "index": 15,
+      "mlp_column": 271,
+      "name": "customer_30d_activity",
+      "min": 0.0,
+      "max": 0.447509765625
+    },
+    {
+      "index": 16,
+      "mlp_column": 272,
+      "name": "customer_90d_activity",
+      "min": 0.0,
+      "max": 0.60400390625
+    },
+    {
+      "index": 17,
+      "mlp_column": 273,
+      "name": "category_age",
+      "min": 0.00273895263671875,
+      "max": 1.0
+    },
+    {
+      "index": 18,
+      "mlp_column": 274,
+      "name": "category_overdue_ratio",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 19,
+      "mlp_column": 275,
+      "name": "category_never_seen",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 20,
+      "mlp_column": 276,
+      "name": "family_age",
+      "min": 0.00273895263671875,
+      "max": 1.0
+    },
+    {
+      "index": 21,
+      "mlp_column": 277,
+      "name": "family_overdue_ratio",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 22,
+      "mlp_column": 278,
+      "name": "family_never_seen",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 23,
+      "mlp_column": 279,
+      "name": "family_history_share",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 24,
+      "mlp_column": 280,
+      "name": "sku_orders_7d",
+      "min": 0.0,
+      "max": 0.42626953125
+    },
+    {
+      "index": 25,
+      "mlp_column": 281,
+      "name": "sku_orders_30d",
+      "min": 0.0,
+      "max": 0.60400390625
+    },
+    {
+      "index": 26,
+      "mlp_column": 282,
+      "name": "sku_orders_90d",
+      "min": 0.0,
+      "max": 0.73974609375
+    },
+    {
+      "index": 27,
+      "mlp_column": 283,
+      "name": "sku_buyers_30d",
+      "min": 0.0,
+      "max": 0.541015625
+    },
+    {
+      "index": 28,
+      "mlp_column": 284,
+      "name": "sku_growth_30d",
+      "min": -0.415771484375,
+      "max": 0.51318359375
+    },
+    {
+      "index": 29,
+      "mlp_column": 285,
+      "name": "category_relative_share",
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "index": 30,
+      "mlp_column": 286,
+      "name": "global_sale_age",
+      "min": 0.00273895263671875,
+      "max": 1.0
+    },
+    {
+      "index": 31,
+      "mlp_column": 287,
+      "name": "month_sin",
+      "min": -1.0,
+      "max": 0.5
+    },
+    {
+      "index": 32,
+      "mlp_column": 288,
+      "name": "month_cos",
+      "min": -0.0,
+      "max": 1.0
+    },
+    {
+      "index": 33,
+      "mlp_column": 289,
+      "name": "sku_last_lift",
+      "min": -0.8046875,
+      "max": 1.0
+    },
+    {
+      "index": 34,
+      "mlp_column": 290,
+      "name": "sku_recent3_lift",
+      "min": -0.8046875,
+      "max": 1.0
+    },
+    {
+      "index": 35,
+      "mlp_column": 291,
+      "name": "category_last_lift",
+      "min": -1.0,
+      "max": 1.0
+    },
+    {
+      "index": 36,
+      "mlp_column": 292,
+      "name": "family_last_lift",
+      "min": -1.0,
+      "max": 1.0
+    },
+    {
+      "index": 37,
+      "mlp_column": 293,
+      "name": "line_last_lift",
+      "min": -1.0,
+      "max": 1.0
+    },
+    {
+      "index": 38,
+      "mlp_column": 294,
+      "name": "sku_support_confidence",
+      "min": 0.0,
+      "max": 0.98193359375
+    },
+    {
+      "index": 39,
+      "mlp_column": 295,
+      "name": "hierarchical_backoff",
+      "min": -1.0,
+      "max": 1.0
+    },
+    {
+      "index": 40,
+      "mlp_column": 296,
+      "name": "same_basket_lift",
+      "min": -0.73828125,
+      "max": 1.0
+    }
+  ],
+  "customer_stat_ranges_validation": [
+    {
+      "mlp_column": 297,
+      "name": "distinct_orders",
+      "min": 0.11395263671875,
+      "max": 1.0
+    },
+    {
+      "mlp_column": 298,
+      "name": "total_quantity",
+      "min": 0.0287628173828125,
+      "max": 1.0
+    },
+    {
+      "mlp_column": 299,
+      "name": "distinct_products",
+      "min": 0.158203125,
+      "max": 1.0
+    },
+    {
+      "mlp_column": 300,
+      "name": "distinct_categories",
+      "min": 0.356201171875,
+      "max": 1.0
+    },
+    {
+      "mlp_column": 301,
+      "name": "median_order_gap",
+      "min": 0.11029052734375,
+      "max": 1.0
+    },
+    {
+      "mlp_column": 302,
+      "name": "median_purchase_quantity",
+      "min": 0.038238525390625,
+      "max": 0.96826171875
+    }
+  ],
+  "embedding_ranges": {
+    "u": [
+      -0.37675052881240845,
+      0.31484827399253845
+    ],
+    "v": [
+      -0.30609217286109924,
+      0.3244096636772156
+    ]
+  },
+  "metrics": {
+    "queries": 6191,
+    "new_targets": 1857,
+    "recall@10": 0.7565593823119603,
+    "ndcg@10": 0.5782861484383223,
+    "new_hits@10": 214,
+    "new_recall@10": 0.11523963381798599,
+    "new_hits@25": 741,
+    "new_recall@25": 0.3990306946688207,
+    "new_hits@50": 1037,
+    "new_recall@50": 0.5584275713516424,
+    "new_hits@100": 1324,
+    "new_recall@100": 0.7129779213785676
+  },
+  "validation_queries": 6191,
+  "product_universe": 841,
+  "eligible_candidates_min": 735,
+  "eligible_candidates_max": 771,
+  "date_range": [
+    "2025-10-01",
+    "2026-02-18"
+  ],
+  "device": "mps",
+  "inference_seconds": 0.9054684170114342,
+  "heldout_access": false,
+  "stage2_executed": false,
+  "training_executed": false,
+  "reference_metrics_matched": true,
+  "zero_based_column_indices": true
+}
