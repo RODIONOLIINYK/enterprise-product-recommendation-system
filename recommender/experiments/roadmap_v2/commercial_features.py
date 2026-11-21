@@ -113,7 +113,10 @@ class CommercialRollingFeatureBuilder:
         events: pd.DataFrame,
         catalogue: pd.DataFrame,
         product_ids: Sequence[str],
+        *,
+        allow_heldout_test: bool = False,
     ):
+        self.allow_heldout_test = bool(allow_heldout_test)
         self.product_ids = [str(p).strip() for p in product_ids]
         self.num_products = len(self.product_ids)
         self.pid_to_idx = {pid: i for i, pid in enumerate(self.product_ids)}
@@ -156,12 +159,15 @@ class CommercialRollingFeatureBuilder:
         else:
             df = events.copy()
             df["purchase_date"] = pd.to_datetime(df["purchase_date"], format="mixed").dt.normalize()
-            if bool(df["purchase_date"].isna().any()) or not bool(df["purchase_date"].lt(TEST_START).all()):
+            if bool(df["purchase_date"].isna().any()) or (
+                not self.allow_heldout_test and not bool(df["purchase_date"].lt(TEST_START).all())
+            ):
                 raise ValueError(f"Development events only (< {TEST_START.date()}).")
             if "full_payment_date" in df.columns:
                 df["full_payment_date"] = pd.to_datetime(df["full_payment_date"], errors="coerce").dt.normalize()
-                # Strict pre-test clamp on settlement dates as well
-                df.loc[df["full_payment_date"] >= TEST_START, "full_payment_date"] = pd.NaT
+                if not self.allow_heldout_test:
+                    # Strict pre-test clamp on settlement dates during development
+                    df.loc[df["full_payment_date"] >= TEST_START, "full_payment_date"] = pd.NaT
             else:
                 df["full_payment_date"] = pd.NaT
 
@@ -413,7 +419,7 @@ class CommercialRollingFeatureBuilder:
     def build(self, customer_id: str, as_of_date: Union[str, pd.Timestamp]) -> np.ndarray:
         """Build (P, 21) float32 strictly-causal Stage 3A-3D features for all canonical products."""
         date_ts = pd.Timestamp(as_of_date)
-        if pd.isna(date_ts) or date_ts >= TEST_START:
+        if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= TEST_START):
             raise ValueError("Development predictions only")
 
         cid = str(customer_id).strip()

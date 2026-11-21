@@ -1,0 +1,40 @@
+{
+  "reference_id": "stage5-dated-first-baskets-v2",
+  "scope": "Archived 3-stage Stage 5 canonical formulation reference (with Stage 1 MLP + quota100_50 slate; evaluated on held-out Test)",
+  "selection": "User-selected mixed first/returning basket recipe. Primary ranker selected on pooled validation NDCG@10.",
+  "seed": 42,
+  "feature_groups": [
+    "3a_financial",
+    "3c_manager",
+    "3e_parsed_specs"
+  ],
+  "aux_lambda": 0.3,
+  "candidate_policy": "quota100_50",
+  "statistics_policy": "rolling_observed_v2",
+  "metadata_policy": "snapshot_unverified",
+  "heldout_access": false,
+  "training_baskets": 29095,
+  "validation_baskets": 6480,
+  "checkpoints": {
+    "two_tower": {
+      "path": "checkpoints/roadmap-v2/stage5_dated_first_baskets/seed42-rlazmsax/two_tower/best.pt",
+      "sha256": "e970acbd88b74798b2c2df018ff27d1e6bc2a55c8fd3011d96149333bace2e1a"
+    },
+    "selector": {
+      "path": "checkpoints/roadmap-v2/stage5_dated_first_baskets/seed42-rlazmsax/stage1_mlp-dated-seed42/best.pt",
+      "sha256": "982e742c63b11724893d0e3ea514303df502e0d43ca85dffd5a9c686c4425c4d"
+    },
+    "ranker": {
+      "path": "checkpoints/roadmap-v2/stage5_dated_first_baskets/seed42-rlazmsax/stage2_ranker-dated-seed42/best_ndcg.pt",
+      "sha256": "76993f2c473f5a43d127e23d25c1ee62356f0b2a67c2adab527d4912c4f38a48"
+    },
+    "discovery_ranker": {
+      "path": "checkpoints/roadmap-v2/stage5_dated_first_baskets/seed42-rlazmsax/stage2_ranker-dated-seed42/best_discovery.pt",
+      "sha256": "5239b52837e8df92e03d37bf5e666b5966fcc63ac33df0c2194fe5c50c17af22"
+    },
+    "summary": {
+      "path": "experiments/roadmap_v2/stage5_dated_first_baskets_seed42.json",
+      "sha256": "6c17b318dfc828ff1714e9be3530b042901e87a1e3673582478b3e57f37cbf81"
+    }
+  }
+}

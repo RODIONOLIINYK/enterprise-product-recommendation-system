@@ -94,15 +94,17 @@ class BaseNameRollingFeatureBuilder:
         product_ids: Sequence[str],
         *,
         allow_non_monotonic: bool = False,
+        allow_heldout_test: bool = False,
     ):
         if purchases.empty:
             dates = pd.Series([], dtype="datetime64[ns]")
         else:
             dates = pd.to_datetime(purchases["purchase_date"], format="mixed")
-            if bool(dates.isna().any()) or not bool(dates.lt(TEST_START).all()):
+            if bool(dates.isna().any()) or (not allow_heldout_test and not bool(dates.lt(TEST_START).all())):
                 raise ValueError(f"Development purchases only (< {TEST_START.date()}).")
 
         self.allow_non_monotonic = bool(allow_non_monotonic)
+        self.allow_heldout_test = bool(allow_heldout_test)
         self.product_ids = [str(p).strip() for p in product_ids]
         self.num_products = len(self.product_ids)
         self.pid_to_idx = {pid: i for i, pid in enumerate(self.product_ids)}
@@ -387,7 +389,7 @@ class BaseNameRollingFeatureBuilder:
     ) -> np.ndarray:
         """Build (P, 19) float32 strictly-causal base_name features for all canonical products."""
         date_ts = pd.Timestamp(as_of_date)
-        if pd.isna(date_ts) or date_ts >= TEST_START:
+        if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= TEST_START):
             raise ValueError("Development predictions only")
 
         if self._last_date is not None and date_ts < self._last_date:

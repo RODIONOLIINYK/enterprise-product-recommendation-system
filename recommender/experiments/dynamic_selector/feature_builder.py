@@ -84,15 +84,19 @@ class DynamicFeatureBuilder:
         relationships=True,
         statistics_policy: str = STATISTICS_POLICY_FROZEN,
         allow_non_monotonic: bool = False,
+        allow_heldout_test: bool = False,
     ):
         if statistics_policy not in VALID_STATISTICS_POLICIES:
             raise ValueError(
                 f'Unknown statistics_policy {statistics_policy!r}; expected one of {VALID_STATISTICS_POLICIES}.'
             )
-        if purchases.purchase_date.isna().any() or not purchases.purchase_date.lt(TEST_START).all():
+        if purchases.purchase_date.isna().any() or (
+            not allow_heldout_test and not purchases.purchase_date.lt(TEST_START).all()
+        ):
             raise ValueError('Development purchases only')
         self.statistics_policy = statistics_policy
         self.allow_non_monotonic = bool(allow_non_monotonic)
+        self.allow_heldout_test = bool(allow_heldout_test)
         self.product_ids = list(product_ids)
         self.relationships_enabled = relationships
         self.index = {sku: i for i, sku in enumerate(product_ids)}
@@ -159,7 +163,7 @@ class DynamicFeatureBuilder:
 
     def global_features(self, date):
         date_ts = pd.Timestamp(date)
-        if pd.isna(date_ts) or date_ts >= TEST_START:
+        if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= TEST_START):
             raise ValueError('Development predictions only')
         cutoff = min(date_ts, TRAIN_CUTOFF) if self.statistics_policy == STATISTICS_POLICY_FROZEN else date_ts
         if cutoff in self.global_cache:
@@ -190,7 +194,7 @@ class DynamicFeatureBuilder:
 
     def build(self, customer_id, as_of_date, *, include_relationships=None, candidate_ids=None):
         date = pd.Timestamp(as_of_date)
-        if pd.isna(date) or date >= TEST_START:
+        if pd.isna(date) or (not self.allow_heldout_test and date >= TEST_START):
             raise ValueError('Development predictions only')
         if include_relationships is None: include_relationships = self.relationships_enabled
         if include_relationships and not self.relationships_enabled: raise ValueError('Relationship tables were omitted from this provider')

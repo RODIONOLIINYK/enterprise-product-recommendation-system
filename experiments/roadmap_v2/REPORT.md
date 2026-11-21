@@ -162,3 +162,75 @@ PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.run_stage5 
 ```
 
 An independent source rebuild and checkpoint replay reproduced the selector metrics, coverage, formulation and resolved-SKU metrics, and every per-case metric for both ranker selections. The full workspace suite passed 630 tests (6 skipped), and the synthetic suite passed 620 (16 skipped). A clean export of the staged repository passed 552 synthetic tests (15 skipped). Each suite also passed 70 subtests. The workspace includes additional unpublished experiments.
+
+---
+
+## Final Held-Out Test Evaluation (`2026-02-19` to `2026-07-17`)
+
+Authorized strictly inference-only evaluation of the pinned [`stage5-dated-first-baskets-v2`](stage5_reference.json) reference (`seed=42`, zero retraining, zero tuning, zero checkpoint re-selection) over the five-month held-out Test period (`2026-02-19..2026-07-17`). All rolling statistics, sequences, familiarity flags, eligibility masks, and multi-line payment settlements (`full_payment_date < t`) are computed strictly prior to each basket's date `t` from the reconciled commercial ledger (`76,797` paid lines matching all `71,916` cleaned rows), while keeping all frozen vocabularies, normalization scales, static formulation vectors (`585` dev formulations), and neural weights unchanged.
+
+### Held-Out Test Population & Catalogue Shift
+
+- **All test baskets:** `6,582` (`255` first observed + `6,327` returning), `10,406` distinct formulation targets (`1,913` truly new to customer) across `1,832` companies (`100%` covered by cached BGE-M3 company text).
+- **Test-only catalogue launches (`>= 2026-02-19`):** `58` new formulations introduced only during the Test window fall outside the frozen `585`-formulation dev universe, accounting for `166` targets (`1.60%` of all targets; `134` truly new) across `150` baskets (`85` baskets contain only unmodeled targets: `6` first observed + `79` returning).
+- **Both scopes are reported below:** **Full Catalogue (`6,582` baskets)** counts all `166` unmodeled formulations as misses in the denominator (unbiased production reality without catalogue refresh); **Modeled Universe (`6,497` baskets)** matches the `585`-formulation dev denominator used in validation.
+
+### Primary Ranker (`best_ndcg.pt`, Epoch 7) — Validation vs. Held-Out Test
+
+| Cohort | Validation (`6,480`) | Test — Modeled (`6,497`) | Test — Full Catalogue (`6,582`) |
+| :--- | ---: | ---: | ---: |
+| **All — Recall@5** | `70.51%` | `68.61%` | `67.49%` |
+| **All — Recall@10** | `80.78%` | `79.89%` | `78.56%` |
+| **All — Recall@50** | `93.36%` | `93.55%` | `92.00%` |
+| **All — NDCG@10** | `0.63345` | `0.61852` | `0.60895` |
+| **All — New hits@10** | `359 / 1,721 (20.86%)` | `353 / 1,779 (19.84%)` | `353 / 1,913 (18.45%)` |
+| **Returning — Recall@10** | `82.69%` | `81.57%` | `80.24%` |
+| **Returning — NDCG@10** | `0.65194` | `0.63408` | `0.62452` |
+| **Returning — New hits@10** | `212 / 1,367 (15.51%)` | `226 / 1,445 (15.64%)` | `226 / 1,564 (14.45%)` |
+| **First observed — Recall@10** | `39.75%` | `37.72%` | `36.81%` |
+| **First observed — NDCG@10** | `0.23750` | `0.22811` | `0.22264` |
+| **First observed — New hits@10** | `147 / 354 (41.53%)` | `127 / 334 (38.02%)` | `127 / 349 (36.39%)` |
+| **100-Slate Coverage (Total)** | `9,864 / 10,163 (97.06%)` | `9,945 / 10,240 (97.12%)` | `9,945 / 10,406 (95.57%)` |
+| **100-Slate Coverage (New)** | `1,423 / 1,721 (82.68%)` | `1,489 / 1,779 (83.70%)` | `1,489 / 1,913 (77.84%)` |
+| **Resolved Exact-SKU Recall@10** | `66.62%` | `65.93%` | `64.15%` |
+| **Resolved Exact-SKU NDCG@10** | `0.53376` | `0.51880` | `0.50595` |
+
+### Stage-by-Stage & Discovery Checkpoint (`best_discovery.pt`, Epoch 3) Summary
+
+- **Two-Tower (Epoch 7):** `910` unseen new hits@25 (`51.15%` modeled / `47.57%` full catalogue) and `1,222` hits@50 (`68.69%` modeled / `63.88%` full catalogue), vs. `908` / `1,183` on validation.
+- **Stage 1 MLP (Epoch 8):** Modeled `Recall@10 = 79.67%`, `NDCG@10 = 0.61656`, `New@10 = 352 / 1,779`; Full Catalogue `Recall@10 = 78.34%`, `NDCG@10 = 0.60699`, `New@10 = 352 / 1,913`.
+- **Stage 2 Discovery Checkpoint (`best_discovery.pt`, Epoch 3):** Modeled `Recall@10 = 80.04%`, `NDCG@10 = 0.61702`, `New@10 = 359 / 1,779 (20.18%)` (`234` returning + `125` first observed); Full Catalogue `Recall@10 = 78.70%`, `NDCG@10 = 0.60743`, `New@10 = 359 / 1,913 (18.77%)`; Resolved Exact-SKU `Recall@10 = 64.02%` (full) / `65.80%` (modeled). The validation trade-off (higher NDCG@10 on `best_ndcg.pt`, higher Recall@10 and new discovery on `best_discovery.pt`) replicated cleanly out-of-time.
+
+### Integrity & Reproduction
+
+- All preserved reference hashes, all 5 pinned `stage5_reference.json` artifact SHA-256 digests, and `commercial_dev_events.parquet` (`20fc9513...`) were verified unchanged before and after evaluation.
+- Aggregate metrics are stored in [`stage5_dated_first_baskets_test_seed42.json`](stage5_dated_first_baskets_test_seed42.json); private per-query `.npz` outputs stay in the ignored checkpoint directory.
+- Reproduce (authorized held-out flag required): `PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.evaluate_stage5_test --allow-heldout-test`.
+
+---
+
+## Stage 5 Follow-Up: Excluding Stage 1 MLP, CatBoost & Modest Ranker Scaling (Validation-Only)
+
+All experiments below ran strictly on the `29,095` training (`< 2025-10-01`) and `6,480` validation (`2025-10-01..2026-02-18`) dated baskets (**zero held-out Test access**), using the exact same `55` causal `rolling_observed_v2` `base_name` features (`41` `base_name` + `3a_financial` + `3c_manager` + `3e_parsed_specs`) and frozen Two-Tower `v_bn` vectors where neural inputs are used.
+
+### Validation Comparison (`6,480` baskets = `289` first observed + `6,191` returning)
+
+| Model (All `585` Eligible Formulations unless noted) | Params / Trees | `R@5` | `R@10` | `NDCG@10` | `New@10` *(of `1,721`)* | First-Obs `NDCG@10` | Returning `New@10` |
+| :--- | :---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Archived 3-Stage w/ Stage 1 MLP (NDCG, Ep 7) | 100-slate | `70.51%` | `80.78%` | `0.63345` | `359` | `0.23750` | `212` |
+| Archived 3-Stage w/ Stage 1 MLP (Disc, Ep 3) | 100-slate | `70.54%` | `80.93%` | `0.63232` | `367` | `0.25371` | `211` |
+| No-MLP Zero-Shot (Pinned NDCG ckpt, all 585) | `~600K` | `70.50%` | `80.74%` | `0.63330` | `355` | `0.23416` | `212` |
+| No-MLP Full-Pool `UPS-CANR` (Std, NDCG Ep 7) | `~600K` | `70.53%` | `80.76%` | `0.63369` | `354` | `0.23543` | `217` |
+| No-MLP Full-Pool `UPS-CANR` (Std, Disc Ep 4) | `~600K` | `70.47%` | `80.88%` | `0.63337` | `371` | `0.25717` | `219` |
+| **No-MLP `modest_wider_mlp_384` (Ep 7 — Active Ref)** | **`769K`** | `70.54%` | `80.85%` | **`0.63428`** | `366` | `0.24414` | `222` |
+| **No-MLP `modest_8h_ffn384_mlp384` (Disc Ep 5)** | **`803K`** | `70.62%` | **`80.96%`** | `0.63321` | **`378`** | `0.23983` | **`230`** |
+| No-MLP Large `bigger_128d_8h_2L_4mlp` (Ep 6 / Ep 3) | `1.30M` | `70.64%` | `80.57%` | `0.63201` | `353` *(372 ep3)* | — | — |
+| **CatBoost Standalone (`72` feats, 0 neural)** | `661 trees` | **`70.69%`** | `80.70%` | `0.63403` | `356` | **`0.27037`** | `204` |
+| CatBoost + Two-Tower (`78` feats) | `501 trees` | `70.30%` | `80.35%` | `0.63291` | `357` | `0.23739` | `209` |
+
+### Key Conclusions & New Active Reference (`stage5-fullpool-nomlp-v3`)
+
+- **Excluding Stage 1 MLP simplifies the system and improves metrics:** With only `585` canonical `base_name` formulations, scoring the full eligible pool directly in Stage 2 eliminates both `RoadmapStage1Selector` and the 100-candidate slate bottleneck (`100%` eligible candidate coverage, `3.3s` total for `6,480` baskets / `1.16 ms` single-request CPU).
+- **Modest capacity scaling hits the sweet spot (`~769K–803K` params):** While drastic scaling (`1.30M` params with 2 memory + 2 cross-attention layers) overfitted (`NDCG@10 = 0.63201`), gently widening the scoring MLP to `(384, 192, 96)` (`modest_wider_mlp_384`, Epoch 7) set a new overall validation peak (**`NDCG@10 = 0.63428`**, `Recall@10 = 80.85%`, `New@10 = 366/1,721`, resolved SKU `Recall@10 = 66.66%` / `NDCG@10 = 0.53410`), and adding 8 heads + FFN 384 (`modest_8h_ffn384_mlp384`, Epoch 5) set new peaks on **`Recall@10 = 80.96%`** and **`New@10 = 378/1,721`** (`230` returning + `148` first observed).
+- **CatBoost Standalone vs. `UPS-CANR`:** Pure tabular CatBoost (`72` features, zero neural models, `0.55 ms` single-request CPU model-only / `1.39 ms` incl. `Pool`) wins cold-start (`First Observed NDCG@10 = 0.27037`) and `Recall@5` (`70.69%`), while `UPS-CANR` wins returning-customer discovery (`222–230` vs `204`) and pooled `NDCG@10` (`0.63428` vs `0.63403`).
+- **Active Reference Promotion:** Per user selection, [`stage5_reference.json`](stage5_reference.json) now points to `stage5-fullpool-nomlp-v3` (`modest_wider_mlp_384` primary + `modest_8h_ffn384_mlp384` discovery companion), while the prior 3-stage reference evaluated on Test is preserved verbatim in [`stage5_3stage_reference.json`](stage5_3stage_reference.json). See [`stage5_nomlp_and_catboost_seed42.json`](stage5_nomlp_and_catboost_seed42.json) and [`stage5_modest_ranker_seed42.json`](stage5_modest_ranker_seed42.json).

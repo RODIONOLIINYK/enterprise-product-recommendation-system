@@ -607,7 +607,7 @@ def _run_dated(prepared, seed, device, replay):
     before_hashes = snapshot_preserved_hashes()
     reference = None
     if replay:
-        reference = json.loads((EVIDENCE_ROOT / "stage5_reference.json").read_text())
+        reference = json.loads((EVIDENCE_ROOT / "stage5_3stage_reference.json").read_text())
         _verify_reference_files(reference)
         saved = json.loads(Path(reference["checkpoints"]["summary"]["path"]).read_text())
         if (manifest != saved["data_manifest"] or seed != reference["seed"] or seed != saved["seed"]

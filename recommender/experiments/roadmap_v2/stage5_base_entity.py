@@ -298,6 +298,8 @@ def build_base_name_sequences(
     subcat_vocab: Mapping[str, int],
     line_vocab: Mapping[str, int],
     seq_len: int = 32,
+    *,
+    allow_heldout_test: bool = False,
 ) -> Dict[str, torch.Tensor]:
     """Build strictly point-in-time (< as_of_date) base_name-unified 32-event purchase sequences.
 
@@ -306,7 +308,7 @@ def build_base_name_sequences(
     """
     df = purchases.copy()
     df["purchase_date"] = pd.to_datetime(df["purchase_date"], format="mixed").dt.normalize()
-    if bool(df["purchase_date"].ge(TEST_START).any()):
+    if not allow_heldout_test and bool(df["purchase_date"].ge(TEST_START).any()):
         raise ValueError("Development purchases only.")
     df["customer_id"] = df["customer_id"].astype(str).str.strip()
     df["product_id"] = df["product_id"].astype(str).str.strip()
