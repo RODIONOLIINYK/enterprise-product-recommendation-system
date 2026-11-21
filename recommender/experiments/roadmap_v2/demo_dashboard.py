@@ -5,6 +5,7 @@ Usage (requires explicit --allow-heldout-test flag since cases come from >= 2026
 """
 
 import argparse
+from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
@@ -170,6 +171,10 @@ class Stage5LiveDemoEngine:
         )
         self.histories = dict(tuple(self.all_purchases.groupby("customer_id", sort=False)))
 
+        # Fast startup pre-indexing (eliminates per-click DataFrame scans & 2.5-year table replays!)
+        self._init_fast_sequence_and_resolver_indices()
+        self._init_relationship_checkpoints()
+
         # Precompute held-out test basket index (>= 2026-02-19)
         self.cases, self.cohort_counts = build_test_basket_cases(
             self.all_purchases, self.product_ids, self.universe, self.test_pool
@@ -262,6 +267,225 @@ class Stage5LiveDemoEngine:
             flush=True,
         )
 
+    def _init_fast_sequence_and_resolver_indices(self) -> None:
+        """Pre-index customer base_name sequences & pack-resolver timelines ONCE at startup (<0.2 ms/req)."""
+        from .base_name_features import _clean_base_name
+
+        # 1. Pre-index base_name -> (cat_id, subcat_id, line_id) from representatives
+        cat_vocab = self.vocabs["category_vocab"]
+        subcat_vocab = self.vocabs["subcategory_vocab"]
+        line_vocab = self.vocabs["business_line_vocab"]
+        rep_df = self.representatives.copy()
+        rep_df["bn"] = rep_df["base_name"].map(_clean_base_name)
+        bn_meta_ids: Dict[str, tuple[int, int, int]] = {}
+        for bn, grp in rep_df.loc[rep_df["bn"] != ""].groupby("bn", sort=False):
+            c_v = str(grp["product_category"].dropna().mode().iloc[0]).strip() if grp["product_category"].notna().any() else ""
+            sc_v = str(grp["product_subcategory"].dropna().mode().iloc[0]).strip() if grp["product_subcategory"].notna().any() else ""
+            bl_v = str(grp["business_line"].dropna().mode().iloc[0]).strip() if grp["business_line"].notna().any() else ""
+            bn_meta_ids[bn] = (
+                int(cat_vocab.get(c_v, 0)),
+                int(subcat_vocab.get(sc_v, 0)),
+                int(line_vocab.get(bl_v, 0)),
+            )
+
+        all_pid_to_bn = self.universe["all_pid_to_bn"]
+        bn_to_idx = self.universe["bn_to_idx"]
+        df = self.all_purchases[["customer_id", "purchase_date", "product_id", "quantity"]].copy()
+        df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(1.0).clip(lower=0.0)
+        df["bn"] = df["product_id"].map(all_pid_to_bn).fillna("")
+        agg = (
+            df.loc[df["bn"] != ""]
+            .groupby(["customer_id", "purchase_date", "bn"], as_index=False, sort=False)["quantity"]
+            .sum()
+            .sort_values(["customer_id", "purchase_date", "bn"], kind="stable")
+        )
+        self._cust_seq_events: Dict[str, tuple[np.ndarray, list[tuple[int, int, float, int, int, int, int]]]] = {}
+        for cid, grp in agg.groupby("customer_id", sort=False):
+            dts = ((grp["purchase_date"] - PURCHASE_DATE_ORIGIN).dt.days).to_numpy(dtype=np.int64)
+            months = grp["purchase_date"].dt.month.to_numpy(dtype=np.int64)
+            evs = []
+            for d_i, bn_s, q_v, m_i in zip(dts.tolist(), grp["bn"].tolist(), grp["quantity"].tolist(), months.tolist()):
+                b_id = bn_to_idx.get(bn_s, -1) + 1
+                c_i, sc_i, bl_i = bn_meta_ids.get(bn_s, (0, 0, 0))
+                evs.append((d_i, b_id, float(q_v), c_i, sc_i, bl_i, int(m_i)))
+            self._cust_seq_events[cid] = (dts, evs)
+
+        # 2. Pre-index pack-size resolver timelines
+        pid_to_idx = {p: i for i, p in enumerate(self.product_ids)}
+        self._pid_cont = [
+            str(self.cat_indexed.at[p, "container_type"]).strip().upper()
+            if p in self.cat_indexed.index and pd.notna(self.cat_indexed.at[p, "container_type"])
+            else ""
+            for p in self.product_ids
+        ]
+        df_sorted = df.sort_values("purchase_date", kind="stable")
+        self._sku_sale_dates: Dict[int, np.ndarray] = {}
+        for pid, grp in df_sorted.groupby("product_id", sort=False):
+            if pid in pid_to_idx:
+                self._sku_sale_dates[pid_to_idx[pid]] = grp["purchase_date"].to_numpy(dtype="datetime64[ns]")
+        self._cust_sku_hist: Dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        for cid, grp in df_sorted.groupby("customer_id", sort=False):
+            dts = grp["purchase_date"].to_numpy(dtype="datetime64[ns]")
+            pidxs = np.array([pid_to_idx.get(p, -1) for p in grp["product_id"]], dtype=np.int64)
+            self._cust_sku_hist[cid] = (dts, pidxs)
+
+    def _init_relationship_checkpoints(self) -> None:
+        """Snapshot RelationshipTable states biweekly across Test window so random date jumps advance <=14 days."""
+        self._rel_tables = (
+            *self.dynamic.tables.values(),
+            self.dynamic.complements,
+            self.base._trans_table,
+            self.base._comp_table,
+        )
+        max_dt = self.all_purchases["purchase_date"].max()
+        anchors = list(pd.date_range(TEST_START, max_dt, freq="14D"))
+        self._rel_checkpoints: list[tuple[pd.Timestamp, list[tuple[np.ndarray, np.ndarray, np.ndarray, int, int]]]] = []
+        for tbl in self._rel_tables:
+            tbl.reset()
+        for dt in anchors:
+            snap = []
+            for tbl in self._rel_tables:
+                tbl.advance(dt)
+                snap.append((
+                    tbl.pairs.astype(np.float32, copy=True),
+                    tbl.source.astype(np.float32, copy=True),
+                    tbl.dest.astype(np.float32, copy=True),
+                    int(tbl.total),
+                    int(tbl.cursor),
+                ))
+            self._rel_checkpoints.append((dt, snap))
+        self.dynamic.last_date = anchors[-1]
+        self.base._last_date = anchors[-1]
+
+    def _seek_relationship_tables(self, target_date: pd.Timestamp) -> None:
+        """Restore nearest <= biweekly snapshot whenever target_date jumps backward or >14 days forward."""
+        if self.dynamic.last_date is not None and 0 <= (target_date - self.dynamic.last_date).days <= 14:
+            return
+        # Find latest checkpoint <= target_date
+        chosen_dt, chosen_snap = self._rel_checkpoints[0]
+        for dt, snap in self._rel_checkpoints:
+            if dt <= target_date:
+                chosen_dt, chosen_snap = dt, snap
+            else:
+                break
+        for tbl, (pairs, src, dst, tot, cur) in zip(self._rel_tables, chosen_snap):
+            tbl.pairs = pairs.astype(np.float64, copy=True)
+            tbl.source = src.astype(np.float64, copy=True)
+            tbl.dest = dst.astype(np.float64, copy=True)
+            tbl.total = tot
+            tbl.cursor = cur
+        self.dynamic.last_date = chosen_dt
+        self.base._last_date = chosen_dt
+
+    def _fast_build_sequence(self, cid: str, pday: int, seq_len: int = 32) -> Dict[str, torch.Tensor]:
+        """Bit-exact single-customer base_name 32-event sequence builder (<0.1 ms)."""
+        sequence = np.zeros((1, seq_len, 9), dtype=np.float32)
+        attn_mask = np.zeros((1, seq_len), dtype=np.int64)
+        seq_bn_ids = np.zeros((1, seq_len), dtype=np.int64)
+        seq_cat_ids = np.zeros((1, seq_len), dtype=np.int64)
+        seq_subcat_ids = np.zeros((1, seq_len), dtype=np.int64)
+        seq_line_ids = np.zeros((1, seq_len), dtype=np.int64)
+        seq_dates = np.zeros((1, seq_len), dtype=np.float32)
+
+        entry = self._cust_seq_events.get(cid)
+        if entry is not None:
+            dts, evs = entry
+            stop = int(dts.searchsorted(pday, side="left"))
+            if stop > 0:
+                log60 = math.log1p(60.0)
+                log50 = math.log1p(50.0)
+                prior_evs = evs[:stop]
+                bn_counts: Dict[int, int] = {}
+                bn_vols: Dict[int, float] = {}
+                cum_vol = 0.0
+                start_keep = max(0, stop - seq_len)
+                prev_day = prior_evs[0][0]
+                last_day = prior_evs[-1][0]
+                for idx_e, (d_i, b_id, q_v, c_i, sc_i, bl_i, m_i) in enumerate(prior_evs):
+                    prev_cnt = bn_counts.get(b_id, 0)
+                    bn_counts[b_id] = prev_cnt + 1
+                    bn_vols[b_id] = bn_vols.get(b_id, 0.0) + q_v
+                    cum_vol += q_v
+                    gap_days = max(0, d_i - prev_day) if idx_e > 0 else 0
+                    prev_day = d_i
+                    if idx_e >= start_keep:
+                        slot = idx_e - start_keep
+                        attn_mask[0, slot] = 1
+                        seq_bn_ids[0, slot] = b_id
+                        seq_cat_ids[0, slot] = c_i
+                        seq_subcat_ids[0, slot] = sc_i
+                        seq_line_ids[0, slot] = bl_i
+                        seq_dates[0, slot] = float(d_i) / 365.25
+                        age_rel = max(0, last_day - d_i)
+                        angle = 2.0 * math.pi * (m_i - 1) / 12.0
+                        sequence[0, slot, 0] = min(1.0, math.log1p(q_v) / log60)
+                        sequence[0, slot, 1] = float(age_rel) / (float(age_rel) + 90.0)
+                        sequence[0, slot, 2] = min(1.0, float(gap_days) / 365.0)
+                        sequence[0, slot, 3] = math.sin(angle)
+                        sequence[0, slot, 4] = math.cos(angle)
+                        sequence[0, slot, 5] = min(1.0, math.log1p(prev_cnt) / log50)
+                        sequence[0, slot, 6] = min(1.0, bn_vols[b_id] / max(cum_vol, 1e-6))
+                        sequence[0, slot, 7] = 1.0 if prev_cnt > 0 else 0.0
+                        sequence[0, slot, 8] = 1.0
+        return {
+            "sequence": torch.from_numpy(sequence),
+            "attention_mask": torch.from_numpy(attn_mask),
+            "seq_product_ids": torch.from_numpy(seq_bn_ids),
+            "seq_category_ids": torch.from_numpy(seq_cat_ids),
+            "seq_subcategory_ids": torch.from_numpy(seq_subcat_ids),
+            "seq_business_line_ids": torch.from_numpy(seq_line_ids),
+            "seq_purchase_dates": torch.from_numpy(seq_dates),
+        }
+
+    def _fast_resolve_skus(self, top_bns: np.ndarray, cid: str, date: pd.Timestamp, row_allowed: np.ndarray) -> np.ndarray:
+        """Bit-exact single-customer causal pack-size resolver (<0.2 ms)."""
+        dt_64 = date.to_datetime64()
+        sku_cnt: Counter[int] = Counter()
+        sku_last: Dict[int, int] = {}
+        cont_cnt: Counter[str] = Counter()
+        entry = self._cust_sku_hist.get(cid)
+        if entry is not None:
+            dts, pidxs = entry
+            stop = int(dts.searchsorted(dt_64, side="left"))
+            for pos_e in range(stop):
+                p_i = int(pidxs[pos_e])
+                if p_i >= 0:
+                    sku_cnt[p_i] += 1
+                    sku_last[p_i] = pos_e
+                    if self._pid_cont[p_i]:
+                        cont_cnt[self._pid_cont[p_i]] += 1
+        dom_cont = cont_cnt.most_common(1)[0][0] if cont_cnt else ""
+        members_map = self.universe["bn_to_member_pid_indices"]
+        out = np.full(len(top_bns), -1, dtype=np.int64)
+        for k, b_idx in enumerate(top_bns.tolist()):
+            if b_idx < 0:
+                continue
+            elig = [p_i for p_i in members_map[b_idx] if row_allowed[p_i]]
+            if not elig:
+                continue
+            if len(elig) == 1:
+                out[k] = elig[0]
+                continue
+            prior_m = [p_i for p_i in elig if sku_cnt[p_i] > 0]
+            if prior_m:
+                out[k] = max(prior_m, key=lambda p_i: (sku_cnt[p_i], sku_last[p_i]))
+                continue
+            if dom_cont:
+                cont_m = [p_i for p_i in elig if self._pid_cont[p_i] == dom_cont]
+                if cont_m:
+                    out[k] = max(
+                        cont_m,
+                        key=lambda p_i: int(self._sku_sale_dates[p_i].searchsorted(dt_64, side="left"))
+                        if p_i in self._sku_sale_dates else 0,
+                    )
+                    continue
+            out[k] = max(
+                elig,
+                key=lambda p_i: int(self._sku_sale_dates[p_i].searchsorted(dt_64, side="left"))
+                if p_i in self._sku_sale_dates else 0,
+            )
+        return out
+
     def metadata_payload(self) -> Dict[str, Any]:
         return {
             "reference_id": self.reference["reference_id"],
@@ -287,6 +511,7 @@ class Stage5LiveDemoEngine:
 
             # 1. Strictly-prior feature & sequence computation (< date)
             t_feat0 = time.perf_counter()
+            self._seek_relationship_tables(date)
             feats_np = dated_candidate_features(
                 cid, date, self.reps, self.dynamic, self.base, self.comm, self.specs
             ).astype(np.float32)
@@ -297,18 +522,7 @@ class Stage5LiveDemoEngine:
                 hist_df, cid, date, normalizer=self.normalizer, include_median_purchase_quantity=True
             )
             profile8 = [float(stats_norm[k]) for k in LEGACY_PROFILE_FEATURES]
-
-            seqs = build_base_name_sequences(
-                prior_df,
-                [cid],
-                [day_int],
-                self.universe,
-                self.representatives,
-                self.vocabs["category_vocab"],
-                self.vocabs["subcategory_vocab"],
-                self.vocabs["business_line_vocab"],
-                allow_heldout_test=True,
-            )
+            seqs = self._fast_build_sequence(cid, day_int)
             t_feat_ms = 1000.0 * (time.perf_counter() - t_feat0)
 
             # 2. Live No-MLP Full-Pool UPS-CANR forward pass (all 585 formulations!)
@@ -347,17 +561,7 @@ class Stage5LiveDemoEngine:
 
             # 3. Resolve Top-10 base_names -> concrete eligible pack SKUs strictly < date
             t_res0 = time.perf_counter()
-            resolved_sku_idx = resolve_base_names_to_skus(
-                top10[None, :],
-                [cid],
-                [day_int],
-                torch.from_numpy(c.sku_allowed).unsqueeze(0),
-                prior_df,
-                self.catalogue,
-                self.product_ids,
-                self.universe,
-                top_k=10,
-            )[0]
+            resolved_sku_idx = self._fast_resolve_skus(top10, cid, date, c.sku_allowed)
             t_res_ms = 1000.0 * (time.perf_counter() - t_res0)
 
             # 4. Human-readable strictly-prior customer stats & purchase history
