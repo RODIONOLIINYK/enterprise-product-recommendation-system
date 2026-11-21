@@ -41,13 +41,43 @@ PARSED_SPEC_FEATURE_NAMES: Tuple[str, ...] = (
 NUM_PARSED_SPEC_FEATURES = len(PARSED_SPEC_FEATURE_NAMES)
 
 # Regex patterns for lubricant/industrial product specs
-_SAE_RE = re.compile(r"\b(\d{1,2}W)[-\s]?(\d{2})\b", re.IGNORECASE)
+_SAE_RE = re.compile(r"(?<![0-9.,])(\d{1,2}W)[-\s]?(\d{2})(?![0-9.,])", re.IGNORECASE)
 _ISO_VG_RE = re.compile(
-    r"\b(?:ISO\s*)?(?:VG\s*)?(?:S\d\s*[A-Z]{1,3}\s*|M|G|R|B|V|GX|MX|MX\s*|V\s*)"
-    r"(10|15|22|32|46|68|100|150|220|320|460|680|1000)\b"
+    r"(?<![0-9.,])(?:ISO\s*)?(?:VG\s*|S\d\s*[A-Z]{1,3}\s*|[MGRBV]\s*|GX\s*|MX\s*)"
+    r"(10|15|22|32|46|68|100|150|220|320|460|680|1000)(?![0-9.,\w])"
 )
 _NLGI_RE = re.compile(r"\b(?:NLGI\s*|Gadus[^\n]{0,25}\s)([0-3](?:\.5)?|00|000)\b", re.IGNORECASE)
+_NLGI_EXPLICIT_RE = re.compile(r"\bNLGI\s*(000|00|[0-3](?:\.5)?)(?![0-9.,])", re.IGNORECASE)
+_GADUS_NLGI_RE = re.compile(
+    r"\bGadus\s+S\d\s+[A-Z0-9]{1,8}(?:\s+[A-Z]{1,4})?\s+(000|00|[0-3](?:\.5)?)(?![0-9.,\w])",
+    re.IGNORECASE,
+)
+_GREASE_END_NLGI_RE = re.compile(
+    r"(?:grease|смазк\w*|змазк\w*|ep|complex|plex|lithium)\s+(000|00|[0-3](?:\.5)?)(?![0-9.,\w])",
+    re.IGNORECASE,
+)
 _PACK_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(л|l|кг|kg|мл|ml|г|g)\b", re.IGNORECASE)
+
+
+def parse_viscosity_grades(text: str) -> Set[str]:
+    """Extract ALL canonical viscosity / NLGI grades from text (e.g. {'ISO220', 'NLGI2'}).
+
+    Fixes decimal pack false-positives (such as '0.4кг' matching NLGI0) and preserves both
+    base-oil ISO VG and NLGI consistency grades on greases.
+    """
+    if not text:
+        return set()
+    out: Set[str] = set()
+    for m in _SAE_RE.finditer(text):
+        out.add(f"{m.group(1).upper()}-{m.group(2)}")
+    for m in _ISO_VG_RE.finditer(text):
+        out.add(f"ISO{m.group(1)}")
+    low = text.lower()
+    if any(k in low for k in ("gadus", "grease", "смазк", "змазк", "nlgi", "cassida grease")):
+        for rx in (_NLGI_EXPLICIT_RE, _GADUS_NLGI_RE, _GREASE_END_NLGI_RE):
+            for m in rx.finditer(text):
+                out.add(f"NLGI{m.group(1)}")
+    return out
 
 
 def parse_viscosity_grade(text: str) -> str:

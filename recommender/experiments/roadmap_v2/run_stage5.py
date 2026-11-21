@@ -230,8 +230,25 @@ def _collapse_bool_matrix_to_bn(mat: torch.Tensor, bn_to_members: Sequence[Seque
     return out
 
 
-def _stage5_tower(universe, enrichment):
+def _stage5_tower(
+    universe,
+    enrichment,
+    num_demand_features: int = 12,
+    num_customer_tabular_features: Optional[int] = None,
+    drop_sales_branch: bool = False,
+):
+    from dataclasses import replace
+
     spec = build_ablation_specs()["E_no_brand"].variant_spec
+    updates = {}
+    if int(num_demand_features) != int(spec.product_demand_features):
+        updates["product_demand_features"] = int(num_demand_features)
+    if num_customer_tabular_features is not None and int(num_customer_tabular_features) != int(spec.customer_tabular_features):
+        updates["customer_tabular_features"] = int(num_customer_tabular_features)
+    if drop_sales_branch:
+        updates["customer_embeddings"] = tuple(c for c in spec.customer_embeddings if c != "sales_branch")
+    if updates:
+        spec = replace(spec, **updates)
     state = torch.load(DEFAULT_RETRIEVER, map_location="cpu", weights_only=False)["model_state_dict"]
     return StaticEnrichedRetriever(
         spec,
@@ -239,7 +256,7 @@ def _stage5_tower(universe, enrichment):
         num_regions=state["customer_tower.region_embedding.weight"].shape[0],
         num_industries=state["customer_tower.industry_embedding.weight"].shape[0],
         num_catalog_products=universe["num_base_names"],
-        num_demand_features=12,
+        num_demand_features=int(num_demand_features),
         product_attr_vocab_sizes={key: len(vocab) for key, vocab in enrichment["product_vocabs"].items()},
         customer_attr_vocab_sizes={key: len(vocab) for key, vocab in enrichment["customer_vocabs"].items()},
     )
@@ -276,6 +293,8 @@ def train_stage5_two_tower(
     epochs: int = 30,
     device: Optional[str] = None,
     replay_checkpoint: Optional[Path] = None,
+    num_customer_tabular_features: Optional[int] = None,
+    drop_sales_branch: bool = False,
 ) -> Dict[str, Any]:
     """Train pack-agnostic Two-Tower retriever (E_no_brand recipe) natively over 585 canonical base_names."""
     dev = get_device(device)
@@ -285,7 +304,14 @@ def train_stage5_two_tower(
 
     torch.manual_seed(int(seed))
     np.random.seed(int(seed))
-    model = _stage5_tower(universe, enrichment).to(dev)
+    demand_dim = int(prod_inputs["demand_features"].shape[1])
+    model = _stage5_tower(
+        universe,
+        enrichment,
+        num_demand_features=demand_dim,
+        num_customer_tabular_features=num_customer_tabular_features,
+        drop_sales_branch=drop_sales_branch,
+    ).to(dev)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.0001)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(epochs), eta_min=1e-5)

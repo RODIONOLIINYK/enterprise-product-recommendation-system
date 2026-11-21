@@ -20,20 +20,10 @@ import numpy as np
 import pandas as pd
 import torch
 
-from recommender.candidates import STATISTICS_POLICY_ROLLING
 from recommender.catalogue import RollingCandidatePool, load_product_catalogue
 from recommender.development import load_development_purchases
-from recommender.experiments.dynamic_selector.feature_builder import DynamicFeatureBuilder
 from recommender.experiments.rolling_candidate_v2.config import DEFAULT_RETRIEVER
-from recommender.experiments.static_enrichment.metadata import (
-    encode_categorical_values,
-    load_enriched_companies,
-)
-from recommender.features import (
-    LEGACY_PROFILE_FEATURES,
-    PointInTimeNormalizer,
-    compute_point_in_time_features,
-)
+from recommender.experiments.static_enrichment.metadata import load_enriched_companies
 from recommender.scope import get_datasets_locs
 from recommender.sequences import PURCHASE_DATE_ORIGIN
 from recommender.split import TEST_START
@@ -41,14 +31,11 @@ from recommender.text import load_cached_embeddings
 from recommender.train_ranker import company_embeddings_path
 from recommender.train_retriever import build_customer_metadata, get_device
 
-from .base_name_features import BaseNameRollingFeatureBuilder
-from .commercial_features import CommercialRollingFeatureBuilder
+from .clean_ranker import CleanStage5BaseNameRanker
 from .config import EVIDENCE_ROOT
 from .dated_baskets import (
     ENRICHMENT,
-    FEATURE_NAMES,
     VOCABS,
-    dated_candidate_features,
     first_observed_pack_indices,
 )
 from .evaluate_stage5_test import (
@@ -58,23 +45,20 @@ from .evaluate_stage5_test import (
     load_aligned_full_commercial_events,
     load_all_cleaned_purchases,
 )
-from .parsed_spec_features import ParsedSpecRollingFeatureBuilder, parse_company_equipment_domains
+from .native_base_name import (
+    CANDIDATE_38_FEATURE_NAMES,
+    CUSTOMER_DYNAMIC_11_FEATURE_NAMES,
+    NativeBaseNameFeatureEngine,
+    build_base_name_static_representations,
+)
+from .parsed_spec_features import parse_company_equipment_domains
 from .run_stage5 import _stage5_tower
-from .run_stage5_bigger_ranker import (
-    MODEST_VARIANTS,
-    OUT_ROOT as BIGGER_ROOT,
-    SWEEP2_VARIANTS,
-    BiggerStage5BaseNameRanker,
-)
-from .stage5_base_entity import (
-    build_base_name_sequences,
-    build_base_name_universe,
-    resolve_base_names_to_skus,
-)
+from .stage5_base_entity import build_base_name_universe
 
 
 ACTIVE_REF_PATH = EVIDENCE_ROOT / "stage5_reference.json"
-F_IDX = {name: i for i, name in enumerate(FEATURE_NAMES)}
+C_IDX = {name: i for i, name in enumerate(CANDIDATE_38_FEATURE_NAMES)}
+U_IDX = {name: i for i, name in enumerate(CUSTOMER_DYNAMIC_11_FEATURE_NAMES)}
 
 
 class Stage5LiveDemoEngine:
@@ -93,7 +77,8 @@ class Stage5LiveDemoEngine:
 
         t0 = time.perf_counter()
         self.lock = threading.Lock()
-        self.dev = get_device(device)
+        # Default to CPU for single-request real-time serving (~1.13 ms median, zero MPS sync overhead!)
+        self.dev = torch.device(device) if device else torch.device("cpu")
         self.reference = json.loads(ACTIVE_REF_PATH.read_text(encoding="utf-8"))
 
         print("[demo] Loading catalogue, purchases, companies & frozen static bundles...", flush=True)
@@ -109,10 +94,7 @@ class Stage5LiveDemoEngine:
         config = torch.load(DEFAULT_RETRIEVER, map_location="cpu", weights_only=False)["config"]
         text_file = company_embeddings_path(DEFAULT_RETRIEVER, config["company_cache_name"])
         self.texts = load_cached_embeddings(text_file, "customer_id")
-        self.normalizer = PointInTimeNormalizer.from_state(config["profile_normalizer"])
         self.profiles = build_customer_metadata(self.companies, self.vocabs)
-        self.sales_branch = self.companies.set_index("customer_id")["sales_branch"].to_dict()
-        self.sales_branch_vocab = enrichment["customer_vocabs"]["sales_branch"]
 
         dev_pool = RollingCandidatePool(self.catalogue, dev_purchases)
         self.universe = build_base_name_universe(self.product_ids, self.catalogue, dev_purchases)
@@ -142,32 +124,20 @@ class Stage5LiveDemoEngine:
                 }
             )
 
-        # Load commercial events & strictly-causal rolling feature builders (allow_non_monotonic=True for random sampling!)
-        print("[demo] Reconciling commercial ledger & initializing strictly-causal feature builders...", flush=True)
+        # Load commercial events & single unified NativeBaseNameFeatureEngine (~0.55 ms/req!)
+        print("[demo] Reconciling commercial ledger & initializing NativeBaseNameFeatureEngine...", flush=True)
         full_commercial = load_aligned_full_commercial_events(RAW_WORKBOOK_PATH, self.all_purchases, self.catalogue)
         self.test_pool = RollingCandidatePool(self.catalogue, self.all_purchases)
-        self.dynamic = DynamicFeatureBuilder(
+        self.native_engine = NativeBaseNameFeatureEngine(
             self.all_purchases[["purchase_date", "customer_id", "product_id", "quantity"]],
+            full_commercial,
             self.catalogue,
             self.companies,
             self.product_ids,
-            statistics_policy=STATISTICS_POLICY_ROLLING,
+            self.universe,
+            self.reps,
             allow_non_monotonic=True,
             allow_heldout_test=True,
-        )
-        self.base = BaseNameRollingFeatureBuilder(
-            self.all_purchases,
-            self.catalogue,
-            self.companies,
-            self.product_ids,
-            allow_non_monotonic=True,
-            allow_heldout_test=True,
-        )
-        self.comm = CommercialRollingFeatureBuilder(
-            full_commercial, self.catalogue, self.product_ids, allow_heldout_test=True
-        )
-        self.specs = ParsedSpecRollingFeatureBuilder(
-            self.all_purchases, self.catalogue, self.companies, self.product_ids, allow_heldout_test=True
         )
         self.histories = dict(tuple(self.all_purchases.groupby("customer_id", sort=False)))
 
@@ -203,56 +173,56 @@ class Stage5LiveDemoEngine:
             "multi_item": [i for i, c in enumerate(self.cases) if int(c.target.sum()) >= 2],
         }
 
-        # Load frozen Two-Tower v_bn & active No-MLP Full-Pool UPS-CANR ranker
-        print("[demo] Loading frozen Two-Tower vectors & active No-MLP Full-Pool UPS-CANR...", flush=True)
+        # Load frozen Pure Pack-Free + 65D Structured Multi-Hot Two-Tower v_bn & CleanStage5BaseNameRanker
+        print("[demo] Loading frozen 65D ProductTower v_bn & CleanStage5BaseNameRanker (all 585 formulations)...", flush=True)
+        bn_static = build_base_name_static_representations(self.universe, self.product_ids, self.catalogue, self.reps)
         tt_ckpt_path = Path(self.reference["checkpoints"]["two_tower"]["path"])
-        tower = _stage5_tower(self.universe, enrichment).to(self.dev)
+        spec_dim = int(self.reference.get("num_product_structured_specs", 65))
+        tower = _stage5_tower(
+            self.universe,
+            enrichment,
+            num_demand_features=spec_dim,
+            num_customer_tabular_features=0,
+            drop_sales_branch=not bool(self.reference.get("sales_branch_enabled", False)),
+        ).to(self.dev)
         tt_ckpt = torch.load(tt_ckpt_path, map_location="cpu", weights_only=False)
         tower.load_state_dict(tt_ckpt["model_state_dict"], strict=True)
         tower.eval()
         with torch.no_grad():
             p_dev = {
-                "text_embedding": enrichment["text_embeddings"]["t1_fam"][self.reps].float().to(self.dev),
-                "demand_features": torch.zeros(len(self.reps), 12, device=self.dev),
+                "text_embedding": bn_static["text_pack_free"].float().to(self.dev),
+                "demand_features": bn_static["full_specs_multihot"].float().to(self.dev),
                 "attr_ids": {k: v[self.reps].to(self.dev) for k, v in enrichment["product_attr_ids"].items()},
             }
             self.v_bn = tower.product_vectors(p_dev).detach()  # (585, 128) on device
         del tower
 
         orig_s = torch.load(DEFAULT_RETRIEVER, map_location="cpu", weights_only=False)["model_state_dict"]
-        all_cfgs = {**MODEST_VARIANTS, **SWEEP2_VARIANTS}
         arch = dict(self.reference["ranker_architecture"])
-        if variant_override:
-            if variant_override not in all_cfgs:
-                raise ValueError(f"Unknown variant {variant_override!r}; available: {list(all_cfgs)}")
-            arch = {"variant": variant_override, **all_cfgs[variant_override]}
-            ckpt_path = checkpoint_override or (BIGGER_ROOT / f"{variant_override}-seed42" / "best_ndcg.pt")
-        else:
-            ckpt_path = checkpoint_override or Path(self.reference["checkpoints"]["ranker"]["path"])
-
-        self.active_variant = str(arch.get("variant", "modest_wider_mlp_384"))
+        ckpt_path = checkpoint_override or Path(self.reference["checkpoints"]["ranker"]["path"])
+        self.active_variant = str(variant_override or arch.get("variant", "v4b_fullspec65_nosb"))
         self.active_ckpt_path = str(ckpt_path)
         ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
         self.active_epoch = int(ck.get("epoch", 0))
         self.active_val_metrics = ck.get("metrics", {})
 
-        self.ranker = BiggerStage5BaseNameRanker(
+        self.ranker = CleanStage5BaseNameRanker(
             num_base_names=self.n_bn,
-            num_features=len(FEATURE_NAMES),
+            num_candidate_features=int(arch.get("num_candidate_features", len(CANDIDATE_38_FEATURE_NAMES))),
+            num_customer_features=int(arch.get("num_customer_features", len(CUSTOMER_DYNAMIC_11_FEATURE_NAMES))),
+            num_pairwise_bias_features=13,
             num_cities=orig_s["customer_tower.city_embedding.weight"].shape[0],
             num_regions=orig_s["customer_tower.region_embedding.weight"].shape[0],
             num_industries=orig_s["customer_tower.industry_embedding.weight"].shape[0],
+            num_sales_branches=int(arch.get("num_sales_branches", 0)),
             num_categories=len(self.vocabs["category_vocab"]) + 1,
             num_subcategories=len(self.vocabs["subcategory_vocab"]) + 1,
             num_business_lines=len(self.vocabs["business_line_vocab"]) + 1,
             d_model=int(arch["d_model"]),
             num_heads=int(arch["num_heads"]),
-            memory_layers=int(arch["memory_layers"]),
-            memory_ffn_mult=int(arch.get("memory_ffn_mult", 2)),
-            memory_ffn_dim=arch.get("memory_ffn_dim"),
-            cross_attn_layers=int(arch["cross_attn_layers"]),
+            memory_ffn_dim=int(arch["memory_ffn_dim"]),
             mlp_widths=tuple(arch["mlp_widths"]),
-            dropout=float(arch.get("dropout", 0.1)),
+            dropout=float(arch.get("dropout", 0.12)),
             aux_60d_enabled=False,
         ).to(self.dev)
         self.ranker.load_state_dict(ck["model_state_dict"], strict=True)
@@ -330,12 +300,10 @@ class Stage5LiveDemoEngine:
             self._cust_sku_hist[cid] = (dts, pidxs)
 
     def _init_relationship_checkpoints(self) -> None:
-        """Snapshot RelationshipTable states biweekly across Test window so random date jumps advance <=14 days."""
+        """Snapshot native 585-BN RelationshipTable states biweekly across Test window so random jumps advance <=14d."""
         self._rel_tables = (
-            *self.dynamic.tables.values(),
-            self.dynamic.complements,
-            self.base._trans_table,
-            self.base._comp_table,
+            *self.native_engine._tables.values(),
+            self.native_engine._complements,
         )
         max_dt = self.all_purchases["purchase_date"].max()
         anchors = list(pd.date_range(TEST_START, max_dt, freq="14D"))
@@ -354,14 +322,12 @@ class Stage5LiveDemoEngine:
                     int(tbl.cursor),
                 ))
             self._rel_checkpoints.append((dt, snap))
-        self.dynamic.last_date = anchors[-1]
-        self.base._last_date = anchors[-1]
+        self.native_engine._last_date = anchors[-1]
 
     def _seek_relationship_tables(self, target_date: pd.Timestamp) -> None:
         """Restore nearest <= biweekly snapshot whenever target_date jumps backward or >14 days forward."""
-        if self.dynamic.last_date is not None and 0 <= (target_date - self.dynamic.last_date).days <= 14:
+        if self.native_engine._last_date is not None and 0 <= (target_date - self.native_engine._last_date).days <= 14:
             return
-        # Find latest checkpoint <= target_date
         chosen_dt, chosen_snap = self._rel_checkpoints[0]
         for dt, snap in self._rel_checkpoints:
             if dt <= target_date:
@@ -374,8 +340,7 @@ class Stage5LiveDemoEngine:
             tbl.dest = dst.astype(np.float64, copy=True)
             tbl.total = tot
             tbl.cursor = cur
-        self.dynamic.last_date = chosen_dt
-        self.base._last_date = chosen_dt
+        self.native_engine._last_date = chosen_dt
 
     def _fast_build_sequence(self, cid: str, pday: int, seq_len: int = 32) -> Dict[str, torch.Tensor]:
         """Bit-exact single-customer base_name 32-event sequence builder (<0.1 ms)."""
@@ -494,7 +459,8 @@ class Stage5LiveDemoEngine:
             "trainable_params": self.trainable_params,
             "device": str(self.dev),
             "num_base_names": self.n_bn,
-            "num_features": len(FEATURE_NAMES),
+            "num_features": len(CANDIDATE_38_FEATURE_NAMES),
+            "num_customer_features": len(CUSTOMER_DYNAMIC_11_FEATURE_NAMES),
             "test_baskets_total": len(self.cases),
             "test_date_range": [str(self.cases[0].date.date()), str(self.cases[-1].date.date())],
             "cohort_counts": self.cohort_counts,
@@ -509,23 +475,20 @@ class Stage5LiveDemoEngine:
             date = c.date
             day_int = int((date - PURCHASE_DATE_ORIGIN).days)
 
-            # 1. Strictly-prior feature & sequence computation (< date)
-            t_feat0 = time.perf_counter()
+            # Time-travel seek (demo-only artifact; live production stays at 'today'!)
             self._seek_relationship_tables(date)
-            feats_np = dated_candidate_features(
-                cid, date, self.reps, self.dynamic, self.base, self.comm, self.specs
-            ).astype(np.float32)
+
+            # 1. Strictly-prior native 38D candidate + 11D current customer state + 32-event sequence (< date)
+            t_feat0 = time.perf_counter()
+            cand_38, cust_11 = self.native_engine.build_split(cid, date)
+            seqs = self._fast_build_sequence(cid, day_int)
+            seqs["sequence"][..., 3:5] = 0.0  # calendar month permanently zeroed
+            t_feat_ms = 1000.0 * (time.perf_counter() - t_feat0)
 
             hist_df = self.histories[cid]
             prior_df = hist_df.loc[hist_df["purchase_date"] < date].sort_values("purchase_date", ascending=False)
-            stats_norm = compute_point_in_time_features(
-                hist_df, cid, date, normalizer=self.normalizer, include_median_purchase_quantity=True
-            )
-            profile8 = [float(stats_norm[k]) for k in LEGACY_PROFILE_FEATURES]
-            seqs = self._fast_build_sequence(cid, day_int)
-            t_feat_ms = 1000.0 * (time.perf_counter() - t_feat0)
 
-            # 2. Live No-MLP Full-Pool UPS-CANR forward pass (all 585 formulations!)
+            # 2. Live Clean Full-Pool UPS-CANR forward pass (ALL 585 eligible formulations!)
             t_inf0 = time.perf_counter()
             prof_ids = self.profiles.get(cid, {})
             text_vec = torch.from_numpy(self.texts.get(cid, np.zeros(1024, dtype=np.float32))).unsqueeze(0).to(self.dev)
@@ -536,7 +499,7 @@ class Stage5LiveDemoEngine:
                     "city_id": torch.tensor([prof_ids.get("city_id", 0)], dtype=torch.long, device=self.dev),
                     "region_id": torch.tensor([prof_ids.get("region_id", 0)], dtype=torch.long, device=self.dev),
                     "industry_id": torch.tensor([prof_ids.get("industry_id", 0)], dtype=torch.long, device=self.dev),
-                    "tabular_features": torch.tensor([profile8], dtype=torch.float32, device=self.dev),
+                    "customer_features": torch.from_numpy(cust_11).unsqueeze(0).to(self.dev),
                     "sequence": seqs["sequence"].to(self.dev),
                     "attention_mask": seqs["attention_mask"].to(self.dev),
                     "seq_product_ids": seqs["seq_product_ids"].to(self.dev),
@@ -545,10 +508,9 @@ class Stage5LiveDemoEngine:
                     "seq_business_line_ids": seqs["seq_business_line_ids"].to(self.dev),
                     "seq_purchase_dates": seqs["seq_purchase_dates"].to(self.dev),
                     "prediction_day": torch.tensor([float(day_int)], dtype=torch.float32, device=self.dev),
-                    "pairwise_features": torch.from_numpy(feats_np).unsqueeze(0).to(self.dev),
+                    "candidate_features": torch.from_numpy(cand_38).unsqueeze(0).to(self.dev),
                     "candidate_vectors": self.v_bn.unsqueeze(0),
                     "candidate_mask": allowed_t,
-                    "candidate_indices": torch.arange(self.n_bn, device=self.dev).unsqueeze(0),
                 }
                 logits = self.ranker(**inp).logits.squeeze(0).cpu()
                 if self.dev.type == "mps":
@@ -622,11 +584,11 @@ class Stage5LiveDemoEngine:
                 "median_order_gap_days": round(median_gap_days, 1) if median_gap_days is not None else None,
                 "days_since_last_order": days_since_last,
                 "financial": {
-                    "prepaid_or_cash_pct": round(100.0 * float(feats_np[0, F_IDX["cust_prepaid_or_cash_ratio"]]), 1),
-                    "avg_deferral_days": round(90.0 * float(feats_np[0, F_IDX["cust_avg_deferral_days_norm"]]), 1),
-                    "actual_vs_contract_ratio": round(2.0 * float(feats_np[0, F_IDX["cust_actual_vs_contract_pay_ratio"]]), 2),
-                    "overdue_unpaid_pct": round(100.0 * float(feats_np[0, F_IDX["cust_overdue_unpaid_ratio"]]), 1),
-                    "mgr_changed_recently": bool(feats_np[0, F_IDX["mgr_changed_recently"]] > 0.5),
+                    "prepaid_or_cash_pct": round(100.0 * float(cust_11[U_IDX["cust_prepaid_or_cash_ratio"]]), 1),
+                    "avg_deferral_days": round(90.0 * float(cust_11[U_IDX["cust_avg_deferral_days_norm"]]), 1),
+                    "actual_vs_contract_ratio": round(2.0 * float(cust_11[U_IDX["cust_actual_vs_contract_pay_ratio"]]), 2),
+                    "overdue_unpaid_pct": round(100.0 * float(cust_11[U_IDX["cust_overdue_unpaid_ratio"]]), 1),
+                    "mgr_changed_recently": bool(cust_11[U_IDX["mgr_changed_recently"]] > 0.5),
                 },
             }
 
@@ -636,7 +598,7 @@ class Stage5LiveDemoEngine:
             new_hits_10 = 0
             for rank_0, bn_i in enumerate(top10.tolist()):
                 meta = self.bn_meta[bn_i]
-                f_row = feats_np[bn_i]
+                f_row = cand_38[bn_i]
                 logit_v = float(logits[bn_i])
                 prob_v = float(1.0 / (1.0 + math.exp(-max(-20.0, min(20.0, logit_v)))))
                 is_hit = bool(c.target[bn_i])
@@ -659,27 +621,27 @@ class Stage5LiveDemoEngine:
                     else:
                         resolved_sku_label = r_pid
 
-                # Build interpretable drivers from the exact 55 causal features
+                # Build interpretable drivers from the exact 38 causal candidate features
                 drivers: List[str] = []
-                if f_row[F_IDX["has_bought_base_sku"]] > 0.5:
-                    approx_orders = max(1, int(round(math.expm1(float(f_row[F_IDX["user_base_sku_order_count_norm"]]) * math.log1p(50.0)))))
-                    approx_days = int(round(math.expm1(float(f_row[F_IDX["days_since_last_base_sku_buy_norm"]]) * math.log1p(365.0))))
+                if f_row[C_IDX["has_bought_base_sku"]] > 0.5:
+                    approx_orders = max(1, int(round(math.expm1(float(f_row[C_IDX["user_base_sku_order_count_norm"]]) * math.log1p(50.0)))))
+                    approx_days = int(round(math.expm1(float(f_row[C_IDX["days_since_last_base_sku_buy_norm"]]) * math.log1p(365.0))))
                     drivers.append(f"Repeat ({approx_orders}× · {approx_days}d ago)")
-                    urg = float(f_row[F_IDX["base_sku_urgency"]]) * 5.0
+                    urg = float(f_row[C_IDX["base_sku_urgency"]]) * 5.0
                     if urg >= 0.6:
                         drivers.append(f"Due ratio {urg:.1f}×")
                 else:
                     drivers.append("New to customer")
-                if f_row[F_IDX["base_name_recent3_lift"]] > 0.15:
-                    drivers.append(f"Seq lift +{f_row[F_IDX['base_name_recent3_lift']]:.2f}")
-                if f_row[F_IDX["mgr_base_name_share_90d"]] > 0.02:
-                    drivers.append(f"Mgr 90d {100*f_row[F_IDX['mgr_base_name_share_90d']]:.1f}%")
-                if f_row[F_IDX["base_name_industry_affinity"]] > 0.03:
-                    drivers.append(f"Industry {100*f_row[F_IDX['base_name_industry_affinity']]:.1f}%")
-                if f_row[F_IDX["app_matches_company_equipment"]] > 0.5:
+                if f_row[C_IDX["base_name_recent3_lift"]] > 0.15:
+                    drivers.append(f"Seq lift +{f_row[C_IDX['base_name_recent3_lift']]:.2f}")
+                if f_row[C_IDX["mgr_base_name_share_90d"]] > 0.02:
+                    drivers.append(f"Mgr 90d {100*f_row[C_IDX['mgr_base_name_share_90d']]:.1f}%")
+                if f_row[C_IDX["base_name_industry_affinity"]] > 0.03:
+                    drivers.append(f"Industry {100*f_row[C_IDX['base_name_industry_affinity']]:.1f}%")
+                if f_row[C_IDX["app_matches_company_equipment"]] > 0.5:
                     drivers.append("Equipment match")
-                if f_row[F_IDX["same_viscosity_grade_bought"]] > 0.5 and is_new_candidate:
-                    drivers.append("Same viscosity grade")
+                if f_row[C_IDX["user_viscosity_order_share"]] > 0.0 and is_new_candidate:
+                    drivers.append(f"Viscosity {100*f_row[C_IDX['user_viscosity_order_share']]:.0f}%")
 
                 predictions.append(
                     {
@@ -943,7 +905,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
       <div class="d">Only orders &amp; settlements &lt; date</div>
     </div>
     <div class="pipe-step">
-      <div class="k">2. 55D Feature + 32-Seq Build</div>
+      <div class="k">2. 38D Cand + 11D Cust + 32-Seq</div>
       <div class="v" id="p-feat-ms">—</div>
       <div class="d">base_name + 3A fin + 3C mgr + 3E specs</div>
     </div>

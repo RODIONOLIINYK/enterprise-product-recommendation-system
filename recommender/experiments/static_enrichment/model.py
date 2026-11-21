@@ -330,12 +330,12 @@ class StaticEnrichedRetriever(nn.Module):
 
     def product_vectors(self, product_inputs: Mapping[str, object]) -> torch.Tensor:
         demand = product_inputs["demand_features"]
-        if self.spec.product_demand_features == 12:
-            # Clean ProductTower: strictly 12D static container_type one-hot only (no demand inputs).
-            demand = demand[:, 6:] if demand.size(1) == 18 else demand
-        else:
-            # Enforce disabled_v1 policy: first 6 demand dimensions are always zero.
+        if self.spec.product_demand_features == 18:
+            # Enforce disabled_v1 policy: first 6 legacy demand dimensions are always zero.
             demand = torch.cat([torch.zeros_like(demand[:, :6]), demand[:, 6:]], dim=-1)
+        elif self.spec.product_demand_features == 12 and demand.size(1) == 18:
+            # Clean ProductTower: strictly 12D static container_type one-hot only (no demand inputs).
+            demand = demand[:, 6:]
         if self.towers is not None:
             return self.towers.product_tower(
                 product_inputs["text_embedding"],
