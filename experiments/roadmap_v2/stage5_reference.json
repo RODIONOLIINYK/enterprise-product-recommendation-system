@@ -1,12 +1,14 @@
 {
-  "reference_id": "stage5-clean-v4b-fullspec65-nosb",
-  "scope": "Active Stage 5 canonical formulation reference (Clean 2-stage No-MLP Full-Pool UPS-CANR over ALL 585 eligible formulations)",
-  "selection": "User-selected Clean v4b reference (`v4b_fullspec65_nosb`, `CleanStage5BaseNameRanker` modest_8h_ffn384_mlp384, zero dead weights, no sales_branch, 11D current customer stats in Token 0, 38D strictly candidate features, pure pack-free BGE-M3 + 65D structured multi-hot specs in ProductTower). Primary NDCG checkpoint (Ep 6): Recall@10=81.10%, NDCG@10=0.63485, New@10=373/1,721 (151/354 first-observed, 222/1,367 returning), resolved SKU Recall@10=66.82%, 1.13 ms CPU 1-req. Discovery checkpoint (Ep 8): Recall@10=80.89%, NDCG@10=0.63328, New@10=381/1,721.",
+  "reference_id": "stage5-v5-shared-uv-ep10",
+  "scope": "Active Stage 5 canonical formulation reference (Unified Stage-1-grounded Shared-UV Full-Pool UPS-CANR over ALL 585 eligible formulations)",
+  "selection": "User-selected v5_shared_uv Ep 10 Discovery reference (`SharedUVStage5Ranker`, 567,442 trainable / 567,345 inference params, zero scratch text/ID tables in Stage 2). Token 0 enriches live Stage-1 customer vector u_bn with 11D current customer stats via residual MLP; Tokens 1..32 directly reuse precomputed Stage-1 v_bn[seq] (no redundant MLP); Candidate Queries Q enrich all 585 precomputed v_bn vectors with 38D dynamic candidate features via residual MLP before 8-head cross-attention. Primary Ep 10 checkpoint: Recall@10=80.89%, NDCG@10=0.63457, New@10=372/1,721 (149/354 first-observed, 223/1,367 returning), First-Obs NDCG@10=0.25231, resolved SKU Recall@10=66.77% / NDCG@10=0.53504 / New@10=214. Companion Ep 7 NDCG checkpoint: NDCG@10=0.63485, Recall@10=80.94%, First-Obs NDCG@10=0.25926, resolved SKU Recall@10=66.93% / NDCG@10=0.53624 / New@10=220.",
   "seed": 42,
-  "pipeline": "two_tower_packfree_65d_to_clean_fullpool_ups_canr_no_stage1_mlp",
+  "pipeline": "two_tower_packfree_65d_to_shared_uv_fullpool_ups_canr_no_stage1_mlp",
   "feature_groups": [
     "native_base_name_38d_candidates",
-    "token0_current_customer_11d",
+    "token0_stage1_u_bn_plus_current_customer_11d",
+    "history_direct_stage1_v_bn",
+    "candidate_queries_stage1_v_bn_plus_38d_mlp",
     "product_tower_packfree_bge_m3_plus_65d_multihot_specs"
   ],
   "num_candidate_features": 38,
@@ -30,8 +32,11 @@
     "total_structured_dim": 65
   },
   "ranker_architecture": {
-    "variant": "v4b_fullspec65_nosb",
-    "class": "CleanStage5BaseNameRanker",
+    "variant": "v5_shared_uv",
+    "class": "SharedUVStage5Ranker",
+    "token0": "LayerNorm(u_bn + MLP([u_bn (128), cust_11 (11)])) + type_emb[0]",
+    "tokens_1_32": "Direct Stage-1 v_bn[seq_product_ids] (128) + pos_emb + type_emb[1]",
+    "candidate_queries": "LayerNorm(v_bn + MLP([v_bn (128), cand_38 (38)]))",
     "d_model": 128,
     "num_heads": 8,
     "memory_layers": 1,
@@ -39,12 +44,11 @@
     "cross_attn_layers": 1,
     "mlp_widths": [384, 192, 96],
     "dropout": 0.12,
-    "num_sales_branches": 0,
     "num_customer_features": 11,
     "num_candidate_features": 38,
     "active_seq_stats": 6,
-    "dead_weights_removed": ["product_text_proj", "habit_proj", "base.mlp"],
-    "trainable_params": 755234
+    "scratch_id_text_tables_removed": true,
+    "trainable_params": 567442
   },
   "checkpoints": {
     "two_tower": {
@@ -52,16 +56,16 @@
       "sha256": "eef5b428e47f0848b5b6d5b5581c6b638f39daebe519b8bb6dbc62e27f7360cb"
     },
     "ranker": {
-      "path": "checkpoints/roadmap-v2/stage5_clean_v4b/v4b_fullspec65_nosb-seed42/ranker_clean_8h/best_ndcg.pt",
-      "sha256": "3ad797d6a7444ff308cfab16439387ba04135e54918e1827246393939c9325a9"
+      "path": "checkpoints/roadmap-v2/stage5_v5_shared_uv/v5_shared_uv-seed42/best_discovery.pt",
+      "sha256": "54fa07e1f5c45905d0f684f76a80865122db5bcdbf5c8e3e5fdf97777b2ac496"
     },
-    "discovery_ranker": {
-      "path": "checkpoints/roadmap-v2/stage5_clean_v4b/v4b_fullspec65_nosb-seed42/ranker_clean_8h/best_discovery.pt",
-      "sha256": "d499c85ee331a05c9fea4b97399e94244a3ba63d4fd2b0b553a7edae996f54a9"
+    "ndcg_ranker": {
+      "path": "checkpoints/roadmap-v2/stage5_v5_shared_uv/v5_shared_uv-seed42/best_ndcg.pt",
+      "sha256": "4788392e50ee3b5fac7a297f69f9488e335f4e8cab402e1ffcc3c38f43f50ee0"
     },
     "summary": {
-      "path": "experiments/roadmap_v2/stage5_clean_v4b_seed42.json",
-      "sha256": "619d7f2f008d3964dd6afee4fb0d1a44cdd41f75205d0b9f00ba99e759d78a20"
+      "path": "experiments/roadmap_v2/stage5_v5_shared_uv_seed42.json",
+      "sha256": "15eef6274f49ea7393d7404ad6b349c7dd44c0f35022efad52fa9dc1c0e6d03c"
     }
   },
   "prior_3stage_reference": "experiments/roadmap_v2/stage5_3stage_reference.json"

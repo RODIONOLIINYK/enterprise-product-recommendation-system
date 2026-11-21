@@ -4,9 +4,9 @@ Next-basket B2B product formulation recommender for industrial distribution, bui
 
 ---
 
-## Current Architecture & End-to-End Pipeline (`Stage 5: stage5-clean-v4b-fullspec65-nosb`)
+## Current Architecture & End-to-End Pipeline (`Stage 5: stage5-v5-shared-uv-ep10`)
 
-In B2B industrial distribution (lubricants, coolants, chemicals), the same product formulation is sold in multiple package sizes (e.g., 4L jug, 20L pail, 209L drum). Rather than letting 4–5 packaging variants of the same oil compete for Top-10 slots, the active **Stage 5** pipeline unifies **`841` development SKUs into `585` canonical `base_name` product formulations** across every stage, handles **both returning customers and cold-start (first-observed) companies** in one dated pipeline, removes all dead weights, calendar month shortcuts, `sales_branch`, and broadcast customer constants, and scores **all `585` eligible formulations directly** (~`1.7 ms` live end-to-end on CPU).
+In B2B industrial distribution (lubricants, coolants, chemicals), the same product formulation is sold in multiple package sizes (e.g., 4L jug, 20L pail, 209L drum). Rather than letting 4–5 packaging variants of the same oil compete for Top-10 slots, the active **Stage 5** pipeline unifies **`841` development SKUs into `585` canonical `base_name` product formulations** across every stage, handles **both returning customers and cold-start (first-observed) companies** in one dated pipeline, grounds all Stage 2 tokens and candidate queries directly in Stage 1's shared `128D` embedding space (`567K` params, zero scratch text/ID tables), and scores **all `585` eligible formulations directly** (`~1.3 ms` ranker on CPU).
 
 ```text
 Raw ERP / NAV Sales (dataset.xlsx) + Companies (customers.csv) + Catalogue (items.csv)
@@ -30,24 +30,23 @@ Raw ERP / NAV Sales (dataset.xlsx) + Companies (customers.csv) + Catalogue (item
          -  3D pack-agnostic parsed specs (multi-value user_viscosity_order_share, app_matches_company_equipment, user_application_order_share)
   │
   ▼  3. Stage 1 — Pure Pack-Free Two-Tower Encoder (No sales_branch, 65D Multi-Hot Specs)
-     • Pure pack-free BGE-M3 formulation text strictly for 585 distinct base_names (NO product_name/packaging/volume in text)
-     • 65D structured multi-hot specs in ProductTower: 12D container_type + 8D volume tiers + 11D application_domain + 34D multi-value viscosity_grade
-     • 6 static product categorical embeddings (category, subcategory, business_line, tier, unit, origin)
-     • Produces cached 128D L2-normalized formulation vectors v_bn (585 × 128) — zero top-50/top-100 shortlist truncation!
+     • ProductTower: pure pack-free BGE-M3 text (585 distinct base_names) + 65D multi-hot [12 container + 8 vol + 11 app + 34 visc] + 6 product attrs → cached v_bn (585 × 128)
+     • CustomerTower: company BGE-M3 + city/region/industry + 32-event base_name Transformer → live u_bn (128D) recomputed per request
+     • Zero Stage 1 MLP & zero top-50/top-100 shortlist truncation (100% eligible candidate coverage)
   │
-  ▼  4. Stage 2 — Clean Full-Pool UPS-CANR (CleanStage5BaseNameRanker, 755K params, zero dead weights)
-     • Token 0 (Dynamic Customer Embedding): company BGE-M3 text + city/region/industry (no sales_branch) + LIVE 11D current customer state
-     • Tokens 1..32 (Purchase History): base_name (64) + cat (32) + subcat (16) + line (16) → 128D (dead product_text_proj & habit_proj deleted)
-     • 1-layer 8-head TransformerEncoder (FFN=384) over 33 tokens → 8-head Statistics-Biased Cross-Attention over ALL 585 v_bn candidates
-     • Scoring MLP trunk: [z_cand (128), h_attended (128), z_cand ⊙ h_attended (128), 38 cand features] = 422D → 384 → 192 → 96 → 1
+  ▼  4. Stage 2 — Unified Shared-UV Full-Pool UPS-CANR (SharedUVStage5Ranker, 567K params, zero scratch text/ID tables)
+     • Token 0 (Customer): LayerNorm(u_bn + MLP([u_bn (128), cust_11 (11)])) + type_emb[0]
+     • Tokens 1..32 (History): direct precomputed Stage-1 v_bn[seq_product_ids] (128) + pos_emb + type_emb[1] (no redundant MLP)
+     • Candidate Queries Q (all 585): LayerNorm(v_bn + MLP([v_bn (128), cand_38 (38)])) before 8-head statistics-biased cross-attention
+     • 1-layer 8-head TransformerEncoder (FFN=384) over 33 tokens → 8-head cross-attention → MLP [z_cand, h_att, z_cand ⊙ h_att, 38D] = 422D → 384 → 192 → 96 → 1
      • Trained with RankerLoss + training-only 60-day forward auxiliary head (λ = 0.3, stripped at inference)
-     • Scores all 585 eligible formulations directly in 1.13 ms median on CPU (~1.73 ms end-to-end incl. features & pack resolver)
+     • Scores all 585 eligible formulations directly in 1.32 ms median on CPU (zero late-epoch overfitting through Ep 10)
   │
-  ▼  5. Top-10 Ranked Product Formulations (+ Optional Causal Pack-Size Resolver → Concrete Eligible SKU, 0.05 ms)
+  ▼  5. Top-10 Ranked Product Formulations (+ Optional Causal Pack-Size Resolver → Concrete Eligible SKU, 0.08 ms)
      • Per recommended base_name: customer's most frequent/recent eligible pack < t → dominant container type < t → rolling popular pack < t
 ```
 
-- **Active Reference Manifest:** [`experiments/roadmap_v2/stage5_reference.json`](experiments/roadmap_v2/stage5_reference.json) (`stage5-clean-v4b-fullspec65-nosb`, `seed=42`, trained on `29,095` dated baskets = `2,984` first observed + `26,111` returning; validated on `6,480` baskets = `289` first observed + `6,191` returning).
+- **Active Reference Manifest:** [`experiments/roadmap_v2/stage5_reference.json`](experiments/roadmap_v2/stage5_reference.json) (`stage5-v5-shared-uv-ep10`, `seed=42`, trained on `29,095` dated baskets = `2,984` first observed + `26,111` returning; validated on `6,480` baskets = `289` first observed + `6,191` returning).
 - **Archived 3-Stage Reference (Evaluated on Held-Out Test):** [`experiments/roadmap_v2/stage5_3stage_reference.json`](experiments/roadmap_v2/stage5_3stage_reference.json) (`stage5-dated-first-baskets-v2`, which included Stage 1 MLP + `quota100_50` 100-item slate).
 
 ---
@@ -59,14 +58,14 @@ Raw ERP / NAV Sales (dataset.xlsx) + Companies (customers.csv) + Catalogue (item
 | Model (`585` Canonical Formulations) | Pipeline | `R@5` | `R@10` | `NDCG@10` | `New@10` *(of `1,721`)* | First-Obs `New@10` / `NDCG@10` | Returning `New@10` | 1-Req CPU Latency |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
 | Archived 3-Stage Reference (NDCG, Ep 7) | 2T → S1 MLP → S2 (`100`-slate) | `70.51%` | `80.78%` | `0.63345` | `359` (`20.86%`) | `147` / `0.23750` | `212` | — |
-| Prior `v3` `modest_wider_mlp_384` (Ep 7) | 2T → Full-Pool S2 (`55D`) | `70.54%` | `80.85%` | `0.63428` | `366` (`21.27%`) | `144` / `0.24414` | `222` | `~1.2 ms` |
-| Prior `v3` `modest_8h_ffn384_mlp384` (Ep 5) | 2T → Full-Pool S2 (`55D`) | `70.62%` | `80.96%` | `0.63321` | `378` (`21.96%`) | `148` / `0.23983` | `230` | `~1.4 ms` |
-| **Clean `v4b` `v4b_fullspec65_nosb` (Active Ref, Ep 6)** ⭐ | **2T (`65D` specs) → Clean S2 (`38D`+`11D`)** | **`70.80%`** | **`81.10%`** | **`0.63485`** | `373` (`21.67%`) | **`151`** / `0.24399` | `222` | **`1.13 ms`** |
-| **Clean `v4b` `v4b_fullspec65_nosb` (Discovery Ref, Ep 8)** ⭐ | **2T (`65D` specs) → Clean S2 (`38D`+`11D`)** | `70.56%` | `80.89%` | `0.63328` | **`381`** (`22.14%`) | `142` / `0.22430` | **`239`** | **`1.13 ms`** |
+| Prior `v3` `modest_wider_mlp_384` (Ep 7) | 2T → Full-Pool S2 (`55D`, `769K`) | `70.54%` | `80.85%` | `0.63428` | `366` (`21.27%`) | `144` / `0.24414` | `222` | `~1.2 ms` |
+| Clean `v4b` `v4b_fullspec65_nosb` (Ep 6 / Ep 8) | 2T (`65D`) → Clean S2 (`755K`) | **`70.80%`** | **`81.10%`** | **`0.63485`** | `373` *(**381** ep8)* | `151` / `0.24399` | `222` *(**239** ep8)* | **`1.13 ms`** |
+| **`v5_shared_uv` (Active Ref, Ep 10 Disc)** ⭐ | **2T (`65D`) → Shared-UV S2 (`567K`)** | `70.54%` | `80.89%` | `0.63457` | **`372`** (`21.62%`) | `149` / `0.25231` | **`223`** | **`1.32 ms`** |
+| **`v5_shared_uv` (Companion, Ep 7 NDCG)** ⭐ | **2T (`65D`) → Shared-UV S2 (`567K`)** | `70.69%` | `80.94%` | **`0.63485`** | `366` (`21.27%`) | `148` / **`0.25926`** | `218` | **`1.32 ms`** |
 | **CatBoost Standalone (`72` feats, `661` trees)** | **Pure Tabular Full-Pool (0 neural)** | `70.69%` | `80.70%` | `0.63403` | `356` (`20.69%`) | `152` / **`0.27037`** | `204` | **`0.55 ms`** *(1.39ms w/ Pool)* |
 
-- **Resolved Exact-SKU Validation (Active Ref `v4b_fullspec65_nosb`, Ep 6):** `sku_Recall@10 = 66.82%`, `sku_NDCG@10 = 0.53453`, `sku_New@10 = 204` (Discovery Ep 8: `sku_New@10 = 220`).
-- **Takeaway on Neural vs. CatBoost:** Clean `v4b` Full-Pool `UPS-CANR` (`755K` params, `1.13 ms` CPU) sets new single-model highs across `Recall@5` (`70.80%`), `Recall@10` (`81.10%`), `NDCG@10` (`0.63485`), and true discovery (`381 / 1,721`, `239` returning), while pure tabular CatBoost remains the cold-start `NDCG@10` leader (`0.27037`).
+- **Resolved Exact-SKU Validation (`v5_shared_uv`):** Active Ep 10 reaches `sku_Recall@10 = 66.77%`, `sku_NDCG@10 = 0.53504`, `sku_New@10 = 214`; Companion Ep 7 sets all-time resolved-SKU highs (`sku_Recall@10 = 66.93%`, `sku_NDCG@10 = 0.53624`, `sku_New@10 = 220`).
+- **Takeaway:** `v5_shared_uv` deletes `188K` redundant Stage 2 parameters (`755K → 567K`), eliminates late-epoch overfitting (`NDCG@10` holds `0.63485 → 0.63457` through epoch 10), boosts cold-start `NDCG@10` (`+0.0153` over `v4b`), and sets new resolved exact-SKU records while scoring all `585` formulations in `1.32 ms` on CPU.
 
 ### 2. Final Held-Out Test Evaluation (`2026-02-19` to `2026-07-17`, Inference-Only on Archived 3-Stage Reference)
 

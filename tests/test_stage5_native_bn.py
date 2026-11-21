@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import torch
 
-from recommender.experiments.roadmap_v2.clean_ranker import CleanStage5BaseNameRanker
+from recommender.experiments.roadmap_v2.clean_ranker import CleanStage5BaseNameRanker, SharedUVStage5Ranker
 from recommender.experiments.roadmap_v2.native_base_name import (
     APPLICATION_BUCKETS,
     CANDIDATE_38_FEATURE_NAMES,
@@ -324,3 +324,41 @@ def test_clean_ranker_zero_dead_weights_dynamic_token0_and_cold_start():
     assert torch.isfinite(out2.logits).all()
     assert not torch.allclose(out1.memory[:, 0], out2.memory[:, 0])
     assert not torch.allclose(out1.logits, out2.logits)
+
+
+def test_shared_uv_ranker_uses_direct_v_bn_history_and_residual_cust_and_cand_mlps():
+    m = SharedUVStage5Ranker(
+        num_candidate_features=38,
+        num_customer_features=11,
+        aux_60d_enabled=False,
+    ).eval()
+
+    # Zero scratch text/city/region/industry/product/cat/subcat/line tables!
+    param_names = [n for n, _ in m.named_parameters()]
+    for forbidden in ("text_proj", "city_embedding", "product_embedding", "cat_embedding", "sales_branch"):
+        assert not any(forbidden in n for n in param_names)
+
+    B, C, L = 2, 10, 32
+    v_bn = torch.randn(C, 128)
+    base_inp = dict(
+        customer_vector=torch.randn(B, 128),
+        customer_features=torch.zeros(B, 11),
+        catalog_product_vectors=v_bn,
+        sequence=torch.zeros(B, L, 9),
+        attention_mask=torch.zeros(B, L, dtype=torch.long),
+        seq_product_ids=torch.zeros(B, L, dtype=torch.long),
+        seq_purchase_dates=torch.zeros(B, L),
+        prediction_day=torch.tensor([500.0, 500.0]),
+        candidate_features=torch.randn(B, C, 38),
+        candidate_mask=torch.ones(B, C, dtype=torch.bool),
+    )
+    with torch.no_grad():
+        out1 = m(**base_inp, return_diagnostics=True)
+        # Mutate ONLY candidate_features -> candidate query z_cand BEFORE cross-attention MUST change!
+        out2 = m(**{**base_inp, "candidate_features": torch.ones(B, C, 38)}, return_diagnostics=True)
+        # Mutate ONLY customer_features -> Token 0 memory MUST change!
+        out3 = m(**{**base_inp, "customer_features": torch.ones(B, 11)}, return_diagnostics=True)
+
+    assert torch.isfinite(out1.logits).all()
+    assert not torch.allclose(out1.z_candidate, out2.z_candidate)
+    assert not torch.allclose(out1.memory[:, 0], out3.memory[:, 0])

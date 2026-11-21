@@ -259,3 +259,21 @@ Following the Stage 5 full-pool transition, we audited every remaining SKU-line 
 | `v4b_pv20_nosb` (`20D` cont+vol, Ep 7 Disc) | `895 / 1,175` | `755K` | `70.73%` | `80.90%` | `0.63342` | `378` | `146` | `66.84%` | `1.24 ms` |
 
 - **Active Reference Promoted (`stage5-clean-v4b-fullspec65-nosb`):** [`stage5_reference.json`](stage5_reference.json) now pins `v4b_fullspec65_nosb` (Two-Tower Ep 9 + `CleanStage5BaseNameRanker` Ep 6 primary / Ep 8 discovery; `stage5_clean_v4b_seed42.json`), setting new single-model validation highs across `Recall@5`, `Recall@10`, `NDCG@10`, `New@10`, and resolved SKU `Recall@10` at **`~1.73 ms` median end-to-end live CPU latency** (`0.55 ms` features + `1.13 ms` ranker + `0.05 ms` pack resolver).
+
+
+---
+
+## Stage 5 `v5_shared_uv`: Unified Stage-1-Grounded Shared Embeddings + Candidate Query MLP (Validation-Only, 2026-11-22)
+
+Building directly on `v4b_fullspec65_nosb`'s frozen Stage 1 `u_bn` and `v_bn` (`65D` structured multi-hot `ProductTower`, pure pack-free BGE-M3, no `sales_branch`), [`SharedUVStage5Ranker`](../../recommender/experiments/roadmap_v2/clean_ranker.py) eliminates **every** scratch text projection and ID embedding table in Stage 2 (`755,234 → 567,442` trainable params, `-24.9%`):
+
+- **Token 0 (Customer):** `LayerNorm(u_bn + MLP([u_bn (128), cust_11 (11)])) + type_emb[0]`
+- **Tokens 1..32 (History):** Direct precomputed Stage 1 `v_bn[seq_product_ids] (128) + pos_emb + type_emb[1]` *(zero redundant MLP)*
+- **Candidate Queries `Q` (all `585` formulations):** `LayerNorm(v_bn + MLP([v_bn (128), cand_38 (38)]))` before 8-head statistics-biased cross-attention
+
+| Checkpoint (`v5_shared_uv`, `567K` params, `seed=42`) | `R@5` | `R@10` | `NDCG@10` | `New@10` (`1,721`) | First-Obs `New@10` / `NDCG@10` | Returning `New@10` | Resolved SKU `R@10` / `NDCG@10` / `New@10` | Steady CPU 1-Req |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | :---: | :---: |
+| **Ep 10 Discovery (Active Reference ⭐)** | `70.54%` | `80.89%` | `0.63457` | **`372`** (`21.62%`) | `149` / `0.25231` | **`223`** | `66.77%` / `0.53504` / `214` | **`1.32 ms`** |
+| **Ep 7 NDCG (Companion)** | `70.69%` | `80.94%` | **`0.63485`** | `366` (`21.27%`) | `148` / **`0.25926`** | `218` | **`66.93%` / `0.53624` / `220`** | **`1.32 ms`** |
+
+- **Active Reference Promoted (`stage5-v5-shared-uv-ep10`):** Per user selection, [`stage5_reference.json`](stage5_reference.json) now pins `v5_shared_uv` Ep 10 Discovery (`best_discovery.pt`, `54fa07e1...`) with Ep 7 NDCG (`best_ndcg.pt`, `4788392e...`) as companion and `stage5_v5_shared_uv_seed42.json` (`15eef627...`).

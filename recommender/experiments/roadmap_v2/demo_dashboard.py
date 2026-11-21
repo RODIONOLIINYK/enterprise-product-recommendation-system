@@ -31,7 +31,7 @@ from recommender.text import load_cached_embeddings
 from recommender.train_ranker import company_embeddings_path
 from recommender.train_retriever import build_customer_metadata, get_device
 
-from .clean_ranker import CleanStage5BaseNameRanker
+from .clean_ranker import CleanStage5BaseNameRanker, SharedUVStage5Ranker
 from .config import EVIDENCE_ROOT
 from .dated_baskets import (
     ENRICHMENT,
@@ -173,12 +173,12 @@ class Stage5LiveDemoEngine:
             "multi_item": [i for i, c in enumerate(self.cases) if int(c.target.sum()) >= 2],
         }
 
-        # Load frozen Pure Pack-Free + 65D Structured Multi-Hot Two-Tower v_bn & CleanStage5BaseNameRanker
-        print("[demo] Loading frozen 65D ProductTower v_bn & CleanStage5BaseNameRanker (all 585 formulations)...", flush=True)
+        # Load frozen Pure Pack-Free + 65D Structured Multi-Hot Two-Tower (keep CustomerTower live for per-request u_bn!)
+        print("[demo] Loading frozen 65D Two-Tower (cached v_bn + live CustomerTower u_bn) & active ranker...", flush=True)
         bn_static = build_base_name_static_representations(self.universe, self.product_ids, self.catalogue, self.reps)
         tt_ckpt_path = Path(self.reference["checkpoints"]["two_tower"]["path"])
         spec_dim = int(self.reference.get("num_product_structured_specs", 65))
-        tower = _stage5_tower(
+        self.tower = _stage5_tower(
             self.universe,
             enrichment,
             num_demand_features=spec_dim,
@@ -186,45 +186,58 @@ class Stage5LiveDemoEngine:
             drop_sales_branch=not bool(self.reference.get("sales_branch_enabled", False)),
         ).to(self.dev)
         tt_ckpt = torch.load(tt_ckpt_path, map_location="cpu", weights_only=False)
-        tower.load_state_dict(tt_ckpt["model_state_dict"], strict=True)
-        tower.eval()
+        self.tower.load_state_dict(tt_ckpt["model_state_dict"], strict=True)
+        self.tower.eval()
         with torch.no_grad():
             p_dev = {
                 "text_embedding": bn_static["text_pack_free"].float().to(self.dev),
                 "demand_features": bn_static["full_specs_multihot"].float().to(self.dev),
                 "attr_ids": {k: v[self.reps].to(self.dev) for k, v in enrichment["product_attr_ids"].items()},
             }
-            self.v_bn = tower.product_vectors(p_dev).detach()  # (585, 128) on device
-        del tower
+            self.v_bn = self.tower.product_vectors(p_dev).detach()  # (585, 128) on device
 
         orig_s = torch.load(DEFAULT_RETRIEVER, map_location="cpu", weights_only=False)["model_state_dict"]
         arch = dict(self.reference["ranker_architecture"])
         ckpt_path = checkpoint_override or Path(self.reference["checkpoints"]["ranker"]["path"])
-        self.active_variant = str(variant_override or arch.get("variant", "v4b_fullspec65_nosb"))
+        self.active_variant = str(variant_override or arch.get("variant", "v5_shared_uv"))
+        self.active_ranker_class = str(arch.get("class", "SharedUVStage5Ranker"))
         self.active_ckpt_path = str(ckpt_path)
         ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
         self.active_epoch = int(ck.get("epoch", 0))
         self.active_val_metrics = ck.get("metrics", {})
 
-        self.ranker = CleanStage5BaseNameRanker(
-            num_base_names=self.n_bn,
-            num_candidate_features=int(arch.get("num_candidate_features", len(CANDIDATE_38_FEATURE_NAMES))),
-            num_customer_features=int(arch.get("num_customer_features", len(CUSTOMER_DYNAMIC_11_FEATURE_NAMES))),
-            num_pairwise_bias_features=13,
-            num_cities=orig_s["customer_tower.city_embedding.weight"].shape[0],
-            num_regions=orig_s["customer_tower.region_embedding.weight"].shape[0],
-            num_industries=orig_s["customer_tower.industry_embedding.weight"].shape[0],
-            num_sales_branches=int(arch.get("num_sales_branches", 0)),
-            num_categories=len(self.vocabs["category_vocab"]) + 1,
-            num_subcategories=len(self.vocabs["subcategory_vocab"]) + 1,
-            num_business_lines=len(self.vocabs["business_line_vocab"]) + 1,
-            d_model=int(arch["d_model"]),
-            num_heads=int(arch["num_heads"]),
-            memory_ffn_dim=int(arch["memory_ffn_dim"]),
-            mlp_widths=tuple(arch["mlp_widths"]),
-            dropout=float(arch.get("dropout", 0.12)),
-            aux_60d_enabled=False,
-        ).to(self.dev)
+        if self.active_ranker_class == "SharedUVStage5Ranker":
+            self.ranker: torch.nn.Module = SharedUVStage5Ranker(
+                num_candidate_features=int(arch.get("num_candidate_features", len(CANDIDATE_38_FEATURE_NAMES))),
+                num_customer_features=int(arch.get("num_customer_features", len(CUSTOMER_DYNAMIC_11_FEATURE_NAMES))),
+                num_pairwise_bias_features=13,
+                d_model=int(arch["d_model"]),
+                num_heads=int(arch["num_heads"]),
+                memory_ffn_dim=int(arch["memory_ffn_dim"]),
+                mlp_widths=tuple(arch["mlp_widths"]),
+                dropout=float(arch.get("dropout", 0.12)),
+                aux_60d_enabled=False,
+            ).to(self.dev)
+        else:
+            self.ranker = CleanStage5BaseNameRanker(
+                num_base_names=self.n_bn,
+                num_candidate_features=int(arch.get("num_candidate_features", len(CANDIDATE_38_FEATURE_NAMES))),
+                num_customer_features=int(arch.get("num_customer_features", len(CUSTOMER_DYNAMIC_11_FEATURE_NAMES))),
+                num_pairwise_bias_features=13,
+                num_cities=orig_s["customer_tower.city_embedding.weight"].shape[0],
+                num_regions=orig_s["customer_tower.region_embedding.weight"].shape[0],
+                num_industries=orig_s["customer_tower.industry_embedding.weight"].shape[0],
+                num_sales_branches=int(arch.get("num_sales_branches", 0)),
+                num_categories=len(self.vocabs["category_vocab"]) + 1,
+                num_subcategories=len(self.vocabs["subcategory_vocab"]) + 1,
+                num_business_lines=len(self.vocabs["business_line_vocab"]) + 1,
+                d_model=int(arch["d_model"]),
+                num_heads=int(arch["num_heads"]),
+                memory_ffn_dim=int(arch["memory_ffn_dim"]),
+                mlp_widths=tuple(arch["mlp_widths"]),
+                dropout=float(arch.get("dropout", 0.12)),
+                aux_60d_enabled=False,
+            ).to(self.dev)
         self.ranker.load_state_dict(ck["model_state_dict"], strict=True)
         self.ranker.eval()
         self.trainable_params = sum(p.numel() for p in self.ranker.parameters() if p.requires_grad)
@@ -488,30 +501,64 @@ class Stage5LiveDemoEngine:
             hist_df = self.histories[cid]
             prior_df = hist_df.loc[hist_df["purchase_date"] < date].sort_values("purchase_date", ascending=False)
 
-            # 2. Live Clean Full-Pool UPS-CANR forward pass (ALL 585 eligible formulations!)
+            # 2. Live CustomerTower u_bn + Full-Pool UPS-CANR forward pass (ALL 585 eligible formulations!)
             t_inf0 = time.perf_counter()
             prof_ids = self.profiles.get(cid, {})
             text_vec = torch.from_numpy(self.texts.get(cid, np.zeros(1024, dtype=np.float32))).unsqueeze(0).to(self.dev)
+            city_t = torch.tensor([prof_ids.get("city_id", 0)], dtype=torch.long, device=self.dev)
+            reg_t = torch.tensor([prof_ids.get("region_id", 0)], dtype=torch.long, device=self.dev)
+            ind_t = torch.tensor([prof_ids.get("industry_id", 0)], dtype=torch.long, device=self.dev)
+            seq_t = seqs["sequence"].to(self.dev)
+            mask_t = seqs["attention_mask"].to(self.dev)
+            seq_pid_t = seqs["seq_product_ids"].to(self.dev)
+            seq_dt_t = seqs["seq_purchase_dates"].to(self.dev)
+            pday_t = torch.tensor([float(day_int)], dtype=torch.float32, device=self.dev)
             allowed_t = torch.from_numpy(c.allowed).unsqueeze(0).to(self.dev)
             with torch.no_grad():
-                inp = {
-                    "text_embedding": text_vec,
-                    "city_id": torch.tensor([prof_ids.get("city_id", 0)], dtype=torch.long, device=self.dev),
-                    "region_id": torch.tensor([prof_ids.get("region_id", 0)], dtype=torch.long, device=self.dev),
-                    "industry_id": torch.tensor([prof_ids.get("industry_id", 0)], dtype=torch.long, device=self.dev),
-                    "customer_features": torch.from_numpy(cust_11).unsqueeze(0).to(self.dev),
-                    "sequence": seqs["sequence"].to(self.dev),
-                    "attention_mask": seqs["attention_mask"].to(self.dev),
-                    "seq_product_ids": seqs["seq_product_ids"].to(self.dev),
-                    "seq_category_ids": seqs["seq_category_ids"].to(self.dev),
-                    "seq_subcategory_ids": seqs["seq_subcategory_ids"].to(self.dev),
-                    "seq_business_line_ids": seqs["seq_business_line_ids"].to(self.dev),
-                    "seq_purchase_dates": seqs["seq_purchase_dates"].to(self.dev),
-                    "prediction_day": torch.tensor([float(day_int)], dtype=torch.float32, device=self.dev),
-                    "candidate_features": torch.from_numpy(cand_38).unsqueeze(0).to(self.dev),
-                    "candidate_vectors": self.v_bn.unsqueeze(0),
-                    "candidate_mask": allowed_t,
-                }
+                if isinstance(self.ranker, SharedUVStage5Ranker):
+                    c_in = {
+                        "text_embedding": text_vec,
+                        "city_id": city_t,
+                        "region_id": reg_t,
+                        "industry_id": ind_t,
+                        "tabular_features": torch.zeros((1, 0), dtype=torch.float32, device=self.dev),
+                        "sequence": seq_t,
+                        "attention_mask": mask_t,
+                        "seq_product_ids": seq_pid_t,
+                        "seq_purchase_dates": seq_dt_t,
+                    }
+                    u_bn = self.tower.encode_purchase(c_in, self.v_bn).squeeze(1)  # (1, 128) live!
+                    inp = {
+                        "customer_vector": u_bn,
+                        "customer_features": torch.from_numpy(cust_11).unsqueeze(0).to(self.dev),
+                        "catalog_product_vectors": self.v_bn,
+                        "sequence": seq_t,
+                        "attention_mask": mask_t,
+                        "seq_product_ids": seq_pid_t,
+                        "seq_purchase_dates": seq_dt_t,
+                        "prediction_day": pday_t,
+                        "candidate_features": torch.from_numpy(cand_38).unsqueeze(0).to(self.dev),
+                        "candidate_mask": allowed_t,
+                    }
+                else:
+                    inp = {
+                        "text_embedding": text_vec,
+                        "city_id": city_t,
+                        "region_id": reg_t,
+                        "industry_id": ind_t,
+                        "customer_features": torch.from_numpy(cust_11).unsqueeze(0).to(self.dev),
+                        "sequence": seq_t,
+                        "attention_mask": mask_t,
+                        "seq_product_ids": seq_pid_t,
+                        "seq_category_ids": seqs["seq_category_ids"].to(self.dev),
+                        "seq_subcategory_ids": seqs["seq_subcategory_ids"].to(self.dev),
+                        "seq_business_line_ids": seqs["seq_business_line_ids"].to(self.dev),
+                        "seq_purchase_dates": seq_dt_t,
+                        "prediction_day": pday_t,
+                        "candidate_features": torch.from_numpy(cand_38).unsqueeze(0).to(self.dev),
+                        "candidate_vectors": self.v_bn.unsqueeze(0),
+                        "candidate_mask": allowed_t,
+                    }
                 logits = self.ranker(**inp).logits.squeeze(0).cpu()
                 if self.dev.type == "mps":
                     torch.mps.synchronize()
