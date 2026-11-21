@@ -111,7 +111,8 @@ Strictly inference-only evaluation on the five-month forward Test split (`stage5
 │       │   ├── run_stage5.py              # Canonical 3-stage Stage 5 trainer & --replay-reference verifier
 │       │   ├── run_stage5_ablations.py    # No-MLP full-pool UPS-CANR & CatBoost (standalone / +Two-Tower) ablations
 │       │   ├── run_stage5_bigger_ranker.py# Modest & scaled No-MLP full-pool UPS-CANR (active reference trainer)
-│       │   └── evaluate_stage5_test.py    # Locked (--allow-heldout-test) inference-only held-out Test evaluator
+│       │   ├── evaluate_stage5_test.py    # Locked (--allow-heldout-test) inference-only held-out Test evaluator
+│       │   └── demo_dashboard.py          # Interactive local web dashboard sampling live held-out Test baskets
 │       ├── dynamic_selector/              # 41D rolling feature schema, DynamicFeatureBuilder, slate selection
 │       ├── rolling_candidate_v2/          # rolling_observed_v2 feature bundle & preserved-hash guardrails
 │       ├── static_enrichment/             # StaticEnrichedRetriever (E_no_brand Two-Tower), t1_fam text cache
@@ -176,6 +177,9 @@ PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.run_stage5 
 
 # Run authorized inference-only held-out Test evaluation (refuses without --allow-heldout-test)
 PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.evaluate_stage5_test --allow-heldout-test
+
+# Launch the interactive live held-out Test demo dashboard (http://127.0.0.1:8765)
+PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.demo_dashboard --allow-heldout-test --port 8765
 
 # Run the test suite (ordinary pytest skips 6 protected real-data readers; zero held-out Test access)
 PYTHONPATH=. ./venv/bin/pytest tests/ -q

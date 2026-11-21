@@ -283,6 +283,34 @@ MODEST_VARIANTS: Dict[str, Dict[str, Any]] = {
 }
 
 
+SWEEP2_VARIANTS: Dict[str, Dict[str, Any]] = {
+    "more_blocks_2mem_2xattn_4mlp384": {
+        "d_model": 128,
+        "num_heads": 8,
+        "memory_layers": 2,
+        "memory_ffn_mult": 2,
+        "memory_ffn_dim": 256,
+        "cross_attn_layers": 2,
+        "mlp_widths": (384, 256, 128, 64),
+        "dropout": 0.15,
+        "batch_size": 64,
+        "lr": 8e-4,
+    },
+    "wider_16h_ffn384_mlp512": {
+        "d_model": 128,
+        "num_heads": 16,
+        "memory_layers": 1,
+        "memory_ffn_mult": 3,
+        "memory_ffn_dim": 384,
+        "cross_attn_layers": 1,
+        "mlp_widths": (512, 256, 128),
+        "dropout": 0.15,
+        "batch_size": 64,
+        "lr": STAGE2_LR,
+    },
+}
+
+
 def run_bigger_ranker(
     *,
     seed: int = SEED,
@@ -332,10 +360,12 @@ def run_bigger_ranker(
     full_window = tr_bn["prediction_days"] <= (TRAIN_CUTOFF - PURCHASE_DATE_ORIGIN).days - 60
 
     ref_ndcg_npz = Path(saved_val["stage2_ranker"]["ndcg"]["bn_predictions_npz"])
-    selected_variants = MODEST_VARIANTS if mode == "modest" else VARIANTS
+    selected_variants = (
+        MODEST_VARIANTS if mode == "modest" else (SWEEP2_VARIANTS if mode == "sweep2" else VARIANTS)
+    )
     summary_path = (
-        EVIDENCE_ROOT / f"stage5_modest_ranker_seed{seed}.json"
-        if mode == "modest"
+        EVIDENCE_ROOT / f"stage5_{mode}_ranker_seed{seed}.json"
+        if mode in ("modest", "sweep2")
         else SUMMARY_PATH
     )
     results: Dict[str, Any] = {
@@ -474,7 +504,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--device", type=str, default=None)
-    parser.add_argument("--mode", choices=("modest", "large"), default="modest")
+    parser.add_argument("--mode", choices=("modest", "sweep2", "large"), default="modest")
     args = parser.parse_args()
     res = run_bigger_ranker(seed=args.seed, device=args.device, mode=args.mode)
     print(f"\nSaved {args.mode} Stage 2 ranker summary ({res['elapsed_seconds']:.1f}s)", flush=True)
