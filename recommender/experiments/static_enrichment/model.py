@@ -203,16 +203,19 @@ class StaticEnrichedCustomerTower(nn.Module):
         tokens = self.token_proj(torch.cat([history_products, quantity, time_feature.unsqueeze(-1)], dim=-1))
         seq_len = tokens.size(1)
         out_seq = tokens + self.pos_embedding[:, :seq_len, :]
-        out_seq = self.transformer(out_seq, src_key_padding_mask=(attention_mask == 0))
-        out_seq = torch.nan_to_num(out_seq, nan=0.0)
+        # Softmax needs one finite key even when the first basket has no history.
+        # Its placeholder output is discarded before fusion.
+        padding = attention_mask == 0
+        empty_history = padding.all(dim=1)
+        padding[:, 0] &= ~empty_history
+        out_seq = self.transformer(out_seq, src_key_padding_mask=padding)
 
         mask_f = attention_mask.unsqueeze(-1).float()
-        has_history = (attention_mask.sum(dim=1, keepdim=True) > 0).float()
         mean_vec = (out_seq * mask_f).sum(dim=1) / mask_f.sum(dim=1).clamp(min=1.0)
         last_idx = (attention_mask.sum(dim=1) - 1).clamp(min=0)
         last_idx_exp = last_idx.view(batch_size, 1, 1).expand(-1, 1, self.hidden_dim)
         last_vec = out_seq.gather(1, last_idx_exp).squeeze(1)
-        h_hist = self.history_pooling(torch.cat([mean_vec, last_vec], dim=-1)) * has_history
+        h_hist = self.history_pooling(torch.cat([mean_vec, last_vec], dim=-1)).masked_fill(empty_history[:, None], 0.0)
 
         u_c = self.late_fusion(torch.cat([h_text, h_tab, h_hist], dim=-1))
         return F.normalize(u_c, p=2, dim=-1)

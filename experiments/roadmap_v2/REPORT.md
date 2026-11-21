@@ -85,13 +85,13 @@ The first four metrics use the NDCG-selected checkpoint. Relative to the auxilia
 
 Adding parsed specs covered nine more new formulations but lost four top-10 hits and 0.00040 NDCG at the NDCG-selected checkpoint. Recall@5 rose 0.39 points (95% interval +0.04 to +0.78 points). The lift depends on the metric, and the test adds financial and manager features as a pair. Removing warehouse from the otherwise matched three-feature recipe changed Recall@10 by +0.005 points, NDCG by +0.00148, and new hits by +5. The intervals for all three warehouse-removal differences included zero. These are validation estimates for selected checkpoints from one seed.
 
-The shared training cohort has 26,253 company-date cases. At formulation level it has 43,613 eligible next-basket positives and 119,329 eligible 60-day positives, including 9,332 and 30,268 new-to-company positives, respectively, before slate restriction. Those are labels on the same cases. The first observed basket currently seeds the purchase history and cases start at the second observed basket.
+The shared training cohort has 26,253 company-date cases. At formulation level it has 43,613 eligible next-basket positives and 119,329 eligible 60-day positives, including 9,332 and 30,268 new-to-company positives, respectively, before slate restriction. Those are labels on the same cases. In that experiment the first observed basket seeded the purchase history and cases started at the second observed basket.
 
 Reproduce the comparison with `PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.compare_stage5_features --train-missing`. The [comparison summary](stage5_warehouse_exclusion_seed42.json) includes both checkpoint selections, paired intervals, and shared Two-Tower checksums.
 
 ## First Observed Baskets in the Same Pipeline
 
-The user selected the warehouse-free financial, manager, and parsed-spec recipe as the [Stage 5 reference](stage5_reference.json). This experiment compares that saved selector and ranker against the same architecture and feature schema trained from scratch on a larger cohort. Both arms use the same frozen Two-Tower weights and 60-day auxiliary loss at weight 0.3. Checkpoints are selected on the original returning-customer validation set.
+The user selected the warehouse-free financial, manager, and parsed-spec recipe as the [returning-basket reference](stage5_returning_reference.json). This experiment compares that saved selector and ranker against the same architecture and feature schema trained from scratch on a larger cohort. Both arms use the same frozen Two-Tower weights and 60-day auxiliary loss at weight 0.3. Checkpoints are selected on the original returning-customer validation set.
 
 Training grows from 26,253 to 29,237 company-date cases. Of 3,167 first observed training baskets, 114 had fewer than 100 eligible formulations and 69 had no eligible target. The 2,984 added cases have 4,256 eligible next-basket formulation labels. Their histories have zero valid purchase tokens. Financial and manager features take their existing empty-history defaults, and parsed equipment match can still use the company profile. Rolling market statistics and eligibility use only earlier events.
 
@@ -115,3 +115,50 @@ PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.compare_sta
 ```
 
 These commands require the local reference weights, cached company embeddings, and development feature bundles. The reference JSON records SHA-256 checksums. The per-customer arrays and model weights stay in the ignored checkpoint tree.
+
+## Dated first-basket reference
+
+The canonical run builds each training and validation basket from one development ledger, keyed by company and prediction date. All three stages were refit on seed 42. Checkpoint selection uses all 6,480 validation baskets in their observed proportions. The Two-Tower selects by unseen hits at 25 and 50, the MLP by new hits at 50, and the primary ranker by formulation NDCG at 10. The discovery checkpoint has a separate identity.
+
+| Training population | Baskets |
+| --- | ---: |
+| First observed | 2,984 |
+| Returning | 26,111 |
+| Total | 29,095 |
+| Of these, eligible for the discovery tower objective | 10,303 |
+| Of these, with an entire 60-day auxiliary window | 26,182 |
+
+All observed baskets contribute to later history, including those excluded from training. The 100-slot policy excludes 125 early training baskets with too few eligible formulations. Another 211 have no eligible target. Applying the same positive-eligibility rule to both cohorts removes 142 returning rows present in the previous mixed fit. Validation retains all modeled targets, including unavailable formulations. The returning cohort contains 1,367 new targets, of which 1,340 were eligible. The first cohort contains 354 new targets, of which 349 were eligible.
+
+### Validation performance
+
+Both columns use the same company/date baskets. Recall and NDCG are averaged per basket. New hits count distinct formulation targets within each basket.
+
+| Cohort | Baskets | Previous mixed Recall@10 | Dated Recall@10 | Previous mixed NDCG@10 | Dated NDCG@10 | Previous → dated new hits@10 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| All | 6,480 | 80.82% | 80.78% | 0.63526 | 0.63345 | 367 → 359 of 1,721 |
+| First observed | 289 | 41.25% | 39.75% | 0.25397 | 0.23750 | 149 → 147 of 354 |
+| Returning | 6,191 | 82.66% | 82.69% | 0.65306 | 0.65194 | 218 → 212 of 1,367 |
+
+The 100-candidate slate covers 9,864 of 10,163 targets (97.06%) and 1,423 of 1,721 new targets (82.68%). After resolving formulations to eligible pack SKUs, this checkpoint reaches exact-SKU Recall@10 of 66.62% and NDCG@10 of 0.53376. See the [aggregate stage and checkpoint results](stage5_dated_first_baskets_seed42.json).
+
+Against the previous mixed fit, pooled NDCG changed by −0.00181 (95% paired customer-bootstrap interval −0.00434 to +0.00077). First-basket NDCG changed by −0.01647 (−0.04359 to +0.00764). Intervals use 2,000 customer-clustered draws and seed 123. Multiple input and selection changes were made together. Neither these intervals nor a single training seed establishes which change accounts for the difference.
+
+### Training and evaluation audit
+
+- The previous mixed experiment reused embeddings from a returning-only tower and selected checkpoints on returning customers. The dated path trains the discovery tower on eligible first and returning baskets, re-encodes each customer from the selected weights and that row's history, and selects all stages on the mixed validation cohort.
+- A first basket has zero valid history tokens, zero customer purchase counts, and zero brand/category/family familiarity. Cold cadence uses a fixed 14-day prior. The customer embedding can be nonzero because profile text and attributes still enter the tower. A masked placeholder keeps attention gradients finite with an empty history. A real history token must be at least one calendar day old.
+- The historical formulation vector averaged the metadata of member packs, including packs first observed after a query. The new formulation vector takes its static text and attributes from its earliest paid pack, with ties resolved by SKU ID. New pack launches cannot change that vector retrospectively. Only formulations with an eligible, previously sold pack can be recommended. Candidate statistics, familiarity, and the final pack resolver use observations strictly before the sample date.
+- The commercial export contains 70,030 lines. The paid-sale filter admits 65,048, whose quantities reconcile on all 61,048 cleaned company/date/SKU records. A multi-line dated basket counts as settled only once every paid line has a known earlier settlement. This prevents the absence of a recorded payment date from making a partial settlement look complete. Warehouse fields do not enter the feature schema.
+- Customer and market statistics, target novelty, eligibility, and 32-event sequences are rebuilt in chronological order. The selector and ranker receive the financial, manager, and parsed-spec columns. The auxiliary loss uses only complete training-period windows. The ordinary next-basket loss still uses eligible cases through September 30, 2025.
+- The permitted static side information includes company descriptions, profile attributes, product names, formulation identity, and catalogue attributes. The exports lack historical versions. Blocking uses the existing last-modified proxy. BGE-M3 text, training-fitted vocabularies and normalization scales are fixed inputs to this reference. The learned weights are fitted offline. Historical metadata accuracy and purchases before the export begins remain unobservable.
+- The source manifest binds development event contents, static inputs, commercial export, ordered feature schema, canonical pack mapping, and ordered company/date keys. Private vectors and predictions are stored locally. The historical SKU retrieval and ranking references have their own scopes.
+
+Reproduce the fit in a new isolated run, or replay the selected reference from the local sources and weights.
+
+```sh
+PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.run_stage5
+PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.run_stage5 --replay-reference
+```
+
+An independent source rebuild and checkpoint replay reproduced the selector metrics, coverage, formulation and resolved-SKU metrics, and every per-case metric for both ranker selections. The full workspace suite passed 630 tests (6 skipped), and the synthetic suite passed 620 (16 skipped). A clean export of the staged repository passed 552 synthetic tests (15 skipped). Each suite also passed 70 subtests. The workspace includes additional unpublished experiments.

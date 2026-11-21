@@ -1,8 +1,8 @@
-"""Stage 5: End-to-end base_name canonical product entity pipeline (Two-Tower + Stage 1 MLP + Stage 2 Transformer)
-with apples-to-apples base_name head-to-head comparison against the best SKU-level model."""
+"""Fit the canonical first/returning formulation reference or replay a versioned Stage 5 experiment."""
 
 import argparse
 from collections import Counter
+from tempfile import mkdtemp
 import json
 from pathlib import Path
 import time
@@ -28,6 +28,9 @@ from recommender.ranker import RankerLoss, UPSCANRRanker
 from recommender.scope import get_datasets_locs
 from recommender.shared_data import atomic_torch_save
 from recommender.train_retriever import get_device
+
+from recommender.split import TRAIN_CUTOFF
+from recommender.sequences import PURCHASE_DATE_ORIGIN
 
 from .augmentation import build_strict_60d_aux_labels
 from .base_name_features import (
@@ -272,6 +275,7 @@ def train_stage5_two_tower(
     seed: int = SEED,
     epochs: int = 30,
     device: Optional[str] = None,
+    replay_checkpoint: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Train pack-agnostic Two-Tower retriever (E_no_brand recipe) natively over 585 canonical base_names."""
     dev = get_device(device)
@@ -332,9 +336,8 @@ def train_stage5_two_tower(
     pw_t = torch.tensor(20.0, device=dev)
 
     best_key = (-1, -1)
-    best_ep = 0
     t0 = time.perf_counter()
-    for ep in range(1, int(epochs) + 1):
+    for ep in range(1, int(epochs) + 1 if replay_checkpoint is None else 1):
         model.train()
         losses = []
         for rows in useful[torch.randperm(len(useful), generator=gen)].split(256):
@@ -353,11 +356,11 @@ def train_stage5_two_tower(
 
         _, _, va_logits = _encode_split(va)
         unseen_ord = va_logits.masked_fill(~va["unseen_bn"], -torch.inf).argsort(dim=-1, descending=True, stable=True)
-        h25 = int(va["new_target_bn"].gather(1, unseen_ord[:, :25]).sum().item())
-        h50 = int(va["new_target_bn"].gather(1, unseen_ord[:, :50]).sum().item())
+        available_new = va["new_target_bn"] & va["unseen_bn"]
+        h25 = int(available_new.gather(1, unseen_ord[:, :25]).sum().item())
+        h50 = int(available_new.gather(1, unseen_ord[:, :50]).sum().item())
         if (h25, h50) > best_key:
             best_key = (h25, h50)
-            best_ep = ep
             atomic_torch_save({"epoch": ep, "h25": h25, "h50": h50, "model_state_dict": model.state_dict()}, out_dir / "best.pt")
         if ep % 5 == 0 or ep == 1 or ep == epochs:
             print(
@@ -366,17 +369,22 @@ def train_stage5_two_tower(
                 flush=True,
             )
 
-    ckpt = torch.load(out_dir / "best.pt", map_location="cpu", weights_only=False)
+    ckpt = torch.load(replay_checkpoint or out_dir / "best.pt", map_location="cpu", weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"], strict=True)
     v_bn, u_tr, tr_dot = _encode_split(tr)
     _, u_va, va_dot = _encode_split(va)
 
+    order = va_dot.masked_fill(~va["unseen_bn"], -torch.inf).argsort(descending=True, stable=True, dim=-1)
+    available_new = va["new_target_bn"] & va["unseen_bn"]
+    for k in (25, 50):
+        if int(available_new.gather(1, order[:, :k]).sum()) != ckpt[f"h{k}"]:
+            raise ValueError(f"Two-Tower validation replay mismatch at depth {k}.")
     atomic_torch_save({"v_bn": v_bn, "u_bn": u_tr, "dot_scores": tr_dot}, out_dir / "train_vectors.pt")
     atomic_torch_save({"v_bn": v_bn, "u_bn": u_va, "dot_scores": va_dot}, out_dir / "val_vectors.pt")
     res = {
-        "selected_epoch": int(best_ep),
-        "true_new_bn_hits@25": int(best_key[0]),
-        "true_new_bn_hits@50": int(best_key[1]),
+        "selected_epoch": int(ckpt["epoch"]),
+        "true_new_bn_hits@25": int(ckpt["h25"]),
+        "true_new_bn_hits@50": int(ckpt["h50"]),
         "true_new_bn_targets": int(va["new_target_bn"].sum().item()),
         "training_seconds": float(time.perf_counter() - t0),
     }
@@ -386,20 +394,26 @@ def train_stage5_two_tower(
 
 def run_stage5(
     *,
-    stage3_groups: Sequence[str] = (),
+    stage3_groups: Optional[Sequence[str]] = None,
     aux_lambda: float = 0.3,
     sku_reference_dir: Optional[Path] = None,
     seed: int = SEED,
     device: Optional[str] = None,
     first_order_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
+    if stage3_groups is None:
+        if first_order_mode is None:
+            if aux_lambda != 0.3:
+                raise ValueError("The dated reference uses the 60-day objective at weight 0.3.")
+            return run_dated_reference(seed=seed, device=device)
+        stage3_groups = FIRST_ORDER_GROUPS
     dev = get_device(device)
     before_hashes = snapshot_preserved_hashes()
     reference = None
     if first_order_mode is not None:
         if first_order_mode not in ("control", "mixed"):
             raise ValueError("First-order mode must be control or mixed.")
-        reference = json.loads((EVIDENCE_ROOT / "stage5_reference.json").read_text())
+        reference = json.loads((EVIDENCE_ROOT / "stage5_returning_reference.json").read_text())
         if (
             tuple(stage3_groups) != FIRST_ORDER_GROUPS
             or list(stage3_groups) != reference["feature_groups"]
@@ -568,11 +582,81 @@ def run_stage5(
             del first_train
         del first, tower, tower_checkpoint
 
+    return _fit_and_evaluate(
+        bn_data, v_bn, universe, purchases, catalogue, product_ids, vocabs, campaign_data,
+        stage5_root, tag, stage3_groups, aux_lambda, seed, dev, tt_res, before_hashes,
+        first_order_mode=first_order_mode, first_val=first_val, first_order_counts=first_order_counts,
+        returning_train_count=returning_train_count, reference=reference,
+    )
+
+
+def run_dated_reference(*, seed=SEED, device=None, replay=False):
+    from .dated_baskets import prepare_dated_baskets
+
+    return _run_dated(prepare_dated_baskets(), seed, device, replay)
+
+
+def _run_dated(prepared, seed, device, replay):
+    (bn_data, inputs, universe, enrichment, vocabs, purchases, catalogue,
+     product_ids, sku_data, manifest) = prepared
+    dev = get_device(device)
+    root = ARTIFACT_ROOT / "stage5_dated_first_baskets"
+    root.mkdir(parents=True, exist_ok=True)
+    run = root / Path(mkdtemp(dir=root, prefix=f"seed{seed}-")).name
+    tt_dir = run / "two_tower"
+    before_hashes = snapshot_preserved_hashes()
+    reference = None
+    if replay:
+        reference = json.loads((EVIDENCE_ROOT / "stage5_reference.json").read_text())
+        _verify_reference_files(reference)
+        saved = json.loads(Path(reference["checkpoints"]["summary"]["path"]).read_text())
+        if (manifest != saved["data_manifest"] or seed != reference["seed"] or seed != saved["seed"]
+                or reference["feature_groups"] != list(FIRST_ORDER_GROUPS)
+                or reference["candidate_policy"] != SLATE_POLICY or reference["aux_lambda"] != 0.3
+                or reference["heldout_access"] is not False):
+            raise ValueError("Dated reference data or scoring recipe mismatch.")
+    tt_res = train_stage5_two_tower(
+        bn_data=bn_data, prod_inputs=inputs, universe=universe, enrichment=enrichment,
+        out_dir=tt_dir, seed=seed, device=str(dev),
+        replay_checkpoint=Path(reference["checkpoints"]["two_tower"]["path"]) if replay else None,
+    )
+    for split in ("train", "val"):
+        vectors = torch.load(tt_dir / f"{split}_vectors.pt", map_location="cpu", weights_only=False)
+        bn_data[split]["u_bn"] = vectors["u_bn"]
+        if not torch.isfinite(vectors["u_bn"]).all():
+            raise ValueError(f"Invalid {split} customer embeddings.")
+    result = _fit_and_evaluate(
+        bn_data, vectors["v_bn"], universe, purchases, catalogue, product_ids, vocabs, sku_data,
+        run, "dated", FIRST_ORDER_GROUPS, 0.3, seed, dev, tt_res, before_hashes,
+        reference=reference, first_order_mode="control" if replay else "dated", data_manifest=manifest,
+    )
+    if replay:
+        for selection in ("ndcg", "discovery"):
+            for key in ("cohorts", "bn_metrics", "resolved_sku_metrics"):
+                if result["stage2_ranker"][selection][key] != saved["stage2_ranker"][selection][key]:
+                    raise ValueError(f"Dated reference {selection} replay mismatch in {key}.")
+        if result["stage2_slate_coverage"] != saved["stage2_slate_coverage"]:
+            raise ValueError("Dated reference candidate coverage mismatch.")
+    return result
+
+
+def _fit_and_evaluate(
+    bn_data, v_bn, universe, purchases, catalogue, product_ids, vocabs, campaign_data,
+    stage5_root, tag, stage3_groups, aux_lambda, seed, dev, tt_res, before_hashes, *,
+    first_order_mode=None, first_val=None, first_order_counts=None, returning_train_count=None,
+    reference=None, data_manifest=None,
+):
+    val_bn = bn_data["val"]
+    n_bn = universe["num_base_names"]
+    bn_to_members = universe["bn_to_member_pid_indices"]
     # Build strictly leak-free 60-day base_name auxiliary labels (< TRAIN_CUTOFF)
     aux_60d_sku = build_strict_60d_aux_labels(
         purchases, bn_data["train"]["customer_ids"], bn_data["train"]["prediction_days"].tolist(), product_ids
     )
     aux_60d_bn = _collapse_bool_matrix_to_bn(aux_60d_sku, bn_to_members)
+
+    # A truncated 60-day window cannot establish a negative for the remaining days.
+    full_window = bn_data["train"]["prediction_days"] <= (TRAIN_CUTOFF - PURCHASE_DATE_ORIGIN).days - 60
 
     # 4. Stage 5.2 — Train Stage 1 MLP natively over 585 base_names (with 60d aux head stripped at inference)
     s1_dir = stage5_root / f"stage1_mlp-{tag}-seed{seed}"
@@ -622,9 +706,11 @@ def run_stage5(
                     customer_stats_6=bn_data["train"]["customer_stats_6"][rows].to(dev),
                     return_aux=True,
                 )
-                loss = F.binary_cross_entropy_with_logits(m_lg[allowed], target[allowed], pos_weight=pw_t) + float(aux_lambda) * F.binary_cross_entropy_with_logits(
-                    a_lg[allowed], aux_60d_bn[rows].to(dev).float()[allowed], pos_weight=aux_pw_t
-                )
+                loss = F.binary_cross_entropy_with_logits(m_lg[allowed], target[allowed], pos_weight=pw_t)
+                aux_mask = allowed if data_manifest is None else allowed & full_window[rows, None].to(dev)
+                if aux_mask.any():
+                    loss = loss + float(aux_lambda) * F.binary_cross_entropy_with_logits(
+                        a_lg[aux_mask], aux_60d_bn[rows].to(dev).float()[aux_mask], pos_weight=aux_pw_t)
             else:
                 m_lg = s1_model(
                     u=bn_data["train"]["u_bn"][rows].to(dev),
@@ -666,6 +752,8 @@ def run_stage5(
         s1_ranked, val_bn["target_bn"], val_bn["new_target_bn"], val_bn["customer_ids"],
         save_path=s1_dir / "bn_predictions.npz",
     )
+    if data_manifest is not None and s1_metrics != s1_ckpt["metrics"]:
+        raise ValueError("Dated selector validation replay mismatch.")
     first_order_results = None
     if first_val is not None:
         first_scores = _score_s1(first_val)
@@ -728,7 +816,7 @@ def run_stage5(
     def _s2_batch_inputs(sp_d: Mapping[str, Any], cand_idx: torch.Tensor, mask: torch.Tensor, rows: torch.Tensor) -> Dict[str, Any]:
         c_b = cand_idx[rows]
         row_ar = rows[:, None]
-        pf = sp_d["features_bn"][row_ar, c_b].to(dev)
+        pf = sp_d["features_bn"][row_ar, c_b].to(dev, dtype=torch.float32)
         c_dev = c_b.to(dev)
         return {
             "text_embedding": sp_d["text_embedding"][rows].to(dev),
@@ -779,8 +867,12 @@ def run_stage5(
             if use_aux:
                 out, a_lg = s2_model(**inp, return_aux=True)
                 l_main = loss_fn(out.logits, y, candidate_mask=inp["candidate_mask"])["loss"]
-                l_aux = aux_loss_fn(a_lg, tr_bn_aux_slate[rows].to(dev), candidate_mask=inp["candidate_mask"])["loss"]
-                loss = l_main + float(aux_lambda) * l_aux
+                aux_rows = full_window[rows].to(dev) if data_manifest is not None else torch.ones_like(y[:, 0], dtype=torch.bool)
+                loss = l_main
+                if aux_rows.any():
+                    l_aux = aux_loss_fn(a_lg[aux_rows], tr_bn_aux_slate[rows].to(dev)[aux_rows],
+                                        candidate_mask=inp["candidate_mask"][aux_rows])["loss"]
+                    loss = loss + float(aux_lambda) * l_aux
             else:
                 out = s2_model(**inp)
                 loss = loss_fn(out.logits, y, candidate_mask=inp["candidate_mask"])["loss"]
@@ -837,6 +929,12 @@ def run_stage5(
         replayed = evaluate_base_name_predictions(
             ranked_bn, val_bn["target_bn"], val_bn["new_target_bn"], val_bn["customer_ids"], save_path=npz_path
         )
+        cohorts = {}
+        if data_manifest is not None:
+            for name, mask in (("first_observed", val_bn["first_observed"]), ("returning", ~val_bn["first_observed"])):
+                ids = [cid for cid, keep in zip(val_bn["customer_ids"], mask.tolist()) if keep]
+                cohorts[name] = evaluate_base_name_predictions(
+                    ranked_bn[mask.numpy()], val_bn["target_bn"][mask], val_bn["new_target_bn"][mask], ids)
         if replayed != ck["metrics"]:
             raise AssertionError(f"Stage 5 S2 {sel_name} replay mismatch!")
         if first_order_results is not None:
@@ -876,6 +974,7 @@ def run_stage5(
         s2_selections[sel_name] = {
             "epoch": int(ck["epoch"]),
             "bn_metrics": replayed,
+            **({"cohorts": cohorts} if cohorts else {}),
             "bn_predictions_npz": str(npz_path),
             "resolved_sku_metrics": {
                 "sku_recall@10": float(np.mean(sku_r10)),
@@ -904,6 +1003,10 @@ def run_stage5(
         "stage2_ranker": s2_selections,
         "preserved_hashes_verified": True,
     }
+    if data_manifest is not None:
+        summary.update(data_manifest=data_manifest, mode="dated_mixed", run_directory=str(stage5_root))
+        atomic_json(summary, stage5_root / "summary.json")
+        return summary
     EVIDENCE_ROOT.mkdir(parents=True, exist_ok=True)
     if first_order_results is not None:
         summary.update(first_order=first_order_results, reference_id=reference["reference_id"], mode=first_order_mode)
@@ -916,12 +1019,21 @@ def run_stage5(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--groups", nargs="*", default=[])
+    parser.add_argument("--groups", nargs="*", default=None, help="Run a historical Stage 5 feature ablation.")
     parser.add_argument("--aux-lambda", type=float, default=0.3)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--device", type=str, default=None)
-    parser.add_argument("--first-order-mode", choices=("control", "mixed"))
+    parser.add_argument("--first-order-mode", choices=("control", "mixed"), help="Reproduce the earlier frozen-tower comparison.")
+    parser.add_argument("--replay-reference", action="store_true", help="Verify and evaluate the pinned dated reference.")
     args = parser.parse_args()
+    if args.groups is None and args.first_order_mode is None:
+        if args.aux_lambda != 0.3:
+            parser.error("The canonical reference uses --aux-lambda 0.3.")
+        result = run_dated_reference(seed=args.seed, device=args.device, replay=args.replay_reference)
+        print(result["run_directory"], json.dumps(result["stage2_ranker"]["ndcg"]["bn_metrics"], indent=2))
+        return
+    if args.replay_reference:
+        parser.error("Reference replay uses its pinned feature groups and cohort.")
     summary = run_stage5(
         stage3_groups=args.groups or (FIRST_ORDER_GROUPS if args.first_order_mode else ()),
         aux_lambda=args.aux_lambda, seed=args.seed, device=args.device, first_order_mode=args.first_order_mode,

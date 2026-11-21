@@ -2,6 +2,10 @@
 
 Next-basket recommendations for B2B enterprise customers using **Stage 1 Two-Tower Retrieval** and **Stage 2 Candidate-Aware Neural Reranking (`UPS-CANR`)**.
 
+## Current formulation reference
+
+Stage 5 predicts the next formulation basket for both first-time and returning companies. Training, checkpoint selection and validation use the same dated features and the 100-candidate slate. A first observed basket has an empty purchase history and can still use the company profile and earlier market activity. The [reference manifest](experiments/roadmap_v2/stage5_reference.json) pins the weights. The [validation report](experiments/roadmap_v2/REPORT.md#dated-first-basket-reference) gives the cohort results, metadata assumptions and replay command.
+
 ## Current Status & Documentation Map
 
 - **[AGENTS.md](AGENTS.md):** Agent handbook with the exact active reference architecture, module map, checkpoint/cache inventory, and strict temporal-leakage guardrails.
@@ -14,7 +18,7 @@ The [2026-11-12 follow-up](HARDENING_REPORT.md) implements versioned demand-free
 
 [DYNAMIC_SELECTOR_EXPERIMENTS.md](DYNAMIC_SELECTOR_EXPERIMENTS.md) records the completed 68-fit P0–P7 campaign. A wider dot-selected slate provides the clearest conservative gain; full-pool MLP selection and candidate attention do not establish a reliable incremental benefit. Scalar scoring features remain an optional accuracy-oriented candidate. All default aliases are preserved.
 
-## Active Pipeline
+## Historical SKU pipeline
 
 ```text
 Raw sales + company profiles + product catalogue
