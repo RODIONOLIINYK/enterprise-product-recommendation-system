@@ -1,0 +1,100 @@
+{
+  "stage": "stage5_base_name_canonical_entity",
+  "tag": "base_only",
+  "stage3_groups": [],
+  "aux_lambda": 0.3,
+  "seed": 42,
+  "heldout_access": false,
+  "num_base_names": 585,
+  "trained_base_names": 553,
+  "two_tower": {
+    "selected_epoch": 17,
+    "true_new_bn_hits@25": 678,
+    "true_new_bn_hits@50": 900,
+    "true_new_bn_targets": 1340,
+    "training_seconds": 39.82666120798967
+  },
+  "stage1_mlp": {
+    "selected_epoch": 1,
+    "bn_metrics": {
+      "queries": 6191,
+      "total_bn_targets": 9809,
+      "true_new_bn_targets": 1340,
+      "bn_recall@5": 0.7163773752962943,
+      "bn_recall@10": 0.820882051733325,
+      "bn_recall@25": 0.9017146417842049,
+      "bn_recall@50": 0.9387625564779383,
+      "bn_micro_recall@10": 0.8143541645427669,
+      "bn_ndcg@10": 0.6405029417698314,
+      "true_new_bn_hits@5": 88,
+      "true_new_bn_hits@10": 207,
+      "true_new_bn_hits@25": 505,
+      "true_new_bn_hits@50": 811,
+      "true_new_bn_recall@10": 0.15447761194029852,
+      "true_new_bn_recall@25": 0.376865671641791,
+      "true_new_bn_recall@50": 0.6052238805970149
+    },
+    "bn_predictions_npz": "checkpoints/roadmap-v2/stage5_base_entity/stage1_mlp-base_only-seed42/bn_predictions.npz"
+  },
+  "stage2_slate_coverage": {
+    "total": 9550,
+    "true_new": 1112
+  },
+  "stage2_ranker": {
+    "ndcg": {
+      "epoch": 4,
+      "bn_metrics": {
+        "queries": 6191,
+        "total_bn_targets": 9809,
+        "true_new_bn_targets": 1340,
+        "bn_recall@5": 0.7280541436723036,
+        "bn_recall@10": 0.8281902794986679,
+        "bn_recall@25": 0.9022427479858695,
+        "bn_recall@50": 0.9409122614576527,
+        "bn_micro_recall@10": 0.8210826791721888,
+        "bn_ndcg@10": 0.6525305782293438,
+        "true_new_bn_hits@5": 94,
+        "true_new_bn_hits@10": 204,
+        "true_new_bn_hits@25": 505,
+        "true_new_bn_hits@50": 836,
+        "true_new_bn_recall@10": 0.15223880597014924,
+        "true_new_bn_recall@25": 0.376865671641791,
+        "true_new_bn_recall@50": 0.6238805970149254
+      },
+      "bn_predictions_npz": "checkpoints/roadmap-v2/stage5_base_entity/stage2_ranker-base_only-seed42/bn_predictions_ndcg.npz",
+      "resolved_sku_metrics": {
+        "sku_recall@10": 0.6876474362095468,
+        "sku_ndcg@10": 0.5524605436261167,
+        "sku_new_hits@10": 107
+      }
+    },
+    "discovery": {
+      "epoch": 6,
+      "bn_metrics": {
+        "queries": 6191,
+        "total_bn_targets": 9809,
+        "true_new_bn_targets": 1340,
+        "bn_recall@5": 0.722265989454978,
+        "bn_recall@10": 0.8291821186507397,
+        "bn_recall@25": 0.9031394033422468,
+        "bn_recall@50": 0.9402302678827501,
+        "bn_micro_recall@10": 0.8223060454684473,
+        "bn_ndcg@10": 0.6519887826765186,
+        "true_new_bn_hits@5": 87,
+        "true_new_bn_hits@10": 225,
+        "true_new_bn_hits@25": 526,
+        "true_new_bn_hits@50": 836,
+        "true_new_bn_recall@10": 0.16791044776119404,
+        "true_new_bn_recall@25": 0.3925373134328358,
+        "true_new_bn_recall@50": 0.6238805970149254
+      },
+      "bn_predictions_npz": "checkpoints/roadmap-v2/stage5_base_entity/stage2_ranker-base_only-seed42/bn_predictions_discovery.npz",
+      "resolved_sku_metrics": {
+        "sku_recall@10": 0.6879202977366483,
+        "sku_ndcg@10": 0.5519743489891045,
+        "sku_new_hits@10": 121
+      }
+    }
+  },
+  "preserved_hashes_verified": true
+}

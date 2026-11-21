@@ -792,16 +792,36 @@ class RankerLoss(nn.Module):
         logits: torch.Tensor,
         targets: torch.Tensor,
         unseen_mask: Optional[torch.Tensor] = None,
+        candidate_mask: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         """Compute BCE loss, Listwise loss, and combined total loss.
 
         Args:
             logits: FloatTensor of shape (B, C) with Stage 2 ranking logits.
             targets: FloatTensor of shape (B, C) with binary ground-truth labels {0.0, 1.0}.
+            candidate_mask: Optional boolean (B, C) validity mask. Padded positions
+                are excluded from both losses. All-masked rows contribute zero.
 
         Returns:
             Dict containing 'loss', 'bce_loss', and 'list_loss'.
         """
+        if candidate_mask is not None:
+            if logits.ndim != 2 or targets.shape != logits.shape:
+                raise ValueError("logits and targets must have matching (B, C) shapes.")
+            if candidate_mask.dtype != torch.bool or candidate_mask.shape != logits.shape:
+                raise ValueError("candidate_mask must be boolean with the same (B, C) shape as logits.")
+            if candidate_mask.device != logits.device or targets.device != logits.device:
+                raise ValueError("logits, targets, and candidate_mask must be on the same device.")
+            if not bool(torch.isfinite(logits[candidate_mask]).all()):
+                raise ValueError("Valid candidate logits must be finite.")
+            if not bool(torch.isfinite(targets[candidate_mask]).all()):
+                raise ValueError("Valid candidate targets must be finite.")
+            if bool(((targets > 0.5) & ~candidate_mask).any()):
+                raise ValueError("Positive targets cannot refer to masked candidates.")
+            if not bool(candidate_mask.all()):
+                return self._masked_loss(logits, targets, unseen_mask, candidate_mask)
+            # Keep the original all-valid arithmetic exactly for historical replay.
+
         pw = torch.tensor([self.pos_weight], dtype=logits.dtype, device=logits.device)
         if self.new_positive_weight != 1.0 and unseen_mask is None:
             raise ValueError("unseen_mask is required when new_positive_weight is not 1.0.")
@@ -846,6 +866,56 @@ class RankerLoss(nn.Module):
 
         return {
             "loss": total_loss,
+            "bce_loss": loss_bce,
+            "list_loss": loss_lw,
+        }
+
+
+    def _masked_loss(
+        self,
+        logits: torch.Tensor,
+        targets: torch.Tensor,
+        unseen_mask: Optional[torch.Tensor],
+        candidate_mask: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+        """Exclude padding before nonlinear operations, including all-empty rows."""
+        if self.new_positive_weight != 1.0 and unseen_mask is None:
+            raise ValueError("unseen_mask is required when new_positive_weight is not 1.0.")
+        safe_logits = torch.where(candidate_mask, logits, torch.zeros_like(logits))
+        safe_targets = torch.where(candidate_mask, targets, torch.zeros_like(targets))
+        pw = logits.new_tensor([self.pos_weight])
+        bce_terms = F.binary_cross_entropy_with_logits(
+            safe_logits, safe_targets, pos_weight=pw, reduction="none",
+        )
+        pos_mask = (safe_targets > 0.5) & candidate_mask
+        target_weights = safe_targets
+        if unseen_mask is not None and self.new_positive_weight != 1.0:
+            if unseen_mask.shape != logits.shape:
+                raise ValueError("unseen_mask must have the same shape as logits.")
+            unseen_positive = unseen_mask.to(device=logits.device, dtype=torch.bool) & pos_mask
+            scale = torch.where(
+                unseen_positive,
+                torch.full_like(safe_targets, self.new_positive_weight),
+                torch.ones_like(safe_targets),
+            )
+            bce_terms = bce_terms * scale
+            target_weights = safe_targets * scale
+        loss_bce = torch.where(candidate_mask, bce_terms, torch.zeros_like(bce_terms)).sum()
+        loss_bce = loss_bce / candidate_mask.sum().clamp_min(1)
+
+        # No softmax row may contain only -inf, and no multiplication may see 0 * -inf.
+        row_has_valid = candidate_mask.any(dim=-1, keepdim=True)
+        softmax_logits = safe_logits.masked_fill(~candidate_mask, -torch.inf)
+        softmax_logits = torch.where(row_has_valid, softmax_logits, torch.zeros_like(softmax_logits))
+        log_probs = F.log_softmax(softmax_logits, dim=-1)
+        log_probs = torch.where(candidate_mask, log_probs, torch.zeros_like(log_probs))
+        pos_counts = pos_mask.sum(dim=-1, keepdim=True).clamp_min(1)
+        per_row = -((target_weights / pos_counts) * log_probs).sum(dim=-1)
+        row_has_pos = pos_mask.any(dim=-1)
+        loss_lw = torch.where(row_has_pos, per_row, torch.zeros_like(per_row)).sum()
+        loss_lw = loss_lw / row_has_pos.sum().clamp_min(1)
+        return {
+            "loss": loss_bce + self.listwise_weight * loss_lw,
             "bce_loss": loss_bce,
             "list_loss": loss_lw,
         }

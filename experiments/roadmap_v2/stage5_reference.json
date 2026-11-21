@@ -1,0 +1,45 @@
+{
+  "reference_id": "stage5-warehouse-free-ace-v1",
+  "scope": "Stage 5 canonical formulation experiments",
+  "selection": "user-selected reference",
+  "seed": 42,
+  "feature_groups": [
+    "3a_financial",
+    "3c_manager",
+    "3e_parsed_specs"
+  ],
+  "aux_lambda": 0.3,
+  "candidate_policy": "quota100_50",
+  "metadata_policy": "snapshot_unverified",
+  "heldout_access": false,
+  "checkpoints": {
+    "two_tower": {
+      "path": "checkpoints/roadmap-v2/stage5_base_entity/two_tower-seed42/best.pt",
+      "sha256": "c87fb1c2eb31d6a9524e52c3e3dccfe011a5c47ae544fa11f885cef9f51c0711"
+    },
+    "train_vectors": {
+      "path": "checkpoints/roadmap-v2/stage5_base_entity/two_tower-seed42/train_vectors.pt",
+      "sha256": "04f23ddc183b529ea15771d5c716f9826aad891351316b24f8a6441dd174677b"
+    },
+    "val_vectors": {
+      "path": "checkpoints/roadmap-v2/stage5_base_entity/two_tower-seed42/val_vectors.pt",
+      "sha256": "5ad8a9811533e8c824ec3ce7f9a2c493f2871546cb0970c58a23e8894ae5b8bc"
+    },
+    "selector": {
+      "path": "checkpoints/roadmap-v2/stage5_base_entity/stage1_mlp-plus_3a_financial_3c_manager_3e_parsed_specs-seed42/best.pt",
+      "sha256": "7ffff765f0762ad968ccac2775ed1cafd4c49f96ddb1d95894428b41a02b5f36"
+    },
+    "ranker": {
+      "path": "checkpoints/roadmap-v2/stage5_base_entity/stage2_ranker-plus_3a_financial_3c_manager_3e_parsed_specs-seed42/best_ndcg.pt",
+      "sha256": "8c807074982b3a71113959ac15983f66ddcaf920be8aa34a34c38b58c5be3117"
+    },
+    "discovery_ranker": {
+      "path": "checkpoints/roadmap-v2/stage5_base_entity/stage2_ranker-plus_3a_financial_3c_manager_3e_parsed_specs-seed42/best_discovery.pt",
+      "sha256": "c48f05c7c89dd74214f6b8738924737475f2c2afbe598e88fec93405c63d6124"
+    },
+    "summary": {
+      "path": "experiments/roadmap_v2/stage5_plus_3a_financial_3c_manager_3e_parsed_specs_summary.json",
+      "sha256": "1fa112404392d296a8b793b521acb2c61ff76f4207dd64623084d2a1829e7ca8"
+    }
+  }
+}

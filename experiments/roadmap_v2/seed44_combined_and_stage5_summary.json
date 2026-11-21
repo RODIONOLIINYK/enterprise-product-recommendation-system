@@ -1,0 +1,2372 @@
+{
+  "stage": "stage3_combined_and_stage5_head_to_head",
+  "seed": 44,
+  "heldout_access": false,
+  "combos": {
+    "top4_3acde": [
+      "3a_financial",
+      "3c_manager",
+      "3d_warehouse",
+      "3e_parsed_specs"
+    ]
+  },
+  "best_sku_combo": "top4_3acde",
+  "stage1_combined": {
+    "top4_3acde": {
+      "tag": "top4_3acde",
+      "groups": [
+        "3a_financial",
+        "3c_manager",
+        "3d_warehouse",
+        "3e_parsed_specs"
+      ],
+      "input_dim": 342,
+      "selected_epoch": 2,
+      "training_seconds": 363.7202228750102,
+      "checkpoint": "checkpoints/roadmap-v2/stage3_combined/runs/stage1-sku_plus_base_name-top4_3acde-seed44/best.pt",
+      "predictions_npz": "checkpoints/roadmap-v2/stage3_combined/runs/stage1-sku_plus_base_name-top4_3acde-seed44/predictions.npz",
+      "train_scores_pt": "checkpoints/roadmap-v2/stage3_combined/runs/stage1-sku_plus_base_name-top4_3acde-seed44/train_scores.pt",
+      "val_scores_pt": "checkpoints/roadmap-v2/stage3_combined/runs/stage1-sku_plus_base_name-top4_3acde-seed44/val_scores.pt",
+      "metrics": {
+        "recall@5": 0.6506032219756089,
+        "recall@10": 0.7656375605005407,
+        "ndcg@10": 0.5907223121668469,
+        "mrr": 0.5686207391051514,
+        "new_hits@10": 281,
+        "new_targets": 1857,
+        "new_recall@10": 0.1513193322563274,
+        "conditional_new_recall@10": 0.1552486187845304,
+        "repeat_recall@10_micro": 0.8835966266777527,
+        "repeat_recall@10_macro": 0.9100913831368991,
+        "mixed_coverage_macro": 0.9946598108365191,
+        "mixed_coverage_micro": 0.9954262358894511,
+        "new_targets_in_slate": 1810,
+        "new_slate_coverage": 0.9746903607969843,
+        "new_reachable_lost_at10": 1529,
+        "new_hits@25": 852,
+        "new_recall@25": 0.4588045234248788,
+        "new_hits@50": 1124,
+        "new_recall@50": 0.6052773290253096,
+        "new_hits@100": 1397,
+        "new_recall@100": 0.7522886375875067,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.7257189793480116,
+            "new_hits@10": 167,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.8113592666551738,
+            "new_hits@10": 102,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7539706770719047,
+            "new_hits@10": 12,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.7579587311409712,
+            "ndcg@10": 0.5861567308514206,
+            "new_hits@10": 76,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7754737187385589,
+            "ndcg@10": 0.5968862446228086,
+            "new_hits@10": 61,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7840695155434332,
+            "ndcg@10": 0.6097600048009613,
+            "new_hits@10": 64,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7434944902307826,
+            "ndcg@10": 0.5684464347417382,
+            "new_hits@10": 41,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7656220517880596,
+            "ndcg@10": 0.5895570383672272,
+            "new_hits@10": 39,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 675,
+            "hits@10": 70
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 211
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 6,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 392,
+            "hits@10": 15
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1465,
+            "hits@10": 266
+          },
+          "sparse_transition": {
+            "targets": 1213,
+            "hits@10": 125
+          },
+          "supported_transition": {
+            "targets": 644,
+            "hits@10": 156
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        },
+        "queries": 6191,
+        "total_targets": 10276,
+        "recall@25": 0.8599164978713175,
+        "recall@50": 0.9072738832930834,
+        "recall@100": 0.9433661236233306,
+        "pack_switch_targets": 455,
+        "true_new_bn_targets": 1402,
+        "pack_switch_hits@10": 166,
+        "true_new_bn_hits@10": 115,
+        "pack_switch_hits@25": 392,
+        "true_new_bn_hits@25": 460,
+        "pack_switch_hits@50": 422,
+        "true_new_bn_hits@50": 702,
+        "pack_switch_hits@100": 432,
+        "true_new_bn_hits@100": 965
+      },
+      "settings": {
+        "stage": "roadmap_v2_stage3_s1",
+        "arm": "sku_plus_base_name",
+        "groups": [
+          "3a_financial",
+          "3c_manager",
+          "3d_warehouse",
+          "3e_parsed_specs"
+        ],
+        "tag": "top4_3acde",
+        "aux_lambda": 0.3,
+        "p_drop": 0.0,
+        "feature_names": [
+          "is_repeat_sku",
+          "user_sku_order_count_norm",
+          "user_sku_qty_share",
+          "days_since_last_sku_buy_norm",
+          "sku_urgency",
+          "user_cat_order_share",
+          "user_subcat_order_share",
+          "user_brand_order_share",
+          "global_sku_popularity_norm",
+          "industry_sku_affinity",
+          "is_repeat_category",
+          "is_repeat_brand",
+          "is_repeat_business_line",
+          "customer_age",
+          "customer_overdue_ratio",
+          "customer_30d_activity",
+          "customer_90d_activity",
+          "category_age",
+          "category_overdue_ratio",
+          "category_never_seen",
+          "family_age",
+          "family_overdue_ratio",
+          "family_never_seen",
+          "family_history_share",
+          "sku_orders_7d",
+          "sku_orders_30d",
+          "sku_orders_90d",
+          "sku_buyers_30d",
+          "sku_growth_30d",
+          "category_relative_share",
+          "global_sale_age",
+          "month_sin",
+          "month_cos",
+          "sku_last_lift",
+          "sku_recent3_lift",
+          "category_last_lift",
+          "family_last_lift",
+          "line_last_lift",
+          "sku_support_confidence",
+          "hierarchical_backoff",
+          "same_basket_lift",
+          "has_bought_base_sku",
+          "user_base_sku_order_count_norm",
+          "user_base_sku_qty_share",
+          "days_since_last_base_sku_buy_norm",
+          "base_sku_urgency",
+          "base_name_global_pop_norm",
+          "base_name_industry_affinity",
+          "base_name_orders_7d",
+          "base_name_orders_30d",
+          "base_name_orders_90d",
+          "base_name_buyers_30d",
+          "base_name_growth_30d",
+          "base_name_category_relative_share",
+          "base_name_global_sale_age",
+          "base_name_last_lift",
+          "base_name_recent3_lift",
+          "base_name_support_confidence",
+          "base_name_hierarchical_backoff",
+          "base_name_same_basket_lift",
+          "cust_prepaid_or_cash_ratio",
+          "cust_avg_deferral_days_norm",
+          "cust_last_deferral_days_norm",
+          "cust_actual_vs_contract_pay_ratio",
+          "cust_overdue_unpaid_ratio",
+          "cust_bonus_rate",
+          "mgr_sku_share_90d",
+          "mgr_base_name_share_90d",
+          "mgr_brand_share_90d",
+          "mgr_cat_share_90d",
+          "mgr_changed_recently",
+          "wh_sku_shipped_30d",
+          "wh_sku_shipped_90d",
+          "wh_bn_shipped_30d",
+          "same_viscosity_grade_bought",
+          "user_viscosity_order_share",
+          "matches_user_dominant_container",
+          "user_container_order_share",
+          "pack_size_log_norm",
+          "pack_size_vs_user_median_pack",
+          "app_matches_company_equipment",
+          "user_application_order_share"
+        ],
+        "seed": 44,
+        "epochs": 10,
+        "heldout_access": false
+      }
+    }
+  },
+  "upgraded_slate_coverage": {
+    "top4_3acde": {
+      "total_in_slate": 9734,
+      "new_in_slate": 1326,
+      "pack_switch_in_slate": 427,
+      "true_new_bn_in_slate": 899
+    }
+  },
+  "stage2_combined_sku": {
+    "top4_3acde": {
+      "arm": "sku_plus_base_name",
+      "variant_name": "top4_3acde_own_slates",
+      "slate_tag": "stage3",
+      "run_dir": "checkpoints/roadmap-v2/stage3_combined/runs/stage2-sku_plus_base_name-top4_3acde_own_slates-stage3-seed44",
+      "training_seconds": 142.40817187500943,
+      "discovery": {
+        "epoch": 5,
+        "checkpoint": "checkpoints/roadmap-v2/stage3_combined/runs/stage2-sku_plus_base_name-top4_3acde_own_slates-stage3-seed44/best_discovery.pt",
+        "checkpoint_sha256": "c128aee3f7a4252965600d41fbd23b9500b63d423e3adf772e3e10364c5bd25d",
+        "predictions_npz": "checkpoints/roadmap-v2/stage3_combined/runs/stage2-sku_plus_base_name-top4_3acde_own_slates-stage3-seed44/predictions_discovery.npz",
+        "metrics": {
+          "queries": 6191,
+          "total_targets": 10276,
+          "repeat_targets": 8419,
+          "new_targets": 1857,
+          "recall@5": 0.6601268089523536,
+          "recall@10": 0.7754586673536296,
+          "recall@25": 0.8658210484617026,
+          "recall@50": 0.9098808363644203,
+          "recall@100": 0.9428113308237469,
+          "ndcg@10": 0.6027217345412677,
+          "mrr": 0.5814864889797278,
+          "new_hits@10": 323,
+          "new_recall@10": 0.17393645665051158,
+          "new_hits@25": 653,
+          "new_recall@25": 0.3516424340333872,
+          "new_hits@50": 995,
+          "new_recall@50": 0.5358104469574583,
+          "new_hits@100": 1326,
+          "new_recall@100": 0.7140549273021002,
+          "conditional_new_recall@10": 0.24358974358974358,
+          "repeat_recall@10_micro": 0.8896543532486043,
+          "repeat_recall@10_macro": 0.9164740960087889,
+          "mixed_coverage_macro": 0.9428113308237469,
+          "mixed_coverage_micro": 0.9472557415336706,
+          "total_targets_in_slate": 9734,
+          "new_targets_in_slate": 1326,
+          "new_slate_coverage": 0.7140549273021002,
+          "repeat_targets_in_slate": 8408,
+          "repeat_slate_coverage": 0.998693431523934,
+          "new_reachable_lost_at10": 1003,
+          "history_cohorts": {
+            "cold_0": {
+              "rows": 0,
+              "recall@10": null,
+              "ndcg@10": null,
+              "new_hits@10": 0,
+              "new_targets": 0
+            },
+            "light_1_8": {
+              "rows": 1116,
+              "recall@10": 0.741310377197474,
+              "ndcg@10": 0.6090224147613589,
+              "new_hits@10": 191,
+              "new_targets": 574
+            },
+            "warm_9_31": {
+              "rows": 1808,
+              "recall@10": 0.8163878433513388,
+              "ndcg@10": 0.6395091053913148,
+              "new_hits@10": 112,
+              "new_targets": 594
+            },
+            "truncated_32": {
+              "rows": 3267,
+              "recall@10": 0.7644729133317166,
+              "ndcg@10": 0.5802108298511829,
+              "new_hits@10": 20,
+              "new_targets": 689
+            }
+          },
+          "validation_months": {
+            "2025-10": {
+              "rows": 1616,
+              "recall@10": 0.7680851455681281,
+              "ndcg@10": 0.6011827709861187,
+              "new_hits@10": 86,
+              "new_targets": 533
+            },
+            "2025-11": {
+              "rows": 1314,
+              "recall@10": 0.7862341636885015,
+              "ndcg@10": 0.6079212605557677,
+              "new_hits@10": 72,
+              "new_targets": 358
+            },
+            "2025-12": {
+              "rows": 1353,
+              "recall@10": 0.7900377343165298,
+              "ndcg@10": 0.617479446030376,
+              "new_hits@10": 62,
+              "new_targets": 380
+            },
+            "2026-01": {
+              "rows": 1149,
+              "recall@10": 0.7583564607716043,
+              "ndcg@10": 0.5821751864974348,
+              "new_hits@10": 57,
+              "new_targets": 351
+            },
+            "2026-02": {
+              "rows": 759,
+              "recall@10": 0.7724040781353035,
+              "ndcg@10": 0.601793655463096,
+              "new_hits@10": 46,
+              "new_targets": 235
+            }
+          },
+          "new_target_cohorts": {
+            "first_snapshot_family": {
+              "targets": 675,
+              "hits@10": 77
+            },
+            "known_snapshot_family": {
+              "targets": 1176,
+              "hits@10": 246
+            },
+            "unknown_snapshot_family_metadata": {
+              "targets": 6,
+              "hits@10": 0
+            },
+            "sku_rare_rolling90d": {
+              "targets": 392,
+              "hits@10": 20
+            },
+            "sku_frequent_rolling90d": {
+              "targets": 1465,
+              "hits@10": 303
+            },
+            "sparse_transition": {
+              "targets": 1213,
+              "hits@10": 142
+            },
+            "supported_transition": {
+              "targets": 644,
+              "hits@10": 181
+            },
+            "unrepresented_catalogue": {
+              "targets": 0,
+              "hits@10": 0
+            }
+          },
+          "pack_switch_targets": 455,
+          "true_new_bn_targets": 1402,
+          "pack_switch_in_slate": 427,
+          "true_new_bn_in_slate": 899,
+          "pack_switch_hits@10": 183,
+          "true_new_bn_hits@10": 140,
+          "val_loss": 2.6835219081567256
+        }
+      },
+      "ndcg": {
+        "epoch": 8,
+        "checkpoint": "checkpoints/roadmap-v2/stage3_combined/runs/stage2-sku_plus_base_name-top4_3acde_own_slates-stage3-seed44/best_ndcg.pt",
+        "checkpoint_sha256": "9d33e167f26b5bb53466c0fbf2433eb7c7f71ac457b25346bcc3faf17931cebc",
+        "predictions_npz": "checkpoints/roadmap-v2/stage3_combined/runs/stage2-sku_plus_base_name-top4_3acde_own_slates-stage3-seed44/predictions_ndcg.npz",
+        "metrics": {
+          "queries": 6191,
+          "total_targets": 10276,
+          "repeat_targets": 8419,
+          "new_targets": 1857,
+          "recall@5": 0.6618795773078517,
+          "recall@10": 0.7729677844841836,
+          "recall@25": 0.8646019208494237,
+          "recall@50": 0.9065443354669439,
+          "recall@100": 0.9428113308237469,
+          "ndcg@10": 0.6027479503248258,
+          "mrr": 0.5822498346362455,
+          "new_hits@10": 311,
+          "new_recall@10": 0.1674744211093161,
+          "new_hits@25": 643,
+          "new_recall@25": 0.3462574044157243,
+          "new_hits@50": 977,
+          "new_recall@50": 0.526117393645665,
+          "new_hits@100": 1326,
+          "new_recall@100": 0.7140549273021002,
+          "conditional_new_recall@10": 0.23453996983408748,
+          "repeat_recall@10_micro": 0.8889416795343865,
+          "repeat_recall@10_macro": 0.915473340118199,
+          "mixed_coverage_macro": 0.9428113308237469,
+          "mixed_coverage_micro": 0.9472557415336706,
+          "total_targets_in_slate": 9734,
+          "new_targets_in_slate": 1326,
+          "new_slate_coverage": 0.7140549273021002,
+          "repeat_targets_in_slate": 8408,
+          "repeat_slate_coverage": 0.998693431523934,
+          "new_reachable_lost_at10": 1015,
+          "history_cohorts": {
+            "cold_0": {
+              "rows": 0,
+              "recall@10": null,
+              "ndcg@10": null,
+              "new_hits@10": 0,
+              "new_targets": 0
+            },
+            "light_1_8": {
+              "rows": 1116,
+              "recall@10": 0.7296616316777607,
+              "ndcg@10": 0.6065186339694594,
+              "new_hits@10": 176,
+              "new_targets": 574
+            },
+            "warm_9_31": {
+              "rows": 1808,
+              "recall@10": 0.8135255645902769,
+              "ndcg@10": 0.6378580382862452,
+              "new_hits@10": 112,
+              "new_targets": 594
+            },
+            "truncated_32": {
+              "rows": 3267,
+              "recall@10": 0.7653158714447438,
+              "ndcg@10": 0.5820295169052795,
+              "new_hits@10": 23,
+              "new_targets": 689
+            }
+          },
+          "validation_months": {
+            "2025-10": {
+              "rows": 1616,
+              "recall@10": 0.7681745295065221,
+              "ndcg@10": 0.6023678745465716,
+              "new_hits@10": 87,
+              "new_targets": 533
+            },
+            "2025-11": {
+              "rows": 1314,
+              "recall@10": 0.7855661440707102,
+              "ndcg@10": 0.6095767337596006,
+              "new_hits@10": 70,
+              "new_targets": 358
+            },
+            "2025-12": {
+              "rows": 1353,
+              "recall@10": 0.7827965159713323,
+              "ndcg@10": 0.6149044594920506,
+              "new_hits@10": 60,
+              "new_targets": 380
+            },
+            "2026-01": {
+              "rows": 1149,
+              "recall@10": 0.759754953488635,
+              "ndcg@10": 0.5850416678750275,
+              "new_hits@10": 57,
+              "new_targets": 351
+            },
+            "2026-02": {
+              "rows": 759,
+              "recall@10": 0.7638438380533242,
+              "ndcg@10": 0.5968690868939003,
+              "new_hits@10": 37,
+              "new_targets": 235
+            }
+          },
+          "new_target_cohorts": {
+            "first_snapshot_family": {
+              "targets": 675,
+              "hits@10": 67
+            },
+            "known_snapshot_family": {
+              "targets": 1176,
+              "hits@10": 244
+            },
+            "unknown_snapshot_family_metadata": {
+              "targets": 6,
+              "hits@10": 0
+            },
+            "sku_rare_rolling90d": {
+              "targets": 392,
+              "hits@10": 20
+            },
+            "sku_frequent_rolling90d": {
+              "targets": 1465,
+              "hits@10": 291
+            },
+            "sparse_transition": {
+              "targets": 1213,
+              "hits@10": 149
+            },
+            "supported_transition": {
+              "targets": 644,
+              "hits@10": 162
+            },
+            "unrepresented_catalogue": {
+              "targets": 0,
+              "hits@10": 0
+            }
+          },
+          "pack_switch_targets": 455,
+          "true_new_bn_targets": 1402,
+          "pack_switch_in_slate": 427,
+          "true_new_bn_in_slate": 899,
+          "pack_switch_hits@10": 184,
+          "true_new_bn_hits@10": 127,
+          "val_loss": 2.6958451684640377
+        }
+      },
+      "settings": {
+        "stage": "roadmap_v2_stage2_aug_stage2",
+        "arm": "sku_plus_base_name",
+        "variant_name": "top4_3acde_own_slates",
+        "slate_tag": "stage3",
+        "num_features": 82,
+        "aux_60d_enabled": true,
+        "aux_lambda": 0.3,
+        "aux_pos_weight": 5.0,
+        "p_drop": 0.0,
+        "statistics_policy": "rolling_observed_v2",
+        "rolling_features_identity": "7bf03c3cf3f8cde7ea22d7ea125c03a5c729cccd042e1f2d3ac673de15264990",
+        "base_name_identity": "09c95eced05fcf7b9cec6f48cfd28848d47c3a54a5c25c24a0155a37c0beceef",
+        "seed": 44,
+        "epochs": 10,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "heldout_access": false
+      },
+      "history": [
+        {
+          "epoch": 1,
+          "train_loss": 4.131767210299081,
+          "main_loss": 3.112454804190754,
+          "aux_loss": 3.397707883458938,
+          "dropped_queries": 0,
+          "qualified": true,
+          "epoch_seconds": 15.600967208010843,
+          "metrics": {
+            "queries": 6191,
+            "total_targets": 10276,
+            "repeat_targets": 8419,
+            "new_targets": 1857,
+            "recall@5": 0.6513096522491528,
+            "recall@10": 0.7676013588300311,
+            "recall@25": 0.8633904066775637,
+            "recall@50": 0.9066400907678356,
+            "recall@100": 0.9428113308237469,
+            "ndcg@10": 0.5938312226175875,
+            "mrr": 0.5721909691384425,
+            "new_hits@10": 277,
+            "new_recall@10": 0.14916532040926225,
+            "new_hits@25": 617,
+            "new_recall@25": 0.33225632740980077,
+            "new_hits@50": 967,
+            "new_recall@50": 0.5207323640280022,
+            "new_hits@100": 1326,
+            "new_recall@100": 0.7140549273021002,
+            "conditional_new_recall@10": 0.20889894419306185,
+            "repeat_recall@10_micro": 0.885140753058558,
+            "repeat_recall@10_macro": 0.9130815971920532,
+            "mixed_coverage_macro": 0.9428113308237469,
+            "mixed_coverage_micro": 0.9472557415336706,
+            "total_targets_in_slate": 9734,
+            "new_targets_in_slate": 1326,
+            "new_slate_coverage": 0.7140549273021002,
+            "repeat_targets_in_slate": 8408,
+            "repeat_slate_coverage": 0.998693431523934,
+            "new_reachable_lost_at10": 1049,
+            "history_cohorts": {
+              "cold_0": {
+                "rows": 0,
+                "recall@10": null,
+                "ndcg@10": null,
+                "new_hits@10": 0,
+                "new_targets": 0
+              },
+              "light_1_8": {
+                "rows": 1116,
+                "recall@10": 0.7307070319167093,
+                "ndcg@10": 0.6057351688515453,
+                "new_hits@10": 173,
+                "new_targets": 574
+              },
+              "warm_9_31": {
+                "rows": 1808,
+                "recall@10": 0.8076429792552581,
+                "ndcg@10": 0.6294657149949495,
+                "new_hits@10": 89,
+                "new_targets": 594
+              },
+              "truncated_32": {
+                "rows": 3267,
+                "recall@10": 0.7580448296309058,
+                "ndcg@10": 0.5700442724445335,
+                "new_hits@10": 15,
+                "new_targets": 689
+              }
+            },
+            "validation_months": {
+              "2025-10": {
+                "rows": 1616,
+                "recall@10": 0.7579123202498822,
+                "ndcg@10": 0.5903911786734316,
+                "new_hits@10": 75,
+                "new_targets": 533
+              },
+              "2025-11": {
+                "rows": 1314,
+                "recall@10": 0.775403608736942,
+                "ndcg@10": 0.5964693097663809,
+                "new_hits@10": 58,
+                "new_targets": 358
+              },
+              "2025-12": {
+                "rows": 1353,
+                "recall@10": 0.7897752371028133,
+                "ndcg@10": 0.6130262665770244,
+                "new_hits@10": 60,
+                "new_targets": 380
+              },
+              "2026-01": {
+                "rows": 1149,
+                "recall@10": 0.7502211814875,
+                "ndcg@10": 0.5749146990792933,
+                "new_hits@10": 50,
+                "new_targets": 351
+              },
+              "2026-02": {
+                "rows": 759,
+                "recall@10": 0.7615063607158469,
+                "ndcg@10": 0.5910075804155103,
+                "new_hits@10": 34,
+                "new_targets": 235
+              }
+            },
+            "new_target_cohorts": {
+              "first_snapshot_family": {
+                "targets": 675,
+                "hits@10": 59
+              },
+              "known_snapshot_family": {
+                "targets": 1176,
+                "hits@10": 218
+              },
+              "unknown_snapshot_family_metadata": {
+                "targets": 6,
+                "hits@10": 0
+              },
+              "sku_rare_rolling90d": {
+                "targets": 392,
+                "hits@10": 15
+              },
+              "sku_frequent_rolling90d": {
+                "targets": 1465,
+                "hits@10": 262
+              },
+              "sparse_transition": {
+                "targets": 1213,
+                "hits@10": 113
+              },
+              "supported_transition": {
+                "targets": 644,
+                "hits@10": 164
+              },
+              "unrepresented_catalogue": {
+                "targets": 0,
+                "hits@10": 0
+              }
+            },
+            "pack_switch_targets": 455,
+            "true_new_bn_targets": 1402,
+            "pack_switch_in_slate": 427,
+            "true_new_bn_in_slate": 899,
+            "pack_switch_hits@10": 173,
+            "true_new_bn_hits@10": 104,
+            "val_loss": 2.7599806615284512
+          }
+        },
+        {
+          "epoch": 2,
+          "train_loss": 3.997611981528809,
+          "main_loss": 3.0111500851429294,
+          "aux_loss": 3.2882061781964453,
+          "dropped_queries": 0,
+          "qualified": true,
+          "epoch_seconds": 13.265607124994858,
+          "metrics": {
+            "queries": 6191,
+            "total_targets": 10276,
+            "repeat_targets": 8419,
+            "new_targets": 1857,
+            "recall@5": 0.6570512620813779,
+            "recall@10": 0.7727868815934896,
+            "recall@25": 0.8638729841872774,
+            "recall@50": 0.9068353947549341,
+            "recall@100": 0.9428113308237469,
+            "ndcg@10": 0.5990810772377292,
+            "mrr": 0.5779374834160288,
+            "new_hits@10": 301,
+            "new_recall@10": 0.16208939149165322,
+            "new_hits@25": 631,
+            "new_recall@25": 0.3397953688745288,
+            "new_hits@50": 961,
+            "new_recall@50": 0.5175013462574044,
+            "new_hits@100": 1326,
+            "new_recall@100": 0.7140549273021002,
+            "conditional_new_recall@10": 0.22699849170437406,
+            "repeat_recall@10_micro": 0.8872787742012116,
+            "repeat_recall@10_macro": 0.9156955334211808,
+            "mixed_coverage_macro": 0.9428113308237469,
+            "mixed_coverage_micro": 0.9472557415336706,
+            "total_targets_in_slate": 9734,
+            "new_targets_in_slate": 1326,
+            "new_slate_coverage": 0.7140549273021002,
+            "repeat_targets_in_slate": 8408,
+            "repeat_slate_coverage": 0.998693431523934,
+            "new_reachable_lost_at10": 1025,
+            "history_cohorts": {
+              "cold_0": {
+                "rows": 0,
+                "recall@10": null,
+                "ndcg@10": null,
+                "new_hits@10": 0,
+                "new_targets": 0
+              },
+              "light_1_8": {
+                "rows": 1116,
+                "recall@10": 0.7432070319167093,
+                "ndcg@10": 0.6104073468708066,
+                "new_hits@10": 192,
+                "new_targets": 574
+              },
+              "warm_9_31": {
+                "rows": 1808,
+                "recall@10": 0.8126037356817224,
+                "ndcg@10": 0.6330868995007324,
+                "new_hits@10": 96,
+                "new_targets": 594
+              },
+              "truncated_32": {
+                "rows": 3267,
+                "recall@10": 0.7608561316846321,
+                "ndcg@10": 0.5763927871973178,
+                "new_hits@10": 13,
+                "new_targets": 689
+              }
+            },
+            "validation_months": {
+              "2025-10": {
+                "rows": 1616,
+                "recall@10": 0.7626877308266541,
+                "ndcg@10": 0.5968144662195659,
+                "new_hits@10": 82,
+                "new_targets": 533
+              },
+              "2025-11": {
+                "rows": 1314,
+                "recall@10": 0.784271478563716,
+                "ndcg@10": 0.6052375791952233,
+                "new_hits@10": 65,
+                "new_targets": 358
+              },
+              "2025-12": {
+                "rows": 1353,
+                "recall@10": 0.7881078665330037,
+                "ndcg@10": 0.6141763612131256,
+                "new_hits@10": 61,
+                "new_targets": 380
+              },
+              "2026-01": {
+                "rows": 1149,
+                "recall@10": 0.7558413735959427,
+                "ndcg@10": 0.5786146906786862,
+                "new_hits@10": 50,
+                "new_targets": 351
+              },
+              "2026-02": {
+                "rows": 759,
+                "recall@10": 0.7727480980445409,
+                "ndcg@10": 0.5973223931413311,
+                "new_hits@10": 43,
+                "new_targets": 235
+              }
+            },
+            "new_target_cohorts": {
+              "first_snapshot_family": {
+                "targets": 675,
+                "hits@10": 70
+              },
+              "known_snapshot_family": {
+                "targets": 1176,
+                "hits@10": 231
+              },
+              "unknown_snapshot_family_metadata": {
+                "targets": 6,
+                "hits@10": 0
+              },
+              "sku_rare_rolling90d": {
+                "targets": 392,
+                "hits@10": 16
+              },
+              "sku_frequent_rolling90d": {
+                "targets": 1465,
+                "hits@10": 285
+              },
+              "sparse_transition": {
+                "targets": 1213,
+                "hits@10": 126
+              },
+              "supported_transition": {
+                "targets": 644,
+                "hits@10": 175
+              },
+              "unrepresented_catalogue": {
+                "targets": 0,
+                "hits@10": 0
+              }
+            },
+            "pack_switch_targets": 455,
+            "true_new_bn_targets": 1402,
+            "pack_switch_in_slate": 427,
+            "true_new_bn_in_slate": 899,
+            "pack_switch_hits@10": 176,
+            "true_new_bn_hits@10": 125,
+            "val_loss": 2.7170670470412897
+          }
+        },
+        {
+          "epoch": 3,
+          "train_loss": 3.9543125780249455,
+          "main_loss": 2.9781394393484666,
+          "aux_loss": 3.2539103344409135,
+          "dropped_queries": 0,
+          "qualified": true,
+          "epoch_seconds": 13.340673290993436,
+          "metrics": {
+            "queries": 6191,
+            "total_targets": 10276,
+            "repeat_targets": 8419,
+            "new_targets": 1857,
+            "recall@5": 0.660942801633554,
+            "recall@10": 0.7748871649225728,
+            "recall@25": 0.8649566442860401,
+            "recall@50": 0.9071853709690679,
+            "recall@100": 0.9428113308237469,
+            "ndcg@10": 0.6009025864744002,
+            "mrr": 0.5792808075401136,
+            "new_hits@10": 315,
+            "new_recall@10": 0.16962843295638125,
+            "new_hits@25": 637,
+            "new_recall@25": 0.3430263866451265,
+            "new_hits@50": 975,
+            "new_recall@50": 0.5250403877221325,
+            "new_hits@100": 1326,
+            "new_recall@100": 0.7140549273021002,
+            "conditional_new_recall@10": 0.23755656108597284,
+            "repeat_recall@10_micro": 0.8889416795343865,
+            "repeat_recall@10_macro": 0.9163706456323387,
+            "mixed_coverage_macro": 0.9428113308237469,
+            "mixed_coverage_micro": 0.9472557415336706,
+            "total_targets_in_slate": 9734,
+            "new_targets_in_slate": 1326,
+            "new_slate_coverage": 0.7140549273021002,
+            "repeat_targets_in_slate": 8408,
+            "repeat_slate_coverage": 0.998693431523934,
+            "new_reachable_lost_at10": 1011,
+            "history_cohorts": {
+              "cold_0": {
+                "rows": 0,
+                "recall@10": null,
+                "ndcg@10": null,
+                "new_hits@10": 0,
+                "new_targets": 0
+              },
+              "light_1_8": {
+                "rows": 1116,
+                "recall@10": 0.7422811059907833,
+                "ndcg@10": 0.6085520687952372,
+                "new_hits@10": 190,
+                "new_targets": 574
+              },
+              "warm_9_31": {
+                "rows": 1808,
+                "recall@10": 0.8150643604183426,
+                "ndcg@10": 0.6372455939578725,
+                "new_hits@10": 107,
+                "new_targets": 594
+              },
+              "truncated_32": {
+                "rows": 3267,
+                "recall@10": 0.7637907438364159,
+                "ndcg@10": 0.5781768503861933,
+                "new_hits@10": 18,
+                "new_targets": 689
+              }
+            },
+            "validation_months": {
+              "2025-10": {
+                "rows": 1616,
+                "recall@10": 0.7674635097438315,
+                "ndcg@10": 0.5990109630739007,
+                "new_hits@10": 86,
+                "new_targets": 533
+              },
+              "2025-11": {
+                "rows": 1314,
+                "recall@10": 0.7833247147744864,
+                "ndcg@10": 0.6060702284337621,
+                "new_hits@10": 68,
+                "new_targets": 358
+              },
+              "2025-12": {
+                "rows": 1353,
+                "recall@10": 0.7914059460505954,
+                "ndcg@10": 0.616337375840036,
+                "new_hits@10": 65,
+                "new_targets": 380
+              },
+              "2026-01": {
+                "rows": 1149,
+                "recall@10": 0.7601262749435073,
+                "ndcg@10": 0.5820697081097995,
+                "new_hits@10": 55,
+                "new_targets": 351
+              },
+              "2026-02": {
+                "rows": 759,
+                "recall@10": 0.7689847116724589,
+                "ndcg@10": 0.5969793837205486,
+                "new_hits@10": 41,
+                "new_targets": 235
+              }
+            },
+            "new_target_cohorts": {
+              "first_snapshot_family": {
+                "targets": 675,
+                "hits@10": 66
+              },
+              "known_snapshot_family": {
+                "targets": 1176,
+                "hits@10": 249
+              },
+              "unknown_snapshot_family_metadata": {
+                "targets": 6,
+                "hits@10": 0
+              },
+              "sku_rare_rolling90d": {
+                "targets": 392,
+                "hits@10": 20
+              },
+              "sku_frequent_rolling90d": {
+                "targets": 1465,
+                "hits@10": 295
+              },
+              "sparse_transition": {
+                "targets": 1213,
+                "hits@10": 137
+              },
+              "supported_transition": {
+                "targets": 644,
+                "hits@10": 178
+              },
+              "unrepresented_catalogue": {
+                "targets": 0,
+                "hits@10": 0
+              }
+            },
+            "pack_switch_targets": 455,
+            "true_new_bn_targets": 1402,
+            "pack_switch_in_slate": 427,
+            "true_new_bn_in_slate": 899,
+            "pack_switch_hits@10": 186,
+            "true_new_bn_hits@10": 129,
+            "val_loss": 2.700501943121151
+          }
+        },
+        {
+          "epoch": 4,
+          "train_loss": 3.9182392187652217,
+          "main_loss": 2.95040164318688,
+          "aux_loss": 3.2261251080645263,
+          "dropped_queries": 0,
+          "qualified": true,
+          "epoch_seconds": 14.273207207996165,
+          "metrics": {
+            "queries": 6191,
+            "total_targets": 10276,
+            "repeat_targets": 8419,
+            "new_targets": 1857,
+            "recall@5": 0.6608703135946631,
+            "recall@10": 0.7739410034169404,
+            "recall@25": 0.8657938811352297,
+            "recall@50": 0.9081902801107886,
+            "recall@100": 0.9428113308237469,
+            "ndcg@10": 0.6013378828771004,
+            "mrr": 0.5797815401753434,
+            "new_hits@10": 318,
+            "new_recall@10": 0.17124394184168013,
+            "new_hits@25": 649,
+            "new_recall@25": 0.34948842218632203,
+            "new_hits@50": 989,
+            "new_recall@50": 0.5325794291868605,
+            "new_hits@100": 1326,
+            "new_recall@100": 0.7140549273021002,
+            "conditional_new_recall@10": 0.2398190045248869,
+            "repeat_recall@10_micro": 0.8889416795343865,
+            "repeat_recall@10_macro": 0.915835077069132,
+            "mixed_coverage_macro": 0.9428113308237469,
+            "mixed_coverage_micro": 0.9472557415336706,
+            "total_targets_in_slate": 9734,
+            "new_targets_in_slate": 1326,
+            "new_slate_coverage": 0.7140549273021002,
+            "repeat_targets_in_slate": 8408,
+            "repeat_slate_coverage": 0.998693431523934,
+            "new_reachable_lost_at10": 1008,
+            "history_cohorts": {
+              "cold_0": {
+                "rows": 0,
+                "recall@10": null,
+                "ndcg@10": null,
+                "new_hits@10": 0,
+                "new_targets": 0
+              },
+              "light_1_8": {
+                "rows": 1116,
+                "recall@10": 0.7410415599931729,
+                "ndcg@10": 0.6082925229707714,
+                "new_hits@10": 192,
+                "new_targets": 574
+              },
+              "warm_9_31": {
+                "rows": 1808,
+                "recall@10": 0.8128987209324599,
+                "ndcg@10": 0.6359479766708119,
+                "new_hits@10": 107,
+                "new_targets": 594
+              },
+              "truncated_32": {
+                "rows": 3267,
+                "recall@10": 0.7636196766929936,
+                "ndcg@10": 0.5798085201824059,
+                "new_hits@10": 19,
+                "new_targets": 689
+              }
+            },
+            "validation_months": {
+              "2025-10": {
+                "rows": 1616,
+                "recall@10": 0.7675170418827597,
+                "ndcg@10": 0.598373982269207,
+                "new_hits@10": 85,
+                "new_targets": 533
+              },
+              "2025-11": {
+                "rows": 1314,
+                "recall@10": 0.7835928890152635,
+                "ndcg@10": 0.6086213861685956,
+                "new_hits@10": 72,
+                "new_targets": 358
+              },
+              "2025-12": {
+                "rows": 1353,
+                "recall@10": 0.7899050578359718,
+                "ndcg@10": 0.6153190786316014,
+                "new_hits@10": 66,
+                "new_targets": 380
+              },
+              "2026-01": {
+                "rows": 1149,
+                "recall@10": 0.7563596615163195,
+                "ndcg@10": 0.580277360910755,
+                "new_hits@10": 52,
+                "new_targets": 351
+              },
+              "2026-02": {
+                "rows": 759,
+                "recall@10": 0.7690663530584478,
+                "ndcg@10": 0.6019981225883291,
+                "new_hits@10": 43,
+                "new_targets": 235
+              }
+            },
+            "new_target_cohorts": {
+              "first_snapshot_family": {
+                "targets": 675,
+                "hits@10": 76
+              },
+              "known_snapshot_family": {
+                "targets": 1176,
+                "hits@10": 242
+              },
+              "unknown_snapshot_family_metadata": {
+                "targets": 6,
+                "hits@10": 0
+              },
+              "sku_rare_rolling90d": {
+                "targets": 392,
+                "hits@10": 18
+              },
+              "sku_frequent_rolling90d": {
+                "targets": 1465,
+                "hits@10": 300
+              },
+              "sparse_transition": {
+                "targets": 1213,
+                "hits@10": 139
+              },
+              "supported_transition": {
+                "targets": 644,
+                "hits@10": 179
+              },
+              "unrepresented_catalogue": {
+                "targets": 0,
+                "hits@10": 0
+              }
+            },
+            "pack_switch_targets": 455,
+            "true_new_bn_targets": 1402,
+            "pack_switch_in_slate": 427,
+            "true_new_bn_in_slate": 899,
+            "pack_switch_hits@10": 183,
+            "true_new_bn_hits@10": 135,
+            "val_loss": 2.6931403048184452
+          }
+        },
+        {
+          "epoch": 5,
+          "train_loss": 3.8810901902887944,
+          "main_loss": 2.921396741611824,
+          "aux_loss": 3.198978033089,
+          "dropped_queries": 0,
+          "qualified": true,
+          "epoch_seconds": 14.283746542001609,
+          "metrics": {
+            "queries": 6191,
+            "total_targets": 10276,
+            "repeat_targets": 8419,
+            "new_targets": 1857,
+            "recall@5": 0.6601268089523536,
+            "recall@10": 0.7754586673536296,
+            "recall@25": 0.8658210484617026,
+            "recall@50": 0.9098808363644203,
+            "recall@100": 0.9428113308237469,
+            "ndcg@10": 0.6027217345412677,
+            "mrr": 0.5814864889797278,
+            "new_hits@10": 323,
+            "new_recall@10": 0.17393645665051158,
+            "new_hits@25": 653,
+            "new_recall@25": 0.3516424340333872,
+            "new_hits@50": 995,
+            "new_recall@50": 0.5358104469574583,
+            "new_hits@100": 1326,
+            "new_recall@100": 0.7140549273021002,
+            "conditional_new_recall@10": 0.24358974358974358,
+            "repeat_recall@10_micro": 0.8896543532486043,
+            "repeat_recall@10_macro": 0.9164740960087889,
+            "mixed_coverage_macro": 0.9428113308237469,
+            "mixed_coverage_micro": 0.9472557415336706,
+            "total_targets_in_slate": 9734,
+            "new_targets_in_slate": 1326,
+            "new_slate_coverage": 0.7140549273021002,
+            "repeat_targets_in_slate": 8408,
+            "repeat_slate_coverage": 0.998693431523934,
+            "new_reachable_lost_at10": 1003,
+            "history_cohorts": {
+              "cold_0": {
+                "rows": 0,
+                "recall@10": null,
+                "ndcg@10": null,
+                "new_hits@10": 0,
+                "new_targets": 0
+              },
+              "light_1_8": {
+                "rows": 1116,
+                "recall@10": 0.741310377197474,
+                "ndcg@10": 0.6090224147613589,
+                "new_hits@10": 191,
+                "new_targets": 574
+              },
+              "warm_9_31": {
+                "rows": 1808,
+                "recall@10": 0.8163878433513388,
+                "ndcg@10": 0.6395091053913148,
+                "new_hits@10": 112,
+                "new_targets": 594
+              },
+              "truncated_32": {
+                "rows": 3267,
+                "recall@10": 0.7644729133317166,
+                "ndcg@10": 0.5802108298511829,
+                "new_hits@10": 20,
+                "new_targets": 689
+              }
+            },
+            "validation_months": {
+              "2025-10": {
+                "rows": 1616,
+                "recall@10": 0.7680851455681281,
+                "ndcg@10": 0.6011827709861187,
+                "new_hits@10": 86,
+                "new_targets": 533
+              },
+              "2025-11": {
+                "rows": 1314,
+                "recall@10": 0.7862341636885015,
+                "ndcg@10": 0.6079212605557677,
+                "new_hits@10": 72,
+                "new_targets": 358
+              },
+              "2025-12": {
+                "rows": 1353,
+                "recall@10": 0.7900377343165298,
+                "ndcg@10": 0.617479446030376,
+                "new_hits@10": 62,
+                "new_targets": 380
+              },
+              "2026-01": {
+                "rows": 1149,
+                "recall@10": 0.7583564607716043,
+                "ndcg@10": 0.5821751864974348,
+                "new_hits@10": 57,
+                "new_targets": 351
+              },
+              "2026-02": {
+                "rows": 759,
+                "recall@10": 0.7724040781353035,
+                "ndcg@10": 0.601793655463096,
+                "new_hits@10": 46,
+                "new_targets": 235
+              }
+            },
+            "new_target_cohorts": {
+              "first_snapshot_family": {
+                "targets": 675,
+                "hits@10": 77
+              },
+              "known_snapshot_family": {
+                "targets": 1176,
+                "hits@10": 246
+              },
+              "unknown_snapshot_family_metadata": {
+                "targets": 6,
+                "hits@10": 0
+              },
+              "sku_rare_rolling90d": {
+                "targets": 392,
+                "hits@10": 20
+              },
+              "sku_frequent_rolling90d": {
+                "targets": 1465,
+                "hits@10": 303
+              },
+              "sparse_transition": {
+                "targets": 1213,
+                "hits@10": 142
+              },
+              "supported_transition": {
+                "targets": 644,
+                "hits@10": 181
+              },
+              "unrepresented_catalogue": {
+                "targets": 0,
+                "hits@10": 0
+              }
+            },
+            "pack_switch_targets": 455,
+            "true_new_bn_targets": 1402,
+            "pack_switch_in_slate": 427,
+            "true_new_bn_in_slate": 899,
+            "pack_switch_hits@10": 183,
+            "true_new_bn_hits@10": 140,
+            "val_loss": 2.6835219081567256
+          }
+        },
+        {
+          "epoch": 6,
+          "train_loss": 3.8403642194984604,
+          "main_loss": 2.8897110110651836,
+          "aux_loss": 3.168843896429614,
+          "dropped_queries": 0,
+          "qualified": true,
+          "epoch_seconds": 13.852285834000213,
+          "metrics": {
+            "queries": 6191,
+            "total_targets": 10276,
+            "repeat_targets": 8419,
+            "new_targets": 1857,
+            "recall@5": 0.6613118146984158,
+            "recall@10": 0.7723209062811753,
+            "recall@25": 0.8646896796958643,
+            "recall@50": 0.9067649578245391,
+            "recall@100": 0.9428113308237469,
+            "ndcg@10": 0.6016840151057017,
+            "mrr": 0.5816825375283984,
+            "new_hits@10": 306,
+            "new_recall@10": 0.16478190630048464,
+            "new_hits@25": 638,
+            "new_recall@25": 0.34356488960689285,
+            "new_hits@50": 974,
+            "new_recall@50": 0.5245018847603662,
+            "new_hits@100": 1326,
+            "new_recall@100": 0.7140549273021002,
+            "conditional_new_recall@10": 0.23076923076923078,
+            "repeat_recall@10_micro": 0.8887041216296472,
+            "repeat_recall@10_macro": 0.9158142422903729,
+            "mixed_coverage_macro": 0.9428113308237469,
+            "mixed_coverage_micro": 0.9472557415336706,
+            "total_targets_in_slate": 9734,
+            "new_targets_in_slate": 1326,
+            "new_slate_coverage": 0.7140549273021002,
+            "repeat_targets_in_slate": 8408,
+            "repeat_slate_coverage": 0.998693431523934,
+            "new_reachable_lost_at10": 1020,
+            "history_cohorts": {
+              "cold_0": {
+                "rows": 0,
+                "recall@10": null,
+                "ndcg@10": null,
+                "new_hits@10": 0,
+                "new_targets": 0
+              },
+              "light_1_8": {
+                "rows": 1116,
+                "recall@10": 0.7316478921317632,
+                "ndcg@10": 0.6059921857519591,
+                "new_hits@10": 178,
+                "new_targets": 574
+              },
+              "warm_9_31": {
+                "rows": 1808,
+                "recall@10": 0.8134748640003064,
+                "ndcg@10": 0.6391769553145209,
+                "new_hits@10": 108,
+                "new_targets": 594
+              },
+              "truncated_32": {
+                "rows": 3267,
+                "recall@10": 0.7634395864876509,
+                "ndcg@10": 0.5794632760978141,
+                "new_hits@10": 20,
+                "new_targets": 689
+              }
+            },
+            "validation_months": {
+              "2025-10": {
+                "rows": 1616,
+                "recall@10": 0.7667065702105925,
+                "ndcg@10": 0.6012477591258909,
+                "new_hits@10": 86,
+                "new_targets": 533
+              },
+              "2025-11": {
+                "rows": 1314,
+                "recall@10": 0.7784305348803066,
+                "ndcg@10": 0.6063929779528024,
+                "new_hits@10": 62,
+                "new_targets": 358
+              },
+              "2025-12": {
+                "rows": 1353,
+                "recall@10": 0.78830455806474,
+                "ndcg@10": 0.618719321345159,
+                "new_hits@10": 63,
+                "new_targets": 380
+              },
+              "2026-01": {
+                "rows": 1149,
+                "recall@10": 0.7633719703563046,
+                "ndcg@10": 0.5819489817648992,
+                "new_hits@10": 57,
+                "new_targets": 351
+              },
+              "2026-02": {
+                "rows": 759,
+                "recall@10": 0.7587519492657834,
+                "ndcg@10": 0.5939688589118682,
+                "new_hits@10": 38,
+                "new_targets": 235
+              }
+            },
+            "new_target_cohorts": {
+              "first_snapshot_family": {
+                "targets": 675,
+                "hits@10": 77
+              },
+              "known_snapshot_family": {
+                "targets": 1176,
+                "hits@10": 229
+              },
+              "unknown_snapshot_family_metadata": {
+                "targets": 6,
+                "hits@10": 0
+              },
+              "sku_rare_rolling90d": {
+                "targets": 392,
+                "hits@10": 19
+              },
+              "sku_frequent_rolling90d": {
+                "targets": 1465,
+                "hits@10": 287
+              },
+              "sparse_transition": {
+                "targets": 1213,
+                "hits@10": 135
+              },
+              "supported_transition": {
+                "targets": 644,
+                "hits@10": 171
+              },
+              "unrepresented_catalogue": {
+                "targets": 0,
+                "hits@10": 0
+              }
+            },
+            "pack_switch_targets": 455,
+            "true_new_bn_targets": 1402,
+            "pack_switch_in_slate": 427,
+            "true_new_bn_in_slate": 899,
+            "pack_switch_hits@10": 181,
+            "true_new_bn_hits@10": 125,
+            "val_loss": 2.68955765694988
+          }
+        },
+        {
+          "epoch": 7,
+          "train_loss": 3.8005778122412317,
+          "main_loss": 2.8586157540045227,
+          "aux_loss": 3.1398734141440285,
+          "dropped_queries": 0,
+          "qualified": true,
+          "epoch_seconds": 15.211894457999733,
+          "metrics": {
+            "queries": 6191,
+            "total_targets": 10276,
+            "repeat_targets": 8419,
+            "new_targets": 1857,
+            "recall@5": 0.6637330142565885,
+            "recall@10": 0.7715540958289346,
+            "recall@25": 0.8644101422050525,
+            "recall@50": 0.9087517710615544,
+            "recall@100": 0.9428113308237469,
+            "ndcg@10": 0.6020057168871793,
+            "mrr": 0.5818432625603794,
+            "new_hits@10": 313,
+            "new_recall@10": 0.16855142703284867,
+            "new_hits@25": 651,
+            "new_recall@25": 0.3505654281098546,
+            "new_hits@50": 993,
+            "new_recall@50": 0.5347334410339257,
+            "new_hits@100": 1326,
+            "new_recall@100": 0.7140549273021002,
+            "conditional_new_recall@10": 0.23604826546003016,
+            "repeat_recall@10_micro": 0.8877538900106902,
+            "repeat_recall@10_macro": 0.9133627029887177,
+            "mixed_coverage_macro": 0.9428113308237469,
+            "mixed_coverage_micro": 0.9472557415336706,
+            "total_targets_in_slate": 9734,
+            "new_targets_in_slate": 1326,
+            "new_slate_coverage": 0.7140549273021002,
+            "repeat_targets_in_slate": 8408,
+            "repeat_slate_coverage": 0.998693431523934,
+            "new_reachable_lost_at10": 1013,
+            "history_cohorts": {
+              "cold_0": {
+                "rows": 0,
+                "recall@10": null,
+                "ndcg@10": null,
+                "new_hits@10": 0,
+                "new_targets": 0
+              },
+              "light_1_8": {
+                "rows": 1116,
+                "recall@10": 0.7329023724185015,
+                "ndcg@10": 0.607816376044441,
+                "new_hits@10": 182,
+                "new_targets": 574
+              },
+              "warm_9_31": {
+                "rows": 1808,
+                "recall@10": 0.8096999746197755,
+                "ndcg@10": 0.635433034450229,
+                "new_hits@10": 108,
+                "new_targets": 594
+              },
+              "truncated_32": {
+                "rows": 3267,
+                "recall@10": 0.7636470173080293,
+                "ndcg@10": 0.5815216992032191,
+                "new_hits@10": 23,
+                "new_targets": 689
+              }
+            },
+            "validation_months": {
+              "2025-10": {
+                "rows": 1616,
+                "recall@10": 0.7649447980512337,
+                "ndcg@10": 0.6014730930800694,
+                "new_hits@10": 86,
+                "new_targets": 533
+              },
+              "2025-11": {
+                "rows": 1314,
+                "recall@10": 0.7883747256464151,
+                "ndcg@10": 0.6101918219322178,
+                "new_hits@10": 72,
+                "new_targets": 358
+              },
+              "2025-12": {
+                "rows": 1353,
+                "recall@10": 0.7858268190016352,
+                "ndcg@10": 0.6153165151810887,
+                "new_hits@10": 62,
+                "new_targets": 380
+              },
+              "2026-01": {
+                "rows": 1149,
+                "recall@10": 0.754685704489882,
+                "ndcg@10": 0.581078520652965,
+                "new_hits@10": 56,
+                "new_targets": 351
+              },
+              "2026-02": {
+                "rows": 759,
+                "recall@10": 0.7565990297215593,
+                "ndcg@10": 0.596920099528236,
+                "new_hits@10": 37,
+                "new_targets": 235
+              }
+            },
+            "new_target_cohorts": {
+              "first_snapshot_family": {
+                "targets": 675,
+                "hits@10": 66
+              },
+              "known_snapshot_family": {
+                "targets": 1176,
+                "hits@10": 247
+              },
+              "unknown_snapshot_family_metadata": {
+                "targets": 6,
+                "hits@10": 0
+              },
+              "sku_rare_rolling90d": {
+                "targets": 392,
+                "hits@10": 17
+              },
+              "sku_frequent_rolling90d": {
+                "targets": 1465,
+                "hits@10": 296
+              },
+              "sparse_transition": {
+                "targets": 1213,
+                "hits@10": 144
+              },
+              "supported_transition": {
+                "targets": 644,
+                "hits@10": 169
+              },
+              "unrepresented_catalogue": {
+                "targets": 0,
+                "hits@10": 0
+              }
+            },
+            "pack_switch_targets": 455,
+            "true_new_bn_targets": 1402,
+            "pack_switch_in_slate": 427,
+            "true_new_bn_in_slate": 899,
+            "pack_switch_hits@10": 181,
+            "true_new_bn_hits@10": 132,
+            "val_loss": 2.6914696133866602
+          }
+        },
+        {
+          "epoch": 8,
+          "train_loss": 3.75281780595617,
+          "main_loss": 2.82117952076478,
+          "aux_loss": 3.105460816636283,
+          "dropped_queries": 0,
+          "qualified": true,
+          "epoch_seconds": 14.34675633299048,
+          "metrics": {
+            "queries": 6191,
+            "total_targets": 10276,
+            "repeat_targets": 8419,
+            "new_targets": 1857,
+            "recall@5": 0.6618795773078517,
+            "recall@10": 0.7729677844841836,
+            "recall@25": 0.8646019208494237,
+            "recall@50": 0.9065443354669439,
+            "recall@100": 0.9428113308237469,
+            "ndcg@10": 0.6027479503248258,
+            "mrr": 0.5822498346362455,
+            "new_hits@10": 311,
+            "new_recall@10": 0.1674744211093161,
+            "new_hits@25": 643,
+            "new_recall@25": 0.3462574044157243,
+            "new_hits@50": 977,
+            "new_recall@50": 0.526117393645665,
+            "new_hits@100": 1326,
+            "new_recall@100": 0.7140549273021002,
+            "conditional_new_recall@10": 0.23453996983408748,
+            "repeat_recall@10_micro": 0.8889416795343865,
+            "repeat_recall@10_macro": 0.915473340118199,
+            "mixed_coverage_macro": 0.9428113308237469,
+            "mixed_coverage_micro": 0.9472557415336706,
+            "total_targets_in_slate": 9734,
+            "new_targets_in_slate": 1326,
+            "new_slate_coverage": 0.7140549273021002,
+            "repeat_targets_in_slate": 8408,
+            "repeat_slate_coverage": 0.998693431523934,
+            "new_reachable_lost_at10": 1015,
+            "history_cohorts": {
+              "cold_0": {
+                "rows": 0,
+                "recall@10": null,
+                "ndcg@10": null,
+                "new_hits@10": 0,
+                "new_targets": 0
+              },
+              "light_1_8": {
+                "rows": 1116,
+                "recall@10": 0.7296616316777607,
+                "ndcg@10": 0.6065186339694594,
+                "new_hits@10": 176,
+                "new_targets": 574
+              },
+              "warm_9_31": {
+                "rows": 1808,
+                "recall@10": 0.8135255645902769,
+                "ndcg@10": 0.6378580382862452,
+                "new_hits@10": 112,
+                "new_targets": 594
+              },
+              "truncated_32": {
+                "rows": 3267,
+                "recall@10": 0.7653158714447438,
+                "ndcg@10": 0.5820295169052795,
+                "new_hits@10": 23,
+                "new_targets": 689
+              }
+            },
+            "validation_months": {
+              "2025-10": {
+                "rows": 1616,
+                "recall@10": 0.7681745295065221,
+                "ndcg@10": 0.6023678745465716,
+                "new_hits@10": 87,
+                "new_targets": 533
+              },
+              "2025-11": {
+                "rows": 1314,
+                "recall@10": 0.7855661440707102,
+                "ndcg@10": 0.6095767337596006,
+                "new_hits@10": 70,
+                "new_targets": 358
+              },
+              "2025-12": {
+                "rows": 1353,
+                "recall@10": 0.7827965159713323,
+                "ndcg@10": 0.6149044594920506,
+                "new_hits@10": 60,
+                "new_targets": 380
+              },
+              "2026-01": {
+                "rows": 1149,
+                "recall@10": 0.759754953488635,
+                "ndcg@10": 0.5850416678750275,
+                "new_hits@10": 57,
+                "new_targets": 351
+              },
+              "2026-02": {
+                "rows": 759,
+                "recall@10": 0.7638438380533242,
+                "ndcg@10": 0.5968690868939003,
+                "new_hits@10": 37,
+                "new_targets": 235
+              }
+            },
+            "new_target_cohorts": {
+              "first_snapshot_family": {
+                "targets": 675,
+                "hits@10": 67
+              },
+              "known_snapshot_family": {
+                "targets": 1176,
+                "hits@10": 244
+              },
+              "unknown_snapshot_family_metadata": {
+                "targets": 6,
+                "hits@10": 0
+              },
+              "sku_rare_rolling90d": {
+                "targets": 392,
+                "hits@10": 20
+              },
+              "sku_frequent_rolling90d": {
+                "targets": 1465,
+                "hits@10": 291
+              },
+              "sparse_transition": {
+                "targets": 1213,
+                "hits@10": 149
+              },
+              "supported_transition": {
+                "targets": 644,
+                "hits@10": 162
+              },
+              "unrepresented_catalogue": {
+                "targets": 0,
+                "hits@10": 0
+              }
+            },
+            "pack_switch_targets": 455,
+            "true_new_bn_targets": 1402,
+            "pack_switch_in_slate": 427,
+            "true_new_bn_in_slate": 899,
+            "pack_switch_hits@10": 184,
+            "true_new_bn_hits@10": 127,
+            "val_loss": 2.6958451684640377
+          }
+        },
+        {
+          "epoch": 9,
+          "train_loss": 3.711712210137769,
+          "main_loss": 2.7886261922599624,
+          "aux_loss": 3.076953280581175,
+          "dropped_queries": 0,
+          "qualified": true,
+          "epoch_seconds": 14.264832957996987,
+          "metrics": {
+            "queries": 6191,
+            "total_targets": 10276,
+            "repeat_targets": 8419,
+            "new_targets": 1857,
+            "recall@5": 0.6598977578207827,
+            "recall@10": 0.7704125676663275,
+            "recall@25": 0.8646787634597826,
+            "recall@50": 0.9084531424839725,
+            "recall@100": 0.9428113308237469,
+            "ndcg@10": 0.6016336097436998,
+            "mrr": 0.5818861406909408,
+            "new_hits@10": 311,
+            "new_recall@10": 0.1674744211093161,
+            "new_hits@25": 656,
+            "new_recall@25": 0.35325794291868606,
+            "new_hits@50": 992,
+            "new_recall@50": 0.5341949380721593,
+            "new_hits@100": 1326,
+            "new_recall@100": 0.7140549273021002,
+            "conditional_new_recall@10": 0.23453996983408748,
+            "repeat_recall@10_micro": 0.886803658391733,
+            "repeat_recall@10_macro": 0.9121562356704412,
+            "mixed_coverage_macro": 0.9428113308237469,
+            "mixed_coverage_micro": 0.9472557415336706,
+            "total_targets_in_slate": 9734,
+            "new_targets_in_slate": 1326,
+            "new_slate_coverage": 0.7140549273021002,
+            "repeat_targets_in_slate": 8408,
+            "repeat_slate_coverage": 0.998693431523934,
+            "new_reachable_lost_at10": 1015,
+            "history_cohorts": {
+              "cold_0": {
+                "rows": 0,
+                "recall@10": null,
+                "ndcg@10": null,
+                "new_hits@10": 0,
+                "new_targets": 0
+              },
+              "light_1_8": {
+                "rows": 1116,
+                "recall@10": 0.7281682027649771,
+                "ndcg@10": 0.6054297738864008,
+                "new_hits@10": 174,
+                "new_targets": 574
+              },
+              "warm_9_31": {
+                "rows": 1808,
+                "recall@10": 0.8104275610083133,
+                "ndcg@10": 0.6368418948079677,
+                "new_hits@10": 110,
+                "new_targets": 594
+              },
+              "truncated_32": {
+                "rows": 3267,
+                "recall@10": 0.7626983354250041,
+                "ndcg@10": 0.5808521286970361,
+                "new_hits@10": 27,
+                "new_targets": 689
+              }
+            },
+            "validation_months": {
+              "2025-10": {
+                "rows": 1616,
+                "recall@10": 0.7635172334197705,
+                "ndcg@10": 0.6019030458518038,
+                "new_hits@10": 87,
+                "new_targets": 533
+              },
+              "2025-11": {
+                "rows": 1314,
+                "recall@10": 0.784658338025918,
+                "ndcg@10": 0.6078413964153512,
+                "new_hits@10": 74,
+                "new_targets": 358
+              },
+              "2025-12": {
+                "rows": 1353,
+                "recall@10": 0.7809619684050773,
+                "ndcg@10": 0.6156469785847308,
+                "new_hits@10": 57,
+                "new_targets": 380
+              },
+              "2026-01": {
+                "rows": 1149,
+                "recall@10": 0.7597028877707729,
+                "ndcg@10": 0.5833083254528807,
+                "new_hits@10": 57,
+                "new_targets": 351
+              },
+              "2026-02": {
+                "rows": 759,
+                "recall@10": 0.7578381287867455,
+                "ndcg@10": 0.5930739564775473,
+                "new_hits@10": 36,
+                "new_targets": 235
+              }
+            },
+            "new_target_cohorts": {
+              "first_snapshot_family": {
+                "targets": 675,
+                "hits@10": 67
+              },
+              "known_snapshot_family": {
+                "targets": 1176,
+                "hits@10": 244
+              },
+              "unknown_snapshot_family_metadata": {
+                "targets": 6,
+                "hits@10": 0
+              },
+              "sku_rare_rolling90d": {
+                "targets": 392,
+                "hits@10": 20
+              },
+              "sku_frequent_rolling90d": {
+                "targets": 1465,
+                "hits@10": 291
+              },
+              "sparse_transition": {
+                "targets": 1213,
+                "hits@10": 147
+              },
+              "supported_transition": {
+                "targets": 644,
+                "hits@10": 164
+              },
+              "unrepresented_catalogue": {
+                "targets": 0,
+                "hits@10": 0
+              }
+            },
+            "pack_switch_targets": 455,
+            "true_new_bn_targets": 1402,
+            "pack_switch_in_slate": 427,
+            "true_new_bn_in_slate": 899,
+            "pack_switch_hits@10": 183,
+            "true_new_bn_hits@10": 128,
+            "val_loss": 2.699326269480647
+          }
+        },
+        {
+          "epoch": 10,
+          "train_loss": 3.6871791587838874,
+          "main_loss": 2.768634600650945,
+          "aux_loss": 3.061815076210783,
+          "dropped_queries": 0,
+          "qualified": true,
+          "epoch_seconds": 13.743003583003883,
+          "metrics": {
+            "queries": 6191,
+            "total_targets": 10276,
+            "repeat_targets": 8419,
+            "new_targets": 1857,
+            "recall@5": 0.6585756902008635,
+            "recall@10": 0.7690544355437792,
+            "recall@25": 0.8629078235649532,
+            "recall@50": 0.9082296998521951,
+            "recall@100": 0.9428113308237469,
+            "ndcg@10": 0.6006982783522852,
+            "mrr": 0.5812160437901791,
+            "new_hits@10": 306,
+            "new_recall@10": 0.16478190630048464,
+            "new_hits@25": 645,
+            "new_recall@25": 0.3473344103392569,
+            "new_hits@50": 990,
+            "new_recall@50": 0.5331179321486268,
+            "new_hits@100": 1326,
+            "new_recall@100": 0.7140549273021002,
+            "conditional_new_recall@10": 0.23076923076923078,
+            "repeat_recall@10_micro": 0.8863285425822545,
+            "repeat_recall@10_macro": 0.9116658864049664,
+            "mixed_coverage_macro": 0.9428113308237469,
+            "mixed_coverage_micro": 0.9472557415336706,
+            "total_targets_in_slate": 9734,
+            "new_targets_in_slate": 1326,
+            "new_slate_coverage": 0.7140549273021002,
+            "repeat_targets_in_slate": 8408,
+            "repeat_slate_coverage": 0.998693431523934,
+            "new_reachable_lost_at10": 1020,
+            "history_cohorts": {
+              "cold_0": {
+                "rows": 0,
+                "recall@10": null,
+                "ndcg@10": null,
+                "new_hits@10": 0,
+                "new_targets": 0
+              },
+              "light_1_8": {
+                "rows": 1116,
+                "recall@10": 0.724583973374296,
+                "ndcg@10": 0.6035870282144786,
+                "new_hits@10": 169,
+                "new_targets": 574
+              },
+              "warm_9_31": {
+                "rows": 1808,
+                "recall@10": 0.8068423050032563,
+                "ndcg@10": 0.6357548250051982,
+                "new_hits@10": 109,
+                "new_targets": 594
+              },
+              "truncated_32": {
+                "rows": 3267,
+                "recall@10": 0.7633331523476998,
+                "ndcg@10": 0.5803107420208881,
+                "new_hits@10": 28,
+                "new_targets": 689
+              }
+            },
+            "validation_months": {
+              "2025-10": {
+                "rows": 1616,
+                "recall@10": 0.7618394428728587,
+                "ndcg@10": 0.6001342747900639,
+                "new_hits@10": 84,
+                "new_targets": 533
+              },
+              "2025-11": {
+                "rows": 1314,
+                "recall@10": 0.7821034347860832,
+                "ndcg@10": 0.6057451241244755,
+                "new_hits@10": 71,
+                "new_targets": 358
+              },
+              "2025-12": {
+                "rows": 1353,
+                "recall@10": 0.7825941438177405,
+                "ndcg@10": 0.6166259763992412,
+                "new_hits@10": 59,
+                "new_targets": 380
+              },
+              "2026-01": {
+                "rows": 1149,
+                "recall@10": 0.7554907523575931,
+                "ndcg@10": 0.5812055245358256,
+                "new_hits@10": 56,
+                "new_targets": 351
+              },
+              "2026-02": {
+                "rows": 759,
+                "recall@10": 0.758222406344936,
+                "ndcg@10": 0.5942778212896666,
+                "new_hits@10": 36,
+                "new_targets": 235
+              }
+            },
+            "new_target_cohorts": {
+              "first_snapshot_family": {
+                "targets": 675,
+                "hits@10": 64
+              },
+              "known_snapshot_family": {
+                "targets": 1176,
+                "hits@10": 242
+              },
+              "unknown_snapshot_family_metadata": {
+                "targets": 6,
+                "hits@10": 0
+              },
+              "sku_rare_rolling90d": {
+                "targets": 392,
+                "hits@10": 19
+              },
+              "sku_frequent_rolling90d": {
+                "targets": 1465,
+                "hits@10": 287
+              },
+              "sparse_transition": {
+                "targets": 1213,
+                "hits@10": 143
+              },
+              "supported_transition": {
+                "targets": 644,
+                "hits@10": 163
+              },
+              "unrepresented_catalogue": {
+                "targets": 0,
+                "hits@10": 0
+              }
+            },
+            "pack_switch_targets": 455,
+            "true_new_bn_targets": 1402,
+            "pack_switch_in_slate": 427,
+            "true_new_bn_in_slate": 899,
+            "pack_switch_hits@10": 180,
+            "true_new_bn_hits@10": 126,
+            "val_loss": 2.7077056826377404
+          }
+        }
+      ]
+    }
+  },
+  "stage2_combined_sku_vs_sku_only_ci": {
+    "top4_3acde": {
+      "recall@5_delta": {
+        "point_delta": 0.003196043668099879,
+        "ci_95": [
+          -0.0017890246513473029,
+          0.0030986019607985834,
+          0.007864367943713684
+        ]
+      },
+      "recall@10_delta": {
+        "point_delta": 0.004614502098965963,
+        "ci_95": [
+          -0.00025778684227230754,
+          0.004584944794885245,
+          0.009113593567571049
+        ]
+      },
+      "recall@25_delta": {
+        "point_delta": 0.005613042622411061,
+        "ci_95": [
+          0.0018317388154387483,
+          0.005502354107315026,
+          0.009487094110247552
+        ]
+      },
+      "recall@50_delta": {
+        "point_delta": 0.0023893193579240385,
+        "ci_95": [
+          -0.001614686798857145,
+          0.0023287477505532527,
+          0.00644312788683728
+        ]
+      },
+      "recall@100_delta": {
+        "point_delta": 0.0027088365967383897,
+        "ci_95": [
+          -0.0006574144247935162,
+          0.002677320879950853,
+          0.005993707494008503
+        ]
+      },
+      "ndcg@10_delta": {
+        "point_delta": 0.0015595302935401205,
+        "ci_95": [
+          -0.0015505342207736308,
+          0.0015021888919225894,
+          0.0045907261792557125
+        ]
+      },
+      "new_recall@10_delta": {
+        "point_delta": 0.031233171782444804,
+        "ci_95": [
+          0.018674587879375888,
+          0.030862526486060145,
+          0.043991576582982285
+        ]
+      }
+    }
+  },
+  "stage2_combined_sku_collapsed_to_bn": {
+    "top4_3acde": {
+      "ndcg": {
+        "bn_metrics": {
+          "queries": 6191,
+          "total_bn_targets": 9809,
+          "true_new_bn_targets": 1340,
+          "bn_recall@5": 0.7234295990824868,
+          "bn_recall@10": 0.8249280150505988,
+          "bn_recall@25": 0.9012577285314151,
+          "bn_recall@50": 0.94042264880211,
+          "bn_micro_recall@10": 0.8195534713018656,
+          "bn_ndcg@10": 0.6496602147500935,
+          "true_new_bn_hits@5": 77,
+          "true_new_bn_hits@10": 209,
+          "true_new_bn_hits@25": 504,
+          "true_new_bn_hits@50": 820,
+          "true_new_bn_recall@10": 0.15597014925373134,
+          "true_new_bn_recall@25": 0.3761194029850746,
+          "true_new_bn_recall@50": 0.6119402985074627
+        },
+        "bn_predictions_npz": "checkpoints/roadmap-v2/stage3_combined/runs/stage2-sku_plus_base_name-top4_3acde_own_slates-stage3-seed44/bn_collapsed_ndcg.npz"
+      },
+      "discovery": {
+        "bn_metrics": {
+          "queries": 6191,
+          "total_bn_targets": 9809,
+          "true_new_bn_targets": 1340,
+          "bn_recall@5": 0.7269812452522373,
+          "bn_recall@10": 0.8254385780679316,
+          "bn_recall@25": 0.9042710633005242,
+          "bn_recall@50": 0.9409795078910914,
+          "bn_micro_recall@10": 0.8194515241105108,
+          "bn_ndcg@10": 0.6501668908886716,
+          "true_new_bn_hits@5": 85,
+          "true_new_bn_hits@10": 212,
+          "true_new_bn_hits@25": 516,
+          "true_new_bn_hits@50": 830,
+          "true_new_bn_recall@10": 0.1582089552238806,
+          "true_new_bn_recall@25": 0.3850746268656716,
+          "true_new_bn_recall@50": 0.6194029850746269
+        },
+        "bn_predictions_npz": "checkpoints/roadmap-v2/stage3_combined/runs/stage2-sku_plus_base_name-top4_3acde_own_slates-stage3-seed44/bn_collapsed_discovery.npz"
+      }
+    }
+  },
+  "stage5_base_name_canonical": {
+    "stage": "stage5_base_name_canonical_entity",
+    "tag": "plus_3a_financial_3c_manager_3d_warehouse_3e_parsed_specs",
+    "stage3_groups": [
+      "3a_financial",
+      "3c_manager",
+      "3d_warehouse",
+      "3e_parsed_specs"
+    ],
+    "aux_lambda": 0.3,
+    "seed": 44,
+    "heldout_access": false,
+    "num_base_names": 585,
+    "trained_base_names": 553,
+    "two_tower": {
+      "selected_epoch": 12,
+      "true_new_bn_hits@25": 676,
+      "true_new_bn_hits@50": 928,
+      "true_new_bn_targets": 1340,
+      "training_seconds": 51.756861082991236
+    },
+    "stage1_mlp": {
+      "selected_epoch": 1,
+      "bn_metrics": {
+        "queries": 6191,
+        "total_bn_targets": 9809,
+        "true_new_bn_targets": 1340,
+        "bn_recall@5": 0.7176434220154182,
+        "bn_recall@10": 0.8234689025237124,
+        "bn_recall@25": 0.9029859948123526,
+        "bn_recall@50": 0.9416108006278597,
+        "bn_micro_recall@10": 0.8171067387093486,
+        "bn_ndcg@10": 0.6420602235432749,
+        "true_new_bn_hits@5": 90,
+        "true_new_bn_hits@10": 222,
+        "true_new_bn_hits@25": 518,
+        "true_new_bn_hits@50": 842,
+        "true_new_bn_recall@10": 0.16567164179104477,
+        "true_new_bn_recall@25": 0.38656716417910447,
+        "true_new_bn_recall@50": 0.6283582089552239
+      },
+      "bn_predictions_npz": "checkpoints/roadmap-v2/stage5_base_entity/stage1_mlp-plus_3a_financial_3c_manager_3d_warehouse_3e_parsed_specs-seed44/bn_predictions.npz"
+    },
+    "stage2_slate_coverage": {
+      "total": 9557,
+      "true_new": 1118
+    },
+    "stage2_ranker": {
+      "ndcg": {
+        "epoch": 5,
+        "bn_metrics": {
+          "queries": 6191,
+          "total_bn_targets": 9809,
+          "true_new_bn_targets": 1340,
+          "bn_recall@5": 0.7268155553236062,
+          "bn_recall@10": 0.8289780529360431,
+          "bn_recall@25": 0.9060058189322782,
+          "bn_recall@50": 0.9418358371550936,
+          "bn_micro_recall@10": 0.8220002038943827,
+          "bn_ndcg@10": 0.6532849438369143,
+          "true_new_bn_hits@5": 94,
+          "true_new_bn_hits@10": 217,
+          "true_new_bn_hits@25": 542,
+          "true_new_bn_hits@50": 844,
+          "true_new_bn_recall@10": 0.1619402985074627,
+          "true_new_bn_recall@25": 0.4044776119402985,
+          "true_new_bn_recall@50": 0.6298507462686567
+        },
+        "bn_predictions_npz": "checkpoints/roadmap-v2/stage5_base_entity/stage2_ranker-plus_3a_financial_3c_manager_3d_warehouse_3e_parsed_specs-seed44/bn_predictions_ndcg.npz",
+        "resolved_sku_metrics": {
+          "sku_recall@10": 0.6883386499115826,
+          "sku_ndcg@10": 0.55317352714076,
+          "sku_new_hits@10": 119
+        }
+      },
+      "discovery": {
+        "epoch": 9,
+        "bn_metrics": {
+          "queries": 6191,
+          "total_bn_targets": 9809,
+          "true_new_bn_targets": 1340,
+          "bn_recall@5": 0.7249388944498019,
+          "bn_recall@10": 0.8257341804747581,
+          "bn_recall@25": 0.9021980068537591,
+          "bn_recall@50": 0.9403561141842843,
+          "bn_micro_recall@10": 0.8190437353450912,
+          "bn_ndcg@10": 0.6513918160650074,
+          "true_new_bn_hits@5": 97,
+          "true_new_bn_hits@10": 219,
+          "true_new_bn_hits@25": 522,
+          "true_new_bn_hits@50": 833,
+          "true_new_bn_recall@10": 0.16343283582089552,
+          "true_new_bn_recall@25": 0.3895522388059702,
+          "true_new_bn_recall@50": 0.6216417910447761
+        },
+        "bn_predictions_npz": "checkpoints/roadmap-v2/stage5_base_entity/stage2_ranker-plus_3a_financial_3c_manager_3d_warehouse_3e_parsed_specs-seed44/bn_predictions_discovery.npz",
+        "resolved_sku_metrics": {
+          "sku_recall@10": 0.6859317258623553,
+          "sku_ndcg@10": 0.5521716444130478,
+          "sku_new_hits@10": 120
+        }
+      }
+    },
+    "preserved_hashes_verified": true
+  },
+  "head_to_head_sku_collapsed_to_stage5_ci": {
+    "ndcg": {
+      "bn_recall_5_delta": {
+        "point_delta": 0.0033859562411195435,
+        "ci_95": [
+          -0.0017867701650390304,
+          0.0033523768195632777,
+          0.008614986876646035
+        ]
+      },
+      "bn_recall_10_delta": {
+        "point_delta": 0.004050037885444147,
+        "ci_95": [
+          -5.641080025100321e-05,
+          0.0040152503499290134,
+          0.00836364767147889
+        ]
+      },
+      "bn_ndcg_10_delta": {
+        "point_delta": 0.0036247290868207846,
+        "ci_95": [
+          0.0001137208392466976,
+          0.0036184203341548486,
+          0.007534436089974966
+        ]
+      },
+      "true_new_bn_recall@10_delta": {
+        "point_delta": 0.005970149253731343,
+        "point_hits_delta": 8,
+        "ci_95": [
+          -0.010090324287299545,
+          0.0059413301916867705,
+          0.02313049581575146
+        ]
+      }
+    },
+    "discovery": {
+      "bn_recall_5_delta": {
+        "point_delta": -0.0020423508024354302,
+        "ci_95": [
+          -0.0075718434415690756,
+          -0.002050496215370369,
+          0.003039679306225753
+        ]
+      },
+      "bn_recall_10_delta": {
+        "point_delta": 0.00029560240682662144,
+        "ci_95": [
+          -0.003735593788312333,
+          0.0002497827379712367,
+          0.00445548557698024
+        ]
+      },
+      "bn_ndcg_10_delta": {
+        "point_delta": 0.0012249251763357706,
+        "ci_95": [
+          -0.002581739539447665,
+          0.001210444583453422,
+          0.005187288265243824
+        ]
+      },
+      "true_new_bn_recall@10_delta": {
+        "point_delta": 0.0052238805970149255,
+        "point_hits_delta": 7,
+        "ci_95": [
+          -0.0099011787611688,
+          0.00539291217257319,
+          0.021122210890202605
+        ]
+      }
+    }
+  },
+  "preserved_hashes_verified": true
+}

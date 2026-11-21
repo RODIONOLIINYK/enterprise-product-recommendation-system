@@ -1,0 +1,103 @@
+{
+  "stage": "stage5_base_name_canonical_entity",
+  "tag": "plus_3a_financial_3c_manager",
+  "stage3_groups": [
+    "3a_financial",
+    "3c_manager"
+  ],
+  "aux_lambda": 0.3,
+  "seed": 42,
+  "heldout_access": false,
+  "num_base_names": 585,
+  "trained_base_names": 553,
+  "two_tower": {
+    "selected_epoch": 17,
+    "true_new_bn_hits@25": 678,
+    "true_new_bn_hits@50": 900,
+    "true_new_bn_targets": 1340,
+    "training_seconds": 39.82666120798967
+  },
+  "stage1_mlp": {
+    "selected_epoch": 1,
+    "bn_metrics": {
+      "queries": 6191,
+      "total_bn_targets": 9809,
+      "true_new_bn_targets": 1340,
+      "bn_recall@5": 0.7154329633876745,
+      "bn_recall@10": 0.8226834867853514,
+      "bn_recall@25": 0.8994900864260686,
+      "bn_recall@50": 0.9395203769700503,
+      "bn_micro_recall@10": 0.8160872667957998,
+      "bn_ndcg@10": 0.6394394226613322,
+      "true_new_bn_hits@5": 92,
+      "true_new_bn_hits@10": 204,
+      "true_new_bn_hits@25": 500,
+      "true_new_bn_hits@50": 821,
+      "true_new_bn_recall@10": 0.15223880597014924,
+      "true_new_bn_recall@25": 0.373134328358209,
+      "true_new_bn_recall@50": 0.6126865671641791
+    },
+    "bn_predictions_npz": "checkpoints/roadmap-v2/stage5_base_entity/stage1_mlp-plus_3a_financial_3c_manager-seed42/bn_predictions.npz"
+  },
+  "stage2_slate_coverage": {
+    "total": 9558,
+    "true_new": 1119
+  },
+  "stage2_ranker": {
+    "ndcg": {
+      "epoch": 7,
+      "bn_metrics": {
+        "queries": 6191,
+        "total_bn_targets": 9809,
+        "true_new_bn_targets": 1340,
+        "bn_recall@5": 0.722088430514699,
+        "bn_recall@10": 0.826802881959386,
+        "bn_recall@25": 0.9021041398047518,
+        "bn_recall@50": 0.9413416718165871,
+        "bn_micro_recall@10": 0.82006320725864,
+        "bn_ndcg@10": 0.6542264045715883,
+        "true_new_bn_hits@5": 93,
+        "true_new_bn_hits@10": 226,
+        "true_new_bn_hits@25": 526,
+        "true_new_bn_hits@50": 846,
+        "true_new_bn_recall@10": 0.16865671641791044,
+        "true_new_bn_recall@25": 0.3925373134328358,
+        "true_new_bn_recall@50": 0.6313432835820896
+      },
+      "bn_predictions_npz": "checkpoints/roadmap-v2/stage5_base_entity/stage2_ranker-plus_3a_financial_3c_manager-seed42/bn_predictions_ndcg.npz",
+      "resolved_sku_metrics": {
+        "sku_recall@10": 0.6853082628378261,
+        "sku_ndcg@10": 0.5534498347859154,
+        "sku_new_hits@10": 120
+      }
+    },
+    "discovery": {
+      "epoch": 7,
+      "bn_metrics": {
+        "queries": 6191,
+        "total_bn_targets": 9809,
+        "true_new_bn_targets": 1340,
+        "bn_recall@5": 0.722088430514699,
+        "bn_recall@10": 0.826802881959386,
+        "bn_recall@25": 0.9021041398047518,
+        "bn_recall@50": 0.9413416718165871,
+        "bn_micro_recall@10": 0.82006320725864,
+        "bn_ndcg@10": 0.6542264045715883,
+        "true_new_bn_hits@5": 93,
+        "true_new_bn_hits@10": 226,
+        "true_new_bn_hits@25": 526,
+        "true_new_bn_hits@50": 846,
+        "true_new_bn_recall@10": 0.16865671641791044,
+        "true_new_bn_recall@25": 0.3925373134328358,
+        "true_new_bn_recall@50": 0.6313432835820896
+      },
+      "bn_predictions_npz": "checkpoints/roadmap-v2/stage5_base_entity/stage2_ranker-plus_3a_financial_3c_manager-seed42/bn_predictions_discovery.npz",
+      "resolved_sku_metrics": {
+        "sku_recall@10": 0.6853082628378261,
+        "sku_ndcg@10": 0.5534498347859154,
+        "sku_new_hits@10": 120
+      }
+    }
+  },
+  "preserved_hashes_verified": true
+}
