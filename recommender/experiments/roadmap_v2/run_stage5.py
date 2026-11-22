@@ -61,6 +61,7 @@ from .config import (
 )
 from .first_baskets import FIRST_ORDER_GROUPS, append_first_baskets, prepare_first_baskets
 from .parsed_spec_features import PARSED_SPEC_FEATURE_NAMES, prepare_or_load_parsed_spec_feature_bundle
+from .stage5_artifacts import product_inputs_digest, vector_identity
 from .stage1_mlp import RoadmapStage1Selector
 from .stage5_base_entity import (
     build_base_name_sequences,
@@ -405,8 +406,12 @@ def train_stage5_two_tower(
     for k in (25, 50):
         if int(available_new.gather(1, order[:, :k]).sum()) != ckpt[f"h{k}"]:
             raise ValueError(f"Two-Tower validation replay mismatch at depth {k}.")
-    atomic_torch_save({"v_bn": v_bn, "u_bn": u_tr, "dot_scores": tr_dot}, out_dir / "train_vectors.pt")
-    atomic_torch_save({"v_bn": v_bn, "u_bn": u_va, "dot_scores": va_dot}, out_dir / "val_vectors.pt")
+    tower_hash = file_digest(replay_checkpoint or out_dir / "best.pt")
+    inputs_hash = product_inputs_digest(prod_inputs)
+    for name, split, u, scores in (("train", tr, u_tr, tr_dot), ("val", va, u_va, va_dot)):
+        identity = vector_identity(split, universe["base_names"], tower_hash, inputs_hash)
+        atomic_torch_save({**identity, "v_bn": v_bn, "u_bn": u, "dot_scores": scores},
+                          out_dir / f"{name}_vectors.pt")
     res = {
         "selected_epoch": int(ckpt["epoch"]),
         "true_new_bn_hits@25": int(ckpt["h25"]),
@@ -619,7 +624,7 @@ def run_stage5(
 def run_dated_reference(*, seed=SEED, device=None, replay=False):
     from .dated_baskets import prepare_dated_baskets
 
-    return _run_dated(prepare_dated_baskets(), seed, device, replay)
+    return _run_dated(prepare_dated_baskets(historical_recipe=replay), seed, device, replay)
 
 
 def _run_dated(prepared, seed, device, replay):

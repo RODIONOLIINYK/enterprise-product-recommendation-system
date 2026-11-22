@@ -41,6 +41,7 @@ from recommender.text import load_cached_embeddings
 
 from .augmentation import build_strict_60d_aux_labels
 from .commercial_features import COMMERCIAL_PARQUET_PATH
+from .stage5_artifacts import stage5_run_paths
 from .config import (
     ARTIFACT_ROOT,
     EVIDENCE_ROOT,
@@ -76,7 +77,6 @@ from .stage5_base_entity import (
 
 
 OUT_ROOT = ARTIFACT_ROOT / "stage5_pure_bn_v1"
-SUMMARY_PATH = EVIDENCE_ROOT / "stage5_pure_bn_seed42.json"
 REF_3STAGE_PATH = EVIDENCE_ROOT / "stage5_3stage_reference.json"
 
 
@@ -183,7 +183,11 @@ def _prepare_native_dated_baskets():
     return splits, bn_static, universe, enrichment, vocabs, purchases, catalogue, product_ids, sku_data, reps
 
 
-def run_pure_bn_experiment(*, seed: int = SEED, device: Optional[str] = None) -> Dict[str, Any]:
+def run_pure_bn_experiment(
+    *, seed: int = SEED, device: Optional[str] = None,
+    output_dir: Optional[Path] = None, summary_path: Optional[Path] = None,
+) -> Dict[str, Any]:
+    run_root, summary_path = stage5_run_paths(OUT_ROOT, output_dir, summary_path)
     t_all = time.perf_counter()
     dev = get_device(device)
     before_hashes = snapshot_preserved_hashes()
@@ -204,7 +208,6 @@ def run_pure_bn_experiment(*, seed: int = SEED, device: Optional[str] = None) ->
         reps,
     ) = _prepare_native_dated_baskets()
 
-    OUT_ROOT.mkdir(parents=True, exist_ok=True)
     n_bn = universe["num_base_names"]
     bn_to_members = universe["bn_to_member_pid_indices"]
     tr_bn = bn_data["train"]
@@ -257,7 +260,7 @@ def run_pure_bn_experiment(*, seed: int = SEED, device: Optional[str] = None) ->
     }
 
     for arm_name, p_in in arms.items():
-        arm_dir = OUT_ROOT / f"{arm_name}-seed{seed}"
+        arm_dir = run_root / f"{arm_name}-seed{seed}"
         tt_dir = arm_dir / "two_tower"
         s2_dir = arm_dir / "ranker_8h"
         s2_dir.mkdir(parents=True, exist_ok=True)
@@ -399,7 +402,8 @@ def run_pure_bn_experiment(*, seed: int = SEED, device: Optional[str] = None) ->
     _verify_reference_files(ref3)
     results["preserved_hashes_verified"] = True
     results["elapsed_seconds"] = float(time.perf_counter() - t_all)
-    atomic_json(results, SUMMARY_PATH, overwrite=True)
+    results["summary_path"] = str(summary_path)
+    atomic_json(results, summary_path, overwrite=False)
     return results
 
 
@@ -407,9 +411,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument("--output-dir", type=Path, help="New exclusive run directory.")
+    parser.add_argument("--summary-path", type=Path, help="New summary file (default: inside the run directory).")
     args = parser.parse_args()
-    res = run_pure_bn_experiment(seed=args.seed, device=args.device)
-    print(f"\nSaved pure-base_name experiment summary to {SUMMARY_PATH} ({res['elapsed_seconds']:.1f}s)", flush=True)
+    res = run_pure_bn_experiment(seed=args.seed, device=args.device, output_dir=args.output_dir, summary_path=args.summary_path)
+    print(f"\nSaved pure-base_name experiment summary to {res['summary_path']} ({res['elapsed_seconds']:.1f}s)", flush=True)
 
 
 if __name__ == "__main__":

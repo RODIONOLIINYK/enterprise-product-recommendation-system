@@ -26,7 +26,7 @@ from recommender.experiments.rolling_candidate_v2.config import DEFAULT_RETRIEVE
 from recommender.experiments.static_enrichment.metadata import load_enriched_companies
 from recommender.scope import get_datasets_locs
 from recommender.sequences import PURCHASE_DATE_ORIGIN
-from recommender.split import TEST_START
+from recommender.split import TEST_START, TRAIN_CUTOFF
 from recommender.text import load_cached_embeddings
 from recommender.train_ranker import company_embeddings_path
 from recommender.train_retriever import build_customer_metadata, get_device
@@ -50,15 +50,32 @@ from .native_base_name import (
     CUSTOMER_DYNAMIC_11_FEATURE_NAMES,
     NativeBaseNameFeatureEngine,
     build_base_name_static_representations,
+    candidate_storage_dtype,
+    observed_pack_ids,
+    representative_attr_ids,
 )
 from .parsed_spec_features import parse_company_equipment_domains
-from .run_stage5 import _stage5_tower
+from .run_stage5 import _stage5_tower, _verify_reference_files
 from .stage5_base_entity import build_base_name_universe
 
 
 ACTIVE_REF_PATH = EVIDENCE_ROOT / "stage5_reference.json"
 C_IDX = {name: i for i, name in enumerate(CANDIDATE_38_FEATURE_NAMES)}
 U_IDX = {name: i for i, name in enumerate(CUSTOMER_DYNAMIC_11_FEATURE_NAMES)}
+
+
+def _case_filter_indices(cases):
+    return {
+        "any": list(range(len(cases))),
+        "returning": [i for i, c in enumerate(cases) if not c.first],
+        "first_observed": [i for i, c in enumerate(cases) if c.first],
+        "has_new": [i for i, c in enumerate(cases) if (c.new.any() or c.extra_new_bn_targets > 0) and not c.first],
+        "multi_item": [i for i, c in enumerate(cases) if int(c.target.sum()) + c.extra_bn_targets >= 2],
+    }
+
+
+def _live_candidate_features(values, storage_dtype):
+    return values.astype(storage_dtype, copy=False).astype(np.float32, copy=False)
 
 
 class Stage5LiveDemoEngine:
@@ -71,6 +88,7 @@ class Stage5LiveDemoEngine:
         device: Optional[str] = None,
         variant_override: Optional[str] = None,
         checkpoint_override: Optional[Path] = None,
+        frozen_v5_replay: bool = False,
     ):
         if not allow_heldout_test:
             raise PermissionError("Demo uses held-out Test baskets (>= 2026-02-19); pass --allow-heldout-test.")
@@ -80,6 +98,11 @@ class Stage5LiveDemoEngine:
         # Default to CPU for single-request real-time serving (~1.13 ms median, zero MPS sync overhead!)
         self.dev = torch.device(device) if device else torch.device("cpu")
         self.reference = json.loads(ACTIVE_REF_PATH.read_text(encoding="utf-8"))
+        _verify_reference_files(self.reference)
+        self.frozen_v5_replay = frozen_v5_replay
+        if frozen_v5_replay and self.reference.get("reference_id") != "stage5-v5-shared-uv-ep10":
+            raise ValueError("Historical v5 replay requires the pinned stage5-v5-shared-uv-ep10 reference.")
+        self.candidate_dtype = candidate_storage_dtype(self.reference.get("candidate_feature_storage_dtype", "float16"))
 
         print("[demo] Loading catalogue, purchases, companies & frozen static bundles...", flush=True)
         dev_purchases = load_development_purchases(str(CLEANED_PURCHASES_PATH))
@@ -97,6 +120,9 @@ class Stage5LiveDemoEngine:
         self.profiles = build_customer_metadata(self.companies, self.vocabs)
 
         dev_pool = RollingCandidatePool(self.catalogue, dev_purchases)
+        observed_before = (None if self.reference.get("metadata_policy") == "snapshot_unverified"
+                           else self.reference.get("observed_before", TRAIN_CUTOFF))
+        allowed_members = observed_pack_ids(dev_pool.first_sales, observed_before)
         self.universe = build_base_name_universe(self.product_ids, self.catalogue, dev_purchases)
         self.n_bn = self.universe["num_base_names"]
         self.reps = first_observed_pack_indices(
@@ -136,6 +162,8 @@ class Stage5LiveDemoEngine:
             self.product_ids,
             self.universe,
             self.reps,
+            allowed_member_pids=allowed_members,
+            frozen_v5_replay=frozen_v5_replay,
             allow_non_monotonic=True,
             allow_heldout_test=True,
         )
@@ -149,33 +177,16 @@ class Stage5LiveDemoEngine:
         self.cases, self.cohort_counts = build_test_basket_cases(
             self.all_purchases, self.product_ids, self.universe, self.test_pool
         )
-        # Keep raw unmodeled formulation names per test basket for transparent display
-        self.case_unmodeled_bns: List[List[str]] = []
-        by_bn = self.universe["bn_to_idx"]
-        all_pid_to_bn = self.universe["all_pid_to_bn"]
-        test_grouped = {
-            (dt, cid): grp["product_id"].tolist()
-            for (dt, cid), grp in self.all_purchases.loc[self.all_purchases["purchase_date"] >= TEST_START].groupby(
-                ["purchase_date", "customer_id"], sort=False
-            )
-        }
-        for c in self.cases:
-            pids_day = test_grouped.get((c.date, c.customer), [])
-            unmod = sorted({all_pid_to_bn.get(p, p) for p in pids_day if all_pid_to_bn.get(p, "") not in by_bn})
-            self.case_unmodeled_bns.append(unmod)
-
         # Pre-index filter pools for instant UI filtering
-        self.filter_indices = {
-            "any": list(range(len(self.cases))),
-            "returning": [i for i, c in enumerate(self.cases) if not c.first],
-            "first_observed": [i for i, c in enumerate(self.cases) if c.first],
-            "has_new": [i for i, c in enumerate(self.cases) if bool(c.new.any()) and not c.first],
-            "multi_item": [i for i, c in enumerate(self.cases) if int(c.target.sum()) >= 2],
-        }
+        self.filter_indices = _case_filter_indices(self.cases)
 
         # Load frozen Pure Pack-Free + 65D Structured Multi-Hot Two-Tower (keep CustomerTower live for per-request u_bn!)
         print("[demo] Loading frozen 65D Two-Tower (cached v_bn + live CustomerTower u_bn) & active ranker...", flush=True)
-        bn_static = build_base_name_static_representations(self.universe, self.product_ids, self.catalogue, self.reps)
+        bn_static = build_base_name_static_representations(
+            self.universe, self.product_ids, self.catalogue, self.reps, allowed_member_pids=allowed_members,
+            frozen_v5_specs=self.reference["reference_id"] == "stage5-v5-shared-uv-ep10",
+        )
+        attr_ids = representative_attr_ids(enrichment, self.product_ids, self.reps, allowed_members)
         tt_ckpt_path = Path(self.reference["checkpoints"]["two_tower"]["path"])
         spec_dim = int(self.reference.get("num_product_structured_specs", 65))
         self.tower = _stage5_tower(
@@ -192,7 +203,7 @@ class Stage5LiveDemoEngine:
             p_dev = {
                 "text_embedding": bn_static["text_pack_free"].float().to(self.dev),
                 "demand_features": bn_static["full_specs_multihot"].float().to(self.dev),
-                "attr_ids": {k: v[self.reps].to(self.dev) for k, v in enrichment["product_attr_ids"].items()},
+                "attr_ids": {k: v.to(self.dev) for k, v in attr_ids.items()},
             }
             self.v_bn = self.tower.product_vectors(p_dev).detach()  # (585, 128) on device
 
@@ -282,7 +293,7 @@ class Stage5LiveDemoEngine:
             .sum()
             .sort_values(["customer_id", "purchase_date", "bn"], kind="stable")
         )
-        self._cust_seq_events: Dict[str, tuple[np.ndarray, list[tuple[int, int, float, int, int, int, int]]]] = {}
+        self._cust_seq_events: Dict[str, tuple[np.ndarray, list[tuple[int, str, int, float, int, int, int, int]]]] = {}
         for cid, grp in agg.groupby("customer_id", sort=False):
             dts = ((grp["purchase_date"] - PURCHASE_DATE_ORIGIN).dt.days).to_numpy(dtype=np.int64)
             months = grp["purchase_date"].dt.month.to_numpy(dtype=np.int64)
@@ -290,7 +301,7 @@ class Stage5LiveDemoEngine:
             for d_i, bn_s, q_v, m_i in zip(dts.tolist(), grp["bn"].tolist(), grp["quantity"].tolist(), months.tolist()):
                 b_id = bn_to_idx.get(bn_s, -1) + 1
                 c_i, sc_i, bl_i = bn_meta_ids.get(bn_s, (0, 0, 0))
-                evs.append((d_i, b_id, float(q_v), c_i, sc_i, bl_i, int(m_i)))
+                evs.append((d_i, bn_s, b_id, float(q_v), c_i, sc_i, bl_i, int(m_i)))
             self._cust_seq_events[cid] = (dts, evs)
 
         # 2. Pre-index pack-size resolver timelines
@@ -355,7 +366,7 @@ class Stage5LiveDemoEngine:
             tbl.cursor = cur
         self.native_engine._last_date = chosen_dt
 
-    def _fast_build_sequence(self, cid: str, pday: int, seq_len: int = 32) -> Dict[str, torch.Tensor]:
+    def _fast_build_sequence(self, cid: str, pday: int, seq_len: int = 32, *, frozen_v5_replay=False) -> Dict[str, torch.Tensor]:
         """Bit-exact single-customer base_name 32-event sequence builder (<0.1 ms)."""
         sequence = np.zeros((1, seq_len, 9), dtype=np.float32)
         attn_mask = np.zeros((1, seq_len), dtype=np.int64)
@@ -373,16 +384,18 @@ class Stage5LiveDemoEngine:
                 log60 = math.log1p(60.0)
                 log50 = math.log1p(50.0)
                 prior_evs = evs[:stop]
-                bn_counts: Dict[int, int] = {}
-                bn_vols: Dict[int, float] = {}
+                bn_counts: Dict[str, int] = {}
+                bn_vols: Dict[str, float] = {}
                 cum_vol = 0.0
                 start_keep = max(0, stop - seq_len)
                 prev_day = prior_evs[0][0]
                 last_day = prior_evs[-1][0]
-                for idx_e, (d_i, b_id, q_v, c_i, sc_i, bl_i, m_i) in enumerate(prior_evs):
-                    prev_cnt = bn_counts.get(b_id, 0)
-                    bn_counts[b_id] = prev_cnt + 1
-                    bn_vols[b_id] = bn_vols.get(b_id, 0.0) + q_v
+                for idx_e, (d_i, bn_s, b_id, q_v, c_i, sc_i, bl_i, m_i) in enumerate(prior_evs):
+                    if frozen_v5_replay and b_id == 0:
+                        bn_s = ""
+                    prev_cnt = bn_counts.get(bn_s, 0)
+                    bn_counts[bn_s] = prev_cnt + 1
+                    bn_vols[bn_s] = bn_vols.get(bn_s, 0.0) + q_v
                     cum_vol += q_v
                     gap_days = max(0, d_i - prev_day) if idx_e > 0 else 0
                     prev_day = d_i
@@ -402,7 +415,7 @@ class Stage5LiveDemoEngine:
                         sequence[0, slot, 3] = math.sin(angle)
                         sequence[0, slot, 4] = math.cos(angle)
                         sequence[0, slot, 5] = min(1.0, math.log1p(prev_cnt) / log50)
-                        sequence[0, slot, 6] = min(1.0, bn_vols[b_id] / max(cum_vol, 1e-6))
+                        sequence[0, slot, 6] = min(1.0, bn_vols[bn_s] / max(cum_vol, 1e-6))
                         sequence[0, slot, 7] = 1.0 if prev_cnt > 0 else 0.0
                         sequence[0, slot, 8] = 1.0
         return {
@@ -494,7 +507,8 @@ class Stage5LiveDemoEngine:
             # 1. Strictly-prior native 38D candidate + 11D current customer state + 32-event sequence (< date)
             t_feat0 = time.perf_counter()
             cand_38, cust_11 = self.native_engine.build_split(cid, date)
-            seqs = self._fast_build_sequence(cid, day_int)
+            cand_38 = _live_candidate_features(cand_38, self.candidate_dtype)
+            seqs = self._fast_build_sequence(cid, day_int, frozen_v5_replay=self.frozen_v5_replay)
             seqs["sequence"][..., 3:5] = 0.0  # calendar month permanently zeroed
             t_feat_ms = 1000.0 * (time.perf_counter() - t_feat0)
 
@@ -612,7 +626,7 @@ class Stage5LiveDemoEngine:
             comp = self.company_map.get(cid, {})
             desc_str = str(comp.get("description", "")) if pd.notna(comp.get("description", "")) else ""
             ind_str = str(comp.get("industry_branch", "")) if pd.notna(comp.get("industry_branch", "")) else ""
-            equip_domains = sorted(parse_company_equipment_domains(desc_str, ind_str))
+            equip_domains = sorted(parse_company_equipment_domains(desc_str, ind_str, frozen_v5=self.frozen_v5_replay))
 
             customer_panel = {
                 "customer_id": cid,
@@ -724,13 +738,13 @@ class Stage5LiveDemoEngine:
                         "hit_top10": (rk is not None and rk <= 10),
                     }
                 )
-            for u_bn in self.case_unmodeled_bns[case_idx]:
+            for u_bn, is_new in c.unmodeled_novelty:
                 gt_items.append(
                     {
                         "base_name": u_bn,
-                        "brand": "New Test Launch",
+                        "brand": "",
                         "category": "Unmodeled (>2026-02-18)",
-                        "is_new": True,
+                        "is_new": is_new,
                         "is_eligible": False,
                         "is_modeled": False,
                         "predicted_rank": None,
@@ -1184,7 +1198,7 @@ function renderCase(d) {
     const cls = g.hit_top10 ? (g.is_new ? 'newhit' : 'hit') : '';
     const rkTxt = g.predicted_rank !== null
       ? (g.hit_top10 ? `Rank #${g.predicted_rank} ✓` : `Rank #${g.predicted_rank}`)
-      : (g.is_modeled ? 'Ineligible on date' : 'Unmodeled test launch');
+      : (g.is_modeled ? 'Ineligible on date' : 'Outside modeled catalogue');
     const tag = g.is_new ? '<span class="pill newtag">Truly New</span>' : '<span class="pill">Repeat</span>';
     return `<div class="gt-item ${cls}">
       <div>
@@ -1290,6 +1304,7 @@ def main() -> None:
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--variant", type=str, default=None)
     parser.add_argument("--checkpoint", type=Path, default=None)
+    parser.add_argument("--replay-frozen-features", action="store_true", help="Reproduce the original v5 validation feature recipe.")
     args = parser.parse_args()
 
     engine = Stage5LiveDemoEngine(
@@ -1297,6 +1312,7 @@ def main() -> None:
         device=args.device,
         variant_override=args.variant,
         checkpoint_override=args.checkpoint,
+        frozen_v5_replay=args.replay_frozen_features,
     )
     server = create_server(engine, args.host, args.port)
     print(f"[demo] Live dashboard running at http://{args.host}:{args.port} (Ctrl+C to stop)", flush=True)

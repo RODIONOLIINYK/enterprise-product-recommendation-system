@@ -10,13 +10,16 @@ from bisect import bisect_left
 from collections import Counter, OrderedDict
 from heapq import heappop, heappush
 import math
+import os
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
 import torch
 
+from recommender.artifacts import json_digest
 from recommender.catalogue import CONTAINER_TYPES
 from recommender.experiments.dynamic_selector.feature_builder import RelationshipTable, log_count
 from recommender.experiments.static_enrichment.text_cache import _clean_field, _dedupe_tokens
@@ -30,7 +33,6 @@ from .parsed_spec_features import (
     parse_company_equipment_domains,
     parse_pack_size_liters_kg,
     parse_product_application,
-    parse_viscosity_grade,
     parse_viscosity_grades,
 )
 
@@ -258,12 +260,35 @@ def _format_pack_size(val: float) -> str:
     return f"{val:.2f}".rstrip("0").rstrip(".")
 
 
+def observed_pack_ids(first_sales: pd.Series, observed_before: Optional[pd.Timestamp]) -> Optional[set[str]]:
+    """Freeze pack metadata using the rolling pool's first genuine paid sale per SKU."""
+    if observed_before is None:
+        return None
+    return set(first_sales.index[first_sales.lt(pd.Timestamp(observed_before).normalize())])
+
+
+def representative_attr_ids(enrichment, product_ids, reps, allowed_member_pids):
+    values = {key: ids[reps] for key, ids in enrichment["product_attr_ids"].items()}
+    if allowed_member_pids is not None:
+        missing = torch.tensor([product_ids[i] not in allowed_member_pids for i in reps], dtype=torch.bool)
+        values = {key: ids.masked_fill(missing, 0) for key, ids in values.items()}
+    return values
+
+
+def candidate_storage_dtype(name):
+    if name not in ("float16", "float32"):
+        raise ValueError(f"Unsupported candidate feature storage dtype: {name}")
+    return np.dtype(name)
+
+
 def build_base_name_static_representations(
     universe: Mapping[str, Any],
     product_ids: Sequence[str],
     catalogue: pd.DataFrame,
     reps: Sequence[int],
     *,
+    allowed_member_pids: Optional[set[str]] = None,
+    frozen_v5_specs: bool = False,
     cache_path: Path = CACHE_ROOT / "pure_bn_text_cache_v1.pt",
 ) -> Dict[str, Any]:
     """Build & cache BGE-M3 embeddings strictly for the 585 distinct base_names:
@@ -278,6 +303,8 @@ def build_base_name_static_representations(
     """
     base_names = list(universe["base_names"])
     members = universe["bn_to_member_pid_indices"]
+    if allowed_member_pids is not None:
+        catalogue = catalogue.loc[catalogue["product_id"].isin(allowed_member_pids)]
     cat_idx = catalogue.drop_duplicates("product_id").set_index("product_id")
 
     pack_free_texts: List[str] = []
@@ -309,7 +336,7 @@ def build_base_name_static_representations(
         sizes: set[float] = set()
         vol_idxs: set[int] = set()
         apps: set[str] = set()
-        viscs: set[str] = set(parse_viscosity_grades(bn_name))
+        viscs: set[str] = set()
         for p_i in mem_idxs:
             pid = product_ids[int(p_i)]
             if pid not in cat_idx.index:
@@ -324,7 +351,7 @@ def build_base_name_static_representations(
             if sz is not None and np.isfinite(sz) and sz > 0:
                 sizes.add(round(float(sz), 3))
                 vol_idxs.add(volume_bucket_index(float(sz)))
-            viscs |= parse_viscosity_grades(p_name)
+            viscs.update(parse_viscosity_grades(p_name, frozen_v5=frozen_v5_specs))
             a = parse_product_application(
                 txt,
                 category=_clean_field(r.get("product_category")),
@@ -334,6 +361,8 @@ def build_base_name_static_representations(
             if a in APPLICATION_TO_IDX:
                 apps.add(a)
 
+        if allowed_member_pids is None or any(product_ids[i] in allowed_member_pids for i in mem_idxs):
+            viscs.update(parse_viscosity_grades(bn_name, frozen_v5=frozen_v5_specs))
         if conts:
             for c_val in conts:
                 multihot[b_i, CONTAINER_TO_IDX[c_val]] = 1.0
@@ -372,8 +401,13 @@ def build_base_name_static_representations(
     full_specs = np.concatenate([multihot, vol_multihot, app_multihot, visc_multihot], axis=1)
 
     cache_path = Path(cache_path)
-    if cache_path.is_file():
-        cached = torch.load(cache_path, map_location="cpu", weights_only=False)
+    # The historical cache remains readable. Write misses to an immutable text-specific path.
+    text_key = json_digest([base_names, pack_free_texts, all_packs_texts])
+    keyed_cache = cache_path.with_name(f"{cache_path.stem}-{text_key}{cache_path.suffix}")
+    for existing in (keyed_cache, cache_path):
+        if not existing.is_file():
+            continue
+        cached = torch.load(existing, map_location="cpu", weights_only=False)
         if (
             cached.get("base_names") == base_names
             and cached.get("pack_free_texts") == pack_free_texts
@@ -413,7 +447,13 @@ def build_base_name_static_representations(
         "viscosity_buckets": VISCOSITY_BUCKETS,
     }
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(payload, cache_path)
+    with NamedTemporaryFile(dir=keyed_cache.parent) as tmp:
+        torch.save(payload, tmp)
+        tmp.flush()
+        try:
+            os.link(tmp.name, keyed_cache)
+        except FileExistsError:
+            pass  # Another builder published the same text identity.
     return payload
 
 
@@ -437,9 +477,12 @@ class NativeBaseNameFeatureEngine:
         universe: Mapping[str, Any],
         reps: Sequence[int],
         *,
+        allowed_member_pids: Optional[set[str]] = None,
+        frozen_v5_replay: bool = False,
         allow_non_monotonic: bool = False,
         allow_heldout_test: bool = False,
     ):
+        self.frozen_v5_replay = frozen_v5_replay
         self.allow_non_monotonic = bool(allow_non_monotonic)
         self.allow_heldout_test = bool(allow_heldout_test)
         self.base_names = list(universe["base_names"])
@@ -457,18 +500,20 @@ class NativeBaseNameFeatureEngine:
         # 1. Canonical per-base_name static attributes (category, subcategory, brand, line, family, viscosity, application)
         cat_df = catalogue.copy()
         cat_df["product_id"] = cat_df["product_id"].astype(str).str.strip()
+        if allowed_member_pids is not None:
+            cat_df = cat_df.loc[cat_df["product_id"].isin(allowed_member_pids)].copy()
         cat_dedup = cat_df.drop_duplicates("product_id").set_index("product_id")
 
         # Parse multi-value viscosity grades & application for EVERY base_name in full catalogue (so prior OOV BNs still contribute!)
         cat_df["bn_clean"] = cat_df["base_name"].map(_clean_base_name)
         all_bn_meta: Dict[str, Dict[str, Any]] = {}
         for bn_s, grp in cat_df.loc[cat_df["bn_clean"] != ""].groupby("bn_clean", sort=False):
-            viscs_set: set[str] = set(parse_viscosity_grades(bn_s))
+            viscs_set: set[str] = set(parse_viscosity_grades(bn_s, frozen_v5=frozen_v5_replay))
             apps = []
             for _, row in grp.iterrows():
                 p_name = str(row.get("product_name", "")) if pd.notna(row.get("product_name")) else ""
                 txt = " ".join(str(row.get(c, "")) for c in ("product_name", "base_name", "short_name") if pd.notna(row.get(c)))
-                viscs_set |= parse_viscosity_grades(p_name)
+                viscs_set |= parse_viscosity_grades(p_name, frozen_v5=frozen_v5_replay)
                 a = parse_product_application(
                     txt,
                     category=str(row.get("product_category", "")) if pd.notna(row.get("product_category")) else "",
@@ -518,7 +563,17 @@ class NativeBaseNameFeatureEngine:
             for v in v_tuple:
                 if v:
                     visc_pos_map.setdefault(v, []).append(i)
-        self._attr_positions["viscosity"] = {k: np.array(v, dtype=np.int64) for k, v in visc_pos_map.items()}
+        # Precompute each observed grade set's matching candidates, counting a multi-grade event once.
+        self._viscosity_matches = {}
+        for meta in all_bn_meta.values():
+            grades = meta.get("viscosities", ())
+            if grades and grades not in self._viscosity_matches:
+                self._viscosity_matches[grades] = np.asarray(sorted({
+                    i for grade in grades for i in visc_pos_map.get(grade, ())
+                }), dtype=np.int64)
+
+        if frozen_v5_replay:
+            self._viscosity_matches = {v: np.asarray(pos, dtype=np.int64) for v, pos in visc_pos_map.items()}
 
         # Integer category mapping for category-relative 30d share
         uniq_cats = sorted(set(self._bn_attr["product_category"]) | {""})
@@ -536,7 +591,7 @@ class NativeBaseNameFeatureEngine:
                 ind = str(row.get("industry_branch", "")).strip() if pd.notna(row.get("industry_branch")) else ""
                 desc = str(row.get("description", "")) if pd.notna(row.get("description")) else ""
                 self.customer_industry[cid] = ind
-                domains = parse_company_equipment_domains(desc, ind)
+                domains = parse_company_equipment_domains(desc, ind, frozen_v5=frozen_v5_replay)
                 if domains:
                     self.company_app_match[cid] = np.array([1.0 if a in domains else 0.0 for a in apps_585], dtype=np.float32)
 
@@ -648,7 +703,8 @@ class NativeBaseNameFeatureEngine:
 
         # 4. Commercial rolling builder (order-date 3a_financial & current manager lookup)
         self._comm = CommercialRollingFeatureBuilder(
-            commercial_events, catalogue, self.rep_pids, allow_heldout_test=self.allow_heldout_test
+            commercial_events, catalogue, self.rep_pids, allow_heldout_test=self.allow_heldout_test,
+            historical_recipe=frozen_v5_replay,
         )
         # 4b. Manager rolling 90d shares strictly on MERGED (manager_id, customer_id, purchase_date, base_name) events!
         self._mgr_bn_events: Dict[str, Dict[str, np.ndarray]] = {}
@@ -779,9 +835,11 @@ class NativeBaseNameFeatureEngine:
                 state["brands"][brand] += 1
             if line:
                 state["lines"].add(line)
-            for v in viscs:
-                if v:
-                    state["viscs"][v] += 1
+            if viscs:
+                if self.frozen_v5_replay:
+                    state["viscs"].update(viscs)
+                else:
+                    state["viscs"][viscs] += 1
             if app and app != "other":
                 state["apps"][app] += 1
         state["end"] = end
@@ -847,7 +905,7 @@ class NativeBaseNameFeatureEngine:
 
     def build(self, customer_id: str, as_of_date: Union[str, pd.Timestamp]) -> np.ndarray:
         """Build (585, 53) float32 strictly-causal native base_name features (no month_sin/month_cos)."""
-        date_ts = pd.Timestamp(as_of_date)
+        date_ts = pd.Timestamp(as_of_date).normalize()
         if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= TEST_START):
             raise ValueError("Development predictions only")
 
@@ -922,13 +980,16 @@ class NativeBaseNameFeatureEngine:
                 pos = ln_pos.get(v)
                 if pos is not None:
                     out[pos, 12] = 1.0
-            visc_pos = self._attr_positions["viscosity"]
-            for v, cnt in st["viscs"].items():
-                pos = visc_pos.get(v)
+            matches = np.zeros(self.n_bn, dtype=np.int64)
+            for grades, count in st["viscs"].items():
+                pos = self._viscosity_matches.get(grades)
                 if pos is not None:
-                    share = min(1.0, cnt * inv_ev)
-                    out[pos, 49] = 1.0
-                    out[pos, 50] = np.maximum(out[pos, 50], share)
+                    if self.frozen_v5_replay:
+                        matches[pos] = np.maximum(matches[pos], count)
+                    else:
+                        matches[pos] += count
+            out[:, 49] = matches > 0
+            out[:, 50] = matches * inv_ev
             app_pos = self._attr_positions["application"]
             for v, cnt in st["apps"].items():
                 pos = app_pos.get(v)
@@ -946,12 +1007,14 @@ class NativeBaseNameFeatureEngine:
             gaps = np.diff(np.array(bdates, dtype="datetime64[ns]")).astype("timedelta64[D]").astype(float)
             med_gap = float(np.median(gaps)) if len(gaps) else 30.0
             age = (date_ts - bdates[-1]).days
-            d30 = date_ts - pd.Timedelta(days=30)
-            d90 = date_ts - pd.Timedelta(days=90)
+            # Archived v5 excluded the first day of the window on its daily timeline.
+            start = date_ts + pd.Timedelta(days=int(self.frozen_v5_replay))
+            d30 = start - pd.Timedelta(days=30)
+            d90 = start - pd.Timedelta(days=90)
             out[:, 13] = min(age / 365.0, 1.0)
             out[:, 14] = min(age / max(med_gap, 1.0) / 4.0, 1.0)
-            out[:, 15] = float(log_count(sum(d > d30 for d in bdates)))
-            out[:, 16] = float(log_count(sum(d > d90 for d in bdates)))
+            out[:, 15] = float(log_count(sum(d >= d30 for d in bdates)))
+            out[:, 16] = float(log_count(sum(d >= d90 for d in bdates)))
 
             # Category & family recency/overdue
             out[:, [17, 19, 20, 22]] = 1.0
@@ -1029,7 +1092,7 @@ class NativeBaseNameFeatureEngine:
 
     def build_merged_profile(self, customer_id: str, as_of_date: Union[str, pd.Timestamp]) -> np.ndarray:
         """Compute the 7 legacy profile features strictly over merged (customer_id, purchase_date, base_name) events."""
-        date_ts = pd.Timestamp(as_of_date)
+        date_ts = pd.Timestamp(as_of_date).normalize()
         if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= TEST_START):
             raise ValueError("Development predictions only")
         cid = str(customer_id).strip()
@@ -1083,11 +1146,12 @@ class NativeBaseNameFeatureEngine:
         - `cust`: fresh point-in-time customer state (11D current dynamic features, or 18D when
           `include_merged_profile=True` appends the 7 base_name-merged profile features).
         """
-        full = self.build(customer_id, as_of_date)
+        date_ts = pd.Timestamp(as_of_date).normalize()
+        full = self.build(customer_id, date_ts)
         cand_38 = np.ascontiguousarray(full[:, _CLEAN_CAND_38_INDICES], dtype=np.float32)
         cust_11 = np.ascontiguousarray(full[0, _CLEAN_CUST_11_INDICES], dtype=np.float32)
         if include_merged_profile:
-            prof_7 = self.build_merged_profile(customer_id, as_of_date)
+            prof_7 = self.build_merged_profile(customer_id, date_ts)
             return cand_38, np.concatenate([cust_11, prof_7], axis=0)
         return cand_38, cust_11
 

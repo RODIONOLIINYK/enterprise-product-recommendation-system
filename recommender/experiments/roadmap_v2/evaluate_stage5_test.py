@@ -111,6 +111,7 @@ class HeldoutTestBasket(NamedTuple):
     sku_allowed: np.ndarray
     extra_sku_targets: int
     extra_new_sku_targets: int
+    unmodeled_novelty: tuple[tuple[str, bool], ...] = ()
 
 
 def load_all_cleaned_purchases(path: Path = CLEANED_PURCHASES_PATH) -> pd.DataFrame:
@@ -289,6 +290,7 @@ def build_test_basket_cases(
                         new=target & ~prior_mod,
                         allowed=allowed,
                         unseen=allowed & ~prior_mod,
+                        unmodeled_novelty=tuple((bn, bn not in prior_unmod_bn) for bn in sorted(unmod_bns)),
                         extra_bn_targets=extra_bn,
                         extra_new_bn_targets=extra_new_bn,
                         sku_target=sku_target,
@@ -576,10 +578,10 @@ def run_heldout_test_evaluation(
         all_purchases, catalogue, companies, product_ids, allow_heldout_test=True
     )
     comm = CommercialRollingFeatureBuilder(
-        full_commercial, catalogue, product_ids, allow_heldout_test=True
+        full_commercial, catalogue, product_ids, allow_heldout_test=True, historical_recipe=True
     )
     specs = ParsedSpecRollingFeatureBuilder(
-        all_purchases, catalogue, companies, product_ids, allow_heldout_test=True
+        all_purchases, catalogue, companies, product_ids, allow_heldout_test=True, historical_recipe=True
     )
     familiarity = FamiliarityStore(
         all_purchases, catalogue, np.asarray(product_ids)[reps], tuple(ATTRIBUTE_COLUMNS)
@@ -605,6 +607,7 @@ def run_heldout_test_evaluation(
         sku_allowed,
         extra_sku_arr,
         extra_new_sku_arr,
+        _unmodeled_novelty,
     ) = zip(*cases, strict=True)
     days = [(dt - PURCHASE_DATE_ORIGIN).days for dt in dates]
 
@@ -618,6 +621,7 @@ def run_heldout_test_evaluation(
         vocabs["subcategory_vocab"],
         vocabs["business_line_vocab"],
         allow_heldout_test=True,
+        frozen_v5_replay=True,
     )
 
     print(f"[stage5/test] Computing strictly-causal features for {len(cases)} test baskets...", flush=True)

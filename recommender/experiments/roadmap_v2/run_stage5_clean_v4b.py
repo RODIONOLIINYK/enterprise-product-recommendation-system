@@ -46,6 +46,7 @@ from recommender.train_retriever import build_customer_metadata, get_device
 from .augmentation import build_strict_60d_aux_labels
 from .clean_ranker import CleanStage5BaseNameRanker
 from .commercial_features import COMMERCIAL_PARQUET_PATH
+from .stage5_artifacts import stage5_run_paths
 from .config import (
     ARTIFACT_ROOT,
     EVIDENCE_ROOT,
@@ -68,6 +69,9 @@ from .native_base_name import (
     CUSTOMER_DYNAMIC_11_FEATURE_NAMES,
     NativeBaseNameFeatureEngine,
     build_base_name_static_representations,
+    candidate_storage_dtype,
+    observed_pack_ids,
+    representative_attr_ids,
 )
 from .run_stage5 import _collapse_bool_matrix_to_bn, _verify_reference_files, train_stage5_two_tower
 from .run_stage5_ablations import _evaluate_with_cohorts_and_sku
@@ -80,11 +84,13 @@ from .stage5_base_entity import (
 
 
 OUT_ROOT = ARTIFACT_ROOT / "stage5_clean_v4b"
-SUMMARY_PATH = EVIDENCE_ROOT / "stage5_clean_v4b_seed42.json"
 REF_3STAGE_PATH = EVIDENCE_ROOT / "stage5_3stage_reference.json"
 
 
-def _prepare_clean_v4b_data():
+def _prepare_clean_v4b_data(
+    *, observed_before=TRAIN_CUTOFF, candidate_feature_storage_dtype="float32", frozen_v5_replay=False,
+):
+    storage_dtype = candidate_storage_dtype(candidate_feature_storage_dtype)
     purchases = load_development_purchases("data/interim/cleaned_purchases.csv")
     catalogue = load_product_catalogue(get_datasets_locs("items"))
     companies = load_enriched_companies(purchases=purchases, minimum_purchases=0)
@@ -98,19 +104,25 @@ def _prepare_clean_v4b_data():
     sales_branch = companies.set_index("customer_id").sales_branch.to_dict()
 
     pool = RollingCandidatePool(catalogue, purchases)
+    allowed_members = observed_pack_ids(pool.first_sales, observed_before)
     universe = build_base_name_universe(product_ids, catalogue, purchases)
     reps = first_observed_pack_indices(product_ids, universe["bn_to_member_pid_indices"], pool.first_sales)
+    observed_catalogue = catalogue if allowed_members is None else catalogue.loc[catalogue.product_id.isin(allowed_members)]
     representatives = catalogue.set_index("product_id").loc[np.asarray(product_ids)[reps]].reset_index()
+
+    if allowed_members is not None:
+        representatives = representatives.loc[representatives.product_id.isin(allowed_members)]
 
     commercial = aligned_commercial_events(
         pd.read_parquet(COMMERCIAL_PARQUET_PATH, filters=[("purchase_date", "<", TEST_START)]),
         purchases,
     )
     engine = NativeBaseNameFeatureEngine(
-        purchases, commercial, catalogue, companies, product_ids, universe, reps
+        purchases, commercial, catalogue, companies, product_ids, universe, reps, allowed_member_pids=allowed_members,
+        frozen_v5_replay=frozen_v5_replay,
     )
     familiarity = FamiliarityStore(
-        purchases, catalogue, np.asarray(product_ids)[reps], tuple(ATTRIBUTE_COLUMNS)
+        purchases, observed_catalogue, np.asarray(product_ids)[reps], tuple(ATTRIBUTE_COLUMNS)
     )
     cases, _ = basket_cases(purchases, product_ids, universe, pool)
 
@@ -121,10 +133,11 @@ def _prepare_clean_v4b_data():
         sequences = build_base_name_sequences(
             purchases, cids, days, universe, representatives,
             vocabs["category_vocab"], vocabs["subcategory_vocab"], vocabs["business_line_vocab"],
+            frozen_v5_replay=frozen_v5_replay,
         )
         sequences["sequence"][..., 3:5] = 0.0
 
-        cand_feats = np.empty((len(rows), len(reps), len(CANDIDATE_38_FEATURE_NAMES)), np.float16)
+        cand_feats = np.empty((len(rows), len(reps), len(CANDIDATE_38_FEATURE_NAMES)), storage_dtype)
         cust_11 = np.empty((len(rows), len(CUSTOMER_DYNAMIC_11_FEATURE_NAMES)), np.float32)
         t_feat = time.perf_counter()
         for i, (cid, date) in enumerate(zip(cids, dates, strict=True)):
@@ -180,7 +193,10 @@ def _prepare_clean_v4b_data():
                 ),
             }
 
-    bn_static = build_base_name_static_representations(universe, product_ids, catalogue, reps)
+    bn_static = build_base_name_static_representations(
+        universe, product_ids, catalogue, reps, allowed_member_pids=allowed_members, frozen_v5_specs=frozen_v5_replay
+    )
+    bn_static["attr_ids"] = representative_attr_ids(enrichment, product_ids, reps, allowed_members)
     return splits, bn_static, universe, enrichment, vocabs, purchases, catalogue, product_ids, sku_data, reps
 
 
@@ -216,7 +232,12 @@ def _score(model: CleanStage5BaseNameRanker, split_d: Mapping[str, Any], v_bn_de
     return torch.cat(chunks, dim=0)
 
 
-def run_clean_v4b(*, seed: int = SEED, device: Optional[str] = None) -> Dict[str, Any]:
+def run_clean_v4b(
+    *, seed: int = SEED, device: Optional[str] = None,
+    output_dir: Optional[Path] = None, summary_path: Optional[Path] = None,
+    observed_before=TRAIN_CUTOFF, candidate_feature_storage_dtype="float32",
+) -> Dict[str, Any]:
+    run_root, summary_path = stage5_run_paths(OUT_ROOT, output_dir, summary_path)
     t_all = time.perf_counter()
     dev = get_device(device)
     before_hashes = snapshot_preserved_hashes()
@@ -235,9 +256,8 @@ def run_clean_v4b(*, seed: int = SEED, device: Optional[str] = None) -> Dict[str
         product_ids,
         sku_data,
         reps,
-    ) = _prepare_clean_v4b_data()
+    ) = _prepare_clean_v4b_data(observed_before=observed_before, candidate_feature_storage_dtype=candidate_feature_storage_dtype)
 
-    OUT_ROOT.mkdir(parents=True, exist_ok=True)
     n_bn = universe["num_base_names"]
     bn_to_members = universe["bn_to_member_pid_indices"]
     tr_bn = bn_data["train"]
@@ -251,7 +271,7 @@ def run_clean_v4b(*, seed: int = SEED, device: Optional[str] = None) -> Dict[str
     aux_60d_bn = _collapse_bool_matrix_to_bn(aux_60d_sku, bn_to_members).float()
     full_window = tr_bn["prediction_days"] <= (TRAIN_CUTOFF - PURCHASE_DATE_ORIGIN).days - 60
 
-    attr_ids = {k: v[reps] for k, v in enrichment["product_attr_ids"].items()}
+    attr_ids = bn_static["attr_ids"]
     prev_8h_disc_npz = Path("checkpoints/roadmap-v2/stage5_bigger_ranker_v1/modest_8h_ffn384_mlp384-seed42/predictions_discovery.npz")
     prev_mlp384_npz = Path("checkpoints/roadmap-v2/stage5_bigger_ranker_v1/modest_wider_mlp_384-seed42/predictions_ndcg.npz")
     v4_ndcg_npz = Path("checkpoints/roadmap-v2/stage5_clean_v4/clean_v4_fullspec_cust19-seed42/ranker_clean_8h/predictions_ndcg.npz")
@@ -275,11 +295,13 @@ def run_clean_v4b(*, seed: int = SEED, device: Optional[str] = None) -> Dict[str
         "candidate_feature_names": list(CANDIDATE_38_FEATURE_NAMES),
         "seed": int(seed),
         "heldout_access": False,
+        "observed_before": str(observed_before) if observed_before is not None else None,
+        "candidate_feature_storage_dtype": candidate_feature_storage_dtype,
         "arms": {},
     }
 
     for arm_name, cfg in arms.items():
-        run_dir = OUT_ROOT / f"{arm_name}-seed{seed}"
+        run_dir = run_root / f"{arm_name}-seed{seed}"
         tt_dir = run_dir / "two_tower"
         s2_dir = run_dir / "ranker_clean_8h"
         s2_dir.mkdir(parents=True, exist_ok=True)
@@ -443,7 +465,8 @@ def run_clean_v4b(*, seed: int = SEED, device: Optional[str] = None) -> Dict[str
     _verify_reference_files(ref3)
     results["preserved_hashes_verified"] = True
     results["elapsed_seconds"] = float(time.perf_counter() - t_all)
-    atomic_json(results, SUMMARY_PATH, overwrite=True)
+    results["summary_path"] = str(summary_path)
+    atomic_json(results, summary_path, overwrite=False)
     return results
 
 
@@ -451,9 +474,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument("--output-dir", type=Path, help="New exclusive run directory.")
+    parser.add_argument("--summary-path", type=Path, help="New summary file (default: inside the run directory).")
+    parser.add_argument("--snapshot-metadata", action="store_true", help="Use historical unrestricted catalogue metadata.")
+    parser.add_argument("--candidate-feature-storage-dtype", choices=("float32", "float16"), default="float32")
     args = parser.parse_args()
-    res = run_clean_v4b(seed=args.seed, device=args.device)
-    print(f"\nSaved clean v4b summary to {SUMMARY_PATH} ({res['elapsed_seconds']:.1f}s)", flush=True)
+    res = run_clean_v4b(seed=args.seed, device=args.device, output_dir=args.output_dir, summary_path=args.summary_path,
+                        observed_before=None if args.snapshot_metadata else TRAIN_CUTOFF,
+                        candidate_feature_storage_dtype=args.candidate_feature_storage_dtype)
+    print(f"\nSaved clean v4b summary to {res['summary_path']} ({res['elapsed_seconds']:.1f}s)", flush=True)
 
 
 if __name__ == "__main__":

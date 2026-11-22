@@ -1,13 +1,12 @@
 """Stage 3E: Deterministic parsed product specs, company equipment tags, and causal pairwise match features."""
 
-from bisect import bisect_left
 from collections import Counter
 import json
 import math
 from pathlib import Path
 import re
 import time
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Dict, List, Sequence, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -41,25 +40,34 @@ PARSED_SPEC_FEATURE_NAMES: Tuple[str, ...] = (
 NUM_PARSED_SPEC_FEATURES = len(PARSED_SPEC_FEATURE_NAMES)
 
 # Regex patterns for lubricant/industrial product specs
-_SAE_RE = re.compile(r"(?<![0-9.,])(\d{1,2}W)[-\s]?(\d{2})(?![0-9.,])", re.IGNORECASE)
-_ISO_VG_RE = re.compile(
-    r"(?<![0-9.,])(?:ISO\s*)?(?:VG\s*|S\d\s*[A-Z]{1,3}\s*|[MGRBV]\s*|GX\s*|MX\s*)"
-    r"(10|15|22|32|46|68|100|150|220|320|460|680|1000)(?![0-9.,\w])"
-)
+def _grade_patterns(*, frozen_v5=False):
+    # The promoted tower was fitted with the original punctuation and ISO case rules.
+    number_end = r"(?![0-9.,])" if frozen_v5 else r"(?![0-9]|[.,][0-9])"
+    word_end = r"(?![\w.,])" if frozen_v5 else r"(?!\w|[.,][0-9])"
+    sae = re.compile(r"(?<![0-9.,])(\d{1,2}W)[-\s]?(\d{2})" + number_end, re.IGNORECASE)
+    iso = re.compile(
+        r"(?<![0-9.,])(?:ISO\s*)?(?:VG\s*|S\d\s*[A-Z]{1,3}\s*|[MGRBV]\s*|GX\s*|MX\s*)"
+        r"(10|15|22|32|46|68|100|150|220|320|460|680|1000)" + word_end,
+        0 if frozen_v5 else re.IGNORECASE,
+    )
+    nlgi = (
+        re.compile(r"\bNLGI\s*(000|00|[0-3](?:\.5)?)" + number_end, re.IGNORECASE),
+        re.compile(r"\bGadus\s+S\d\s+[A-Z0-9]{1,8}(?:\s+[A-Z]{1,4})?\s+(000|00|[0-3](?:\.5)?)"
+                   + word_end, re.IGNORECASE),
+        re.compile(r"(?:grease|смазк\w*|змазк\w*|ep|complex|plex|lithium)\s+(000|00|[0-3](?:\.5)?)"
+                   + word_end, re.IGNORECASE),
+    )
+    return sae, iso, nlgi
+
+
+_GRADE_PATTERNS = _grade_patterns()
+_SAE_RE, _ISO_VG_RE, _NLGI_PATTERNS = _GRADE_PATTERNS
+_FROZEN_V5_GRADE_PATTERNS = _grade_patterns(frozen_v5=True)
 _NLGI_RE = re.compile(r"\b(?:NLGI\s*|Gadus[^\n]{0,25}\s)([0-3](?:\.5)?|00|000)\b", re.IGNORECASE)
-_NLGI_EXPLICIT_RE = re.compile(r"\bNLGI\s*(000|00|[0-3](?:\.5)?)(?![0-9.,])", re.IGNORECASE)
-_GADUS_NLGI_RE = re.compile(
-    r"\bGadus\s+S\d\s+[A-Z0-9]{1,8}(?:\s+[A-Z]{1,4})?\s+(000|00|[0-3](?:\.5)?)(?![0-9.,\w])",
-    re.IGNORECASE,
-)
-_GREASE_END_NLGI_RE = re.compile(
-    r"(?:grease|смазк\w*|змазк\w*|ep|complex|plex|lithium)\s+(000|00|[0-3](?:\.5)?)(?![0-9.,\w])",
-    re.IGNORECASE,
-)
 _PACK_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(л|l|кг|kg|мл|ml|г|g)\b", re.IGNORECASE)
 
 
-def parse_viscosity_grades(text: str) -> Set[str]:
+def parse_viscosity_grades(text: str, *, frozen_v5: bool = False) -> Set[str]:
     """Extract ALL canonical viscosity / NLGI grades from text (e.g. {'ISO220', 'NLGI2'}).
 
     Fixes decimal pack false-positives (such as '0.4кг' matching NLGI0) and preserves both
@@ -68,30 +76,32 @@ def parse_viscosity_grades(text: str) -> Set[str]:
     if not text:
         return set()
     out: Set[str] = set()
-    for m in _SAE_RE.finditer(text):
+    sae, iso, nlgi = _FROZEN_V5_GRADE_PATTERNS if frozen_v5 else _GRADE_PATTERNS
+    for m in sae.finditer(text):
         out.add(f"{m.group(1).upper()}-{m.group(2)}")
-    for m in _ISO_VG_RE.finditer(text):
+    for m in iso.finditer(text):
         out.add(f"ISO{m.group(1)}")
     low = text.lower()
     if any(k in low for k in ("gadus", "grease", "смазк", "змазк", "nlgi", "cassida grease")):
-        for rx in (_NLGI_EXPLICIT_RE, _GADUS_NLGI_RE, _GREASE_END_NLGI_RE):
+        for rx in nlgi:
             for m in rx.finditer(text):
                 out.add(f"NLGI{m.group(1)}")
     return out
 
 
-def parse_viscosity_grade(text: str) -> str:
+def parse_viscosity_grade(text: str, *, historical_recipe: bool = False) -> str:
     """Extract canonical viscosity / NLGI grade string (e.g. '15W-40', 'ISO46', 'NLGI2') or ''."""
     if not text:
         return ""
-    m = _SAE_RE.search(text)
+    sae, iso = _FROZEN_V5_GRADE_PATTERNS[:2] if historical_recipe else (_SAE_RE, _ISO_VG_RE)
+    m = sae.search(text)
     if m:
         return f"{m.group(1).upper()}-{m.group(2)}"
     if any(k in text.lower() for k in ("gadus", "grease", "смазк", "змазк", "nlgi", "cassida grease")):
         m = _NLGI_RE.search(text)
         if m:
             return f"NLGI{m.group(1)}"
-    m = _ISO_VG_RE.search(text)
+    m = iso.search(text)
     if m:
         return f"ISO{m.group(1)}"
     return ""
@@ -209,14 +219,18 @@ _COMPANY_DOMAIN_PATTERNS: Dict[str, Tuple[str, ...]] = {
 }
 
 
-def parse_company_equipment_domains(description: str, industry_branch: str = "") -> Set[str]:
+_COMPANY_DOMAIN_REGEX = {
+    domain: re.compile(r"\b(?:" + "|".join(re.escape(word) for word in words) + ")")
+    for domain, words in _COMPANY_DOMAIN_PATTERNS.items()
+}
+
+
+def parse_company_equipment_domains(description: str, industry_branch: str = "", *, frozen_v5: bool = False) -> Set[str]:
     """Extract canonical set of matching product application domains from company text + industry."""
     blob = f" {description or ''} {industry_branch or ''} ".lower()
-    matched: Set[str] = set()
-    for domain, keywords in _COMPANY_DOMAIN_PATTERNS.items():
-        if any(kw in blob for kw in keywords):
-            matched.add(domain)
-    return matched
+    if frozen_v5:
+        return {domain for domain, words in _COMPANY_DOMAIN_PATTERNS.items() if any(w in blob for w in words)}
+    return {domain for domain, pattern in _COMPANY_DOMAIN_REGEX.items() if pattern.search(blob)}
 
 
 class ParsedSpecRollingFeatureBuilder:
@@ -230,6 +244,7 @@ class ParsedSpecRollingFeatureBuilder:
         product_ids: Sequence[str],
         *,
         allow_heldout_test: bool = False,
+        historical_recipe: bool = False,
     ):
         self.allow_heldout_test = bool(allow_heldout_test)
         self.product_ids = [str(p).strip() for p in product_ids]
@@ -251,7 +266,7 @@ class ParsedSpecRollingFeatureBuilder:
             cont = str(row.get("container_type", "")).strip().upper() if pd.notna(row.get("container_type")) else ""
             if cont in ("", "NONE", "NAN"):
                 cont = ""
-            all_visc[pid] = parse_viscosity_grade(text)
+            all_visc[pid] = parse_viscosity_grade(text, historical_recipe=historical_recipe)
             all_cont[pid] = cont
             all_pack[pid] = parse_pack_size_liters_kg(text, cont)
             all_app[pid] = parse_product_application(
@@ -280,7 +295,7 @@ class ParsedSpecRollingFeatureBuilder:
                 cid = str(row["customer_id"]).strip()
                 desc = str(row.get("description", "")) if pd.notna(row.get("description")) else ""
                 ind = str(row.get("industry_branch", "")) if pd.notna(row.get("industry_branch")) else ""
-                domains = parse_company_equipment_domains(desc, ind)
+                domains = parse_company_equipment_domains(desc, ind, frozen_v5=historical_recipe)
                 if domains:
                     vec = np.array([1.0 if a in domains else 0.0 for a in self.prod_app], dtype=np.float32)
                     self.company_app_match[cid] = vec

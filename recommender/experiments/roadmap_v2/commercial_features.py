@@ -115,8 +115,10 @@ class CommercialRollingFeatureBuilder:
         product_ids: Sequence[str],
         *,
         allow_heldout_test: bool = False,
+        historical_recipe: bool = False,
     ):
         self.allow_heldout_test = bool(allow_heldout_test)
+        self.historical_recipe = historical_recipe
         self.product_ids = [str(p).strip() for p in product_ids]
         self.num_products = len(self.product_ids)
         self.pid_to_idx = {pid: i for i, pid in enumerate(self.product_ids)}
@@ -418,7 +420,7 @@ class CommercialRollingFeatureBuilder:
 
     def build(self, customer_id: str, as_of_date: Union[str, pd.Timestamp]) -> np.ndarray:
         """Build (P, 21) float32 strictly-causal Stage 3A-3D features for all canonical products."""
-        date_ts = pd.Timestamp(as_of_date)
+        date_ts = pd.Timestamp(as_of_date).normalize()
         if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= TEST_START):
             raise ValueError("Development predictions only")
 
@@ -512,8 +514,11 @@ class CommercialRollingFeatureBuilder:
                 mgr_sl = [m for m in ord_data["manager"][:stop].tolist() if m]
                 if mgr_sl:
                     curr_mgr = mgr_sl[-1]
-                    if len(mgr_sl) >= 2 and mgr_sl[-1] != mgr_sl[-2]:
-                        mgr_changed = 1.0
+                    last_two = ord_data["manager"][max(0, stop - 2):stop]
+                    if self.historical_recipe:
+                        mgr_changed = float(len(mgr_sl) >= 2 and mgr_sl[-1] != mgr_sl[-2])
+                    elif len(last_two) == 2 and all(last_two) and last_two[0] != last_two[1]:
+                        mgr_changed = float(dts[stop - 1] >= (date_ts - pd.Timedelta(days=90)).to_datetime64())
 
                 # 3D: Dominant recent warehouse strictly < t (last 5 orders, tie-break most recent)
                 wh_sl = [w for w in ord_data["warehouse"][:stop].tolist() if w]

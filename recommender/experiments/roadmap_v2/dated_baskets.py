@@ -215,7 +215,7 @@ def dated_candidate_features(
     ).astype(np.float16)
 
 
-def prepare_dated_baskets():
+def prepare_dated_baskets(*, historical_recipe=False):
     purchases = load_development_purchases("data/interim/cleaned_purchases.csv")
     catalogue = load_product_catalogue(get_datasets_locs("items"))
     companies = load_enriched_companies(purchases=purchases, minimum_purchases=0)
@@ -272,9 +272,9 @@ def prepare_dated_baskets():
         ),
         purchases,
     )
-    comm = CommercialRollingFeatureBuilder(commercial, catalogue, product_ids)
+    comm = CommercialRollingFeatureBuilder(commercial, catalogue, product_ids, historical_recipe=historical_recipe)
     specs = ParsedSpecRollingFeatureBuilder(
-        purchases, catalogue, companies, product_ids
+        purchases, catalogue, companies, product_ids, historical_recipe=historical_recipe
     )
     familiarity = FamiliarityStore(
         purchases, catalogue, np.asarray(product_ids)[reps], tuple(ATTRIBUTE_COLUMNS)

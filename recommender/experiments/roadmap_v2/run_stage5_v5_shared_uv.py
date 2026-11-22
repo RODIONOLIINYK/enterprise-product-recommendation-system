@@ -18,9 +18,10 @@ import time
 from typing import Any, Dict, Mapping, Optional
 
 import numpy as np
+import pandas as pd
 import torch
 
-from recommender.artifacts import atomic_json
+from recommender.artifacts import atomic_json, file_digest
 from recommender.experiments.rolling_candidate_v2.train import snapshot_preserved_hashes
 from recommender.ranker import RankerLoss
 from recommender.sequences import PURCHASE_DATE_ORIGIN
@@ -30,6 +31,7 @@ from recommender.train_retriever import get_device
 
 from .augmentation import build_strict_60d_aux_labels
 from .clean_ranker import SharedUVStage5Ranker
+from .stage5_artifacts import read_stage5_vectors, stage5_run_paths, validate_stage5_vectors
 from .config import (
     ARTIFACT_ROOT,
     EVIDENCE_ROOT,
@@ -40,14 +42,13 @@ from .config import (
     STAGE2_WEIGHT_DECAY,
 )
 from .native_base_name import CANDIDATE_38_FEATURE_NAMES, CUSTOMER_DYNAMIC_11_FEATURE_NAMES
-from .run_stage5 import _collapse_bool_matrix_to_bn, _verify_reference_files
+from .run_stage5 import _collapse_bool_matrix_to_bn, _encode_first_baskets, _stage5_tower, _verify_reference_files
 from .run_stage5_ablations import _evaluate_with_cohorts_and_sku
 from .run_stage5_clean_v4b import _prepare_clean_v4b_data
 from .stage5_base_entity import evaluate_base_name_predictions, paired_base_name_bootstrap_ci
 
 
 OUT_ROOT = ARTIFACT_ROOT / "stage5_v5_shared_uv"
-SUMMARY_PATH = EVIDENCE_ROOT / "stage5_v5_shared_uv_seed42.json"
 REF_PATH = EVIDENCE_ROOT / "stage5_reference.json"
 REF_3STAGE_PATH = EVIDENCE_ROOT / "stage5_3stage_reference.json"
 V4B_TT_DIR = ARTIFACT_ROOT / "stage5_clean_v4b" / "v4b_fullspec65_nosb-seed42" / "two_tower"
@@ -91,7 +92,29 @@ def _score_v5(
     return torch.cat(chunks, dim=0)
 
 
-def run_v5_shared_uv(*, seed: int = SEED, device: Optional[str] = None) -> Dict[str, Any]:
+@torch.no_grad()
+def _verify_unsealed_vectors(tower, product_inputs, splits, exports, device):
+    """Lacking row keys, compare the values used by the ranker against fresh inference."""
+    tower.eval()
+    inputs = {k: v.to(device) for k, v in product_inputs.items() if k != "attr_ids"}
+    inputs["attr_ids"] = {k: v.to(device) for k, v in product_inputs["attr_ids"].items()}
+    vectors = tower.product_vectors(inputs)
+    if not torch.allclose(vectors.cpu(), exports["train"]["v_bn"], atol=1e-5, rtol=1e-4):
+        raise ValueError("Unsealed catalogue vectors do not reproduce the selected tower and product inputs.")
+    for split, rows in splits.items():
+        encoded = dict(rows)
+        _encode_first_baskets(encoded, tower, vectors, device)
+        if not torch.allclose(encoded["u_bn"], exports[split]["u_bn"], atol=1e-5, rtol=1e-4):
+            raise ValueError(f"Unsealed {split} customer vectors do not reproduce the ordered basket rows.")
+
+
+def run_v5_shared_uv(
+    *, seed: int = SEED, device: Optional[str] = None,
+    output_dir: Optional[Path] = None, summary_path: Optional[Path] = None,
+    two_tower_dir: Path = V4B_TT_DIR, allow_unsealed_legacy_vectors: bool = False,
+    observed_before: Optional[pd.Timestamp] = TRAIN_CUTOFF, candidate_feature_storage_dtype: str = "float32",
+) -> Dict[str, Any]:
+    run_root, summary_path = stage5_run_paths(OUT_ROOT, output_dir, summary_path)
     t_all = time.perf_counter()
     dev = get_device(device)
     before_hashes = snapshot_preserved_hashes()
@@ -100,25 +123,40 @@ def run_v5_shared_uv(*, seed: int = SEED, device: Optional[str] = None) -> Dict[
     _verify_reference_files(ref_active)
     _verify_reference_files(ref3)
 
+    exports, legacy = read_stage5_vectors(two_tower_dir, allow_unsealed_legacy=allow_unsealed_legacy_vectors)
+    if legacy:
+        observed_before, candidate_feature_storage_dtype = None, "float16"
     print("[v5-shared-uv] Preparing native 38D candidate + 11D current customer features & loading frozen v4b u_bn/v_bn...", flush=True)
     (
         bn_data,
-        _,
+        bn_static,
         universe,
-        _,
+        enrichment,
         _,
         purchases,
         catalogue,
         product_ids,
         sku_data,
         _,
-    ) = _prepare_clean_v4b_data()
-
-    tr_vec = torch.load(V4B_TT_DIR / "train_vectors.pt", map_location="cpu", weights_only=False)
-    va_vec = torch.load(V4B_TT_DIR / "val_vectors.pt", map_location="cpu", weights_only=False)
-    v_bn = tr_vec["v_bn"].float()
-    u_tr = tr_vec["u_bn"].float()
-    u_va = va_vec["u_bn"].float()
+    ) = _prepare_clean_v4b_data(
+        observed_before=observed_before, candidate_feature_storage_dtype=candidate_feature_storage_dtype,
+        frozen_v5_replay=legacy,
+    )
+    prod_inputs = {
+        "text_embedding": bn_static["text_pack_free"].float(),
+        "demand_features": bn_static["full_specs_multihot"].float(),
+        "attr_ids": bn_static["attr_ids"],
+    }
+    tower_path = two_tower_dir / "best.pt"
+    v_bn, u_tr, u_va = validate_stage5_vectors(
+        exports, bn_data, universe["base_names"], file_digest(tower_path), prod_inputs, legacy=legacy,
+    )
+    if legacy:
+        tower = _stage5_tower(universe, enrichment, num_demand_features=65,
+                              num_customer_tabular_features=0, drop_sales_branch=True).to(dev)
+        tower.load_state_dict(torch.load(tower_path, map_location="cpu", weights_only=True)["model_state_dict"])
+        _verify_unsealed_vectors(tower, prod_inputs, bn_data, exports, dev)
+    del exports
     v_dev = v_bn.to(dev)
 
     tr_bn = bn_data["train"]
@@ -132,7 +170,7 @@ def run_v5_shared_uv(*, seed: int = SEED, device: Optional[str] = None) -> Dict[
     aux_60d_bn = _collapse_bool_matrix_to_bn(aux_60d_sku, bn_to_members).float()
     full_window = tr_bn["prediction_days"] <= (TRAIN_CUTOFF - PURCHASE_DATE_ORIGIN).days - 60
 
-    s2_dir = OUT_ROOT / f"v5_shared_uv-seed{seed}"
+    s2_dir = run_root / f"v5_shared_uv-seed{seed}"
     s2_dir.mkdir(parents=True, exist_ok=True)
 
     def _make_ranker(aux: bool) -> SharedUVStage5Ranker:
@@ -270,7 +308,9 @@ def run_v5_shared_uv(*, seed: int = SEED, device: Optional[str] = None) -> Dict[
             "mlp_widths": [384, 192, 96],
             "trainable_params": int(n_params),
         },
-        "two_tower_source": str(V4B_TT_DIR / "best.pt"),
+        "observed_before": str(observed_before) if observed_before is not None else None,
+        "candidate_feature_storage_dtype": candidate_feature_storage_dtype,
+        "two_tower_source": str(two_tower_dir / "best.pt"),
         "seed": int(seed),
         "heldout_access": False,
         "ranker": s2_res,
@@ -278,7 +318,8 @@ def run_v5_shared_uv(*, seed: int = SEED, device: Optional[str] = None) -> Dict[
         "preserved_hashes_verified": True,
         "elapsed_seconds": float(time.perf_counter() - t_all),
     }
-    atomic_json(results, SUMMARY_PATH, overwrite=True)
+    results["summary_path"] = str(summary_path)
+    atomic_json(results, summary_path, overwrite=False)
     del model
     gc.collect()
     if dev.type == "mps":
@@ -290,9 +331,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument("--output-dir", type=Path, help="New exclusive run directory.")
+    parser.add_argument("--summary-path", type=Path, help="New summary file (default: inside the run directory).")
+    parser.add_argument("--two-tower-dir", type=Path, default=V4B_TT_DIR, help="Directory containing best.pt and sealed split vectors.")
+    parser.add_argument("--allow-unsealed-legacy-vectors", action="store_true", help="Explicitly accept pre-seal exports for historical replay.")
+    parser.add_argument("--snapshot-metadata", action="store_true")
+    parser.add_argument("--candidate-feature-storage-dtype", choices=("float32", "float16"), default="float32")
     args = parser.parse_args()
-    res = run_v5_shared_uv(seed=args.seed, device=args.device)
-    print(f"\nSaved v5_shared_uv summary to {SUMMARY_PATH} ({res['elapsed_seconds']:.1f}s)", flush=True)
+    res = run_v5_shared_uv(seed=args.seed, device=args.device, output_dir=args.output_dir, summary_path=args.summary_path,
+                           two_tower_dir=args.two_tower_dir, allow_unsealed_legacy_vectors=args.allow_unsealed_legacy_vectors,
+                           observed_before=None if args.snapshot_metadata else TRAIN_CUTOFF,
+                           candidate_feature_storage_dtype=args.candidate_feature_storage_dtype)
+    print(f"\nSaved v5_shared_uv summary to {res['summary_path']} ({res['elapsed_seconds']:.1f}s)", flush=True)
     print(f"CPU 1-req SharedUVStage5Ranker latency: {res['cpu_single_request_ranker_ms']}", flush=True)
 
 

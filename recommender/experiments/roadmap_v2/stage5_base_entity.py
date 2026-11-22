@@ -132,9 +132,10 @@ def evaluate_base_name_predictions(
             continue
         preds = ranked_bn_indices[i]
         valid = preds >= 0
-        preds_v = preds[valid]
-        rel = row_t[preds_v]
-        new_rel = row_nt[preds_v]
+        rel = np.zeros(preds.shape, dtype=bool)
+        new_rel = np.zeros_like(rel)
+        rel[valid] = row_t[preds[valid]]
+        new_rel[valid] = row_nt[preds[valid]]
 
         for k in (5, 10, 25, 50):
             hk = int(rel[:k].sum())
@@ -300,6 +301,7 @@ def build_base_name_sequences(
     seq_len: int = 32,
     *,
     allow_heldout_test: bool = False,
+    frozen_v5_replay: bool = False,
 ) -> Dict[str, torch.Tensor]:
     """Build strictly point-in-time (< as_of_date) base_name-unified 32-event purchase sequences.
 
@@ -340,7 +342,7 @@ def build_base_name_sequences(
 
     origin = pd.Timestamp("2025-01-01")
     # Pre-index per customer: chronological list of (day_int, bn_id_1based, qty, cat_id, subcat_id, line_id, month)
-    cust_ev: Dict[str, Tuple[np.ndarray, List[Tuple[int, int, float, int, int, int, int]]]] = {}
+    cust_ev: Dict[str, Tuple[np.ndarray, List[Tuple[int, str, int, float, int, int, int, int]]]] = {}
     for cid, grp in agg.groupby("customer_id", sort=False):
         dts = ((grp["purchase_date"] - origin).dt.days).to_numpy(dtype=np.int64)
         months = grp["purchase_date"].dt.month.to_numpy(dtype=np.int64)
@@ -348,7 +350,7 @@ def build_base_name_sequences(
         for d_i, bn_s, q_v, m_i in zip(dts.tolist(), grp["bn"].tolist(), grp["quantity"].tolist(), months.tolist()):
             b_id = bn_to_idx.get(bn_s, -1) + 1  # 1..B (0 = padding / OOV)
             c_i, sc_i, bl_i = bn_meta.get(bn_s, (0, 0, 0))
-            evs.append((d_i, b_id, float(q_v), c_i, sc_i, bl_i, int(m_i)))
+            evs.append((d_i, bn_s, b_id, float(q_v), c_i, sc_i, bl_i, int(m_i)))
         cust_ev[cid] = (dts, evs)
 
     n_rows = len(customer_ids)
@@ -374,17 +376,19 @@ def build_base_name_sequences(
             continue
         # Running prior counts & total volume up to each event in the last `seq_len` window
         prior_evs = evs[:stop]
-        bn_counts: Dict[int, int] = {}
-        bn_vols: Dict[int, float] = {}
+        bn_counts: Dict[str, int] = {}
+        bn_vols: Dict[str, float] = {}
         cum_vol = 0.0
         # Compute running stats chronologically across prior_evs, retaining last `seq_len`
         start_keep = max(0, stop - seq_len)
         prev_day = prior_evs[0][0]
         last_day = prior_evs[-1][0]
-        for idx_e, (d_i, b_id, q_v, c_i, sc_i, bl_i, m_i) in enumerate(prior_evs):
-            prev_cnt = bn_counts.get(b_id, 0)
-            bn_counts[b_id] = prev_cnt + 1
-            bn_vols[b_id] = bn_vols.get(b_id, 0.0) + q_v
+        for idx_e, (d_i, bn_s, b_id, q_v, c_i, sc_i, bl_i, m_i) in enumerate(prior_evs):
+            if frozen_v5_replay and b_id == 0:
+                bn_s = ""  # Archived validation recipe pooled unknown formulations.
+            prev_cnt = bn_counts.get(bn_s, 0)
+            bn_counts[bn_s] = prev_cnt + 1
+            bn_vols[bn_s] = bn_vols.get(bn_s, 0.0) + q_v
             cum_vol += q_v
             gap_days = max(0, d_i - prev_day) if idx_e > 0 else 0
             prev_day = d_i
@@ -406,7 +410,7 @@ def build_base_name_sequences(
                 sequence[row, slot, 3] = math.sin(angle)
                 sequence[row, slot, 4] = math.cos(angle)
                 sequence[row, slot, 5] = min(1.0, math.log1p(prev_cnt) / log50)
-                sequence[row, slot, 6] = min(1.0, bn_vols[b_id] / max(cum_vol, 1e-6))
+                sequence[row, slot, 6] = min(1.0, bn_vols[bn_s] / max(cum_vol, 1e-6))
                 sequence[row, slot, 7] = 1.0 if prev_cnt > 0 else 0.0
                 sequence[row, slot, 8] = 1.0  # real_event_indicator
 

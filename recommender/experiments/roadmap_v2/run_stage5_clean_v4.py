@@ -51,6 +51,7 @@ from recommender.train_retriever import build_customer_metadata, get_device
 from .augmentation import build_strict_60d_aux_labels
 from .clean_ranker import CleanStage5BaseNameRanker
 from .commercial_features import COMMERCIAL_PARQUET_PATH
+from .stage5_artifacts import stage5_run_paths
 from .config import (
     ARTIFACT_ROOT,
     EVIDENCE_ROOT,
@@ -89,7 +90,6 @@ from .stage5_base_entity import (
 
 
 OUT_ROOT = ARTIFACT_ROOT / "stage5_clean_v4"
-SUMMARY_PATH = EVIDENCE_ROOT / "stage5_clean_v4_seed42.json"
 REF_3STAGE_PATH = EVIDENCE_ROOT / "stage5_3stage_reference.json"
 
 
@@ -233,7 +233,11 @@ def _score_clean_ranker(model: CleanStage5BaseNameRanker, split_d: Mapping[str, 
     return torch.cat(chunks, dim=0)
 
 
-def run_clean_v4(*, seed: int = SEED, device: Optional[str] = None) -> Dict[str, Any]:
+def run_clean_v4(
+    *, seed: int = SEED, device: Optional[str] = None,
+    output_dir: Optional[Path] = None, summary_path: Optional[Path] = None,
+) -> Dict[str, Any]:
+    run_root, summary_path = stage5_run_paths(OUT_ROOT, output_dir, summary_path)
     t_all = time.perf_counter()
     dev = get_device(device)
     before_hashes = snapshot_preserved_hashes()
@@ -255,7 +259,6 @@ def run_clean_v4(*, seed: int = SEED, device: Optional[str] = None) -> Dict[str,
         _,
     ) = _prepare_clean_v4_data()
 
-    OUT_ROOT.mkdir(parents=True, exist_ok=True)
     n_bn = universe["num_base_names"]
     bn_to_members = universe["bn_to_member_pid_indices"]
     tr_bn = bn_data["train"]
@@ -270,7 +273,7 @@ def run_clean_v4(*, seed: int = SEED, device: Optional[str] = None) -> Dict[str,
     full_window = tr_bn["prediction_days"] <= (TRAIN_CUTOFF - PURCHASE_DATE_ORIGIN).days - 60
 
     attr_ids = {k: v[reps] for k, v in enrichment["product_attr_ids"].items()}
-    run_dir = OUT_ROOT / f"clean_v4_fullspec_cust19-seed{seed}"
+    run_dir = run_root / f"clean_v4_fullspec_cust19-seed{seed}"
     tt_dir = run_dir / "two_tower"
     s2_dir = run_dir / "ranker_clean_8h"
     s2_dir.mkdir(parents=True, exist_ok=True)
@@ -480,7 +483,8 @@ def run_clean_v4(*, seed: int = SEED, device: Optional[str] = None) -> Dict[str,
         "preserved_hashes_verified": True,
         "elapsed_seconds": float(time.perf_counter() - t_all),
     }
-    atomic_json(results, SUMMARY_PATH, overwrite=True)
+    results["summary_path"] = str(summary_path)
+    atomic_json(results, summary_path, overwrite=False)
     del model
     gc.collect()
     if dev.type == "mps":
@@ -492,9 +496,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument("--output-dir", type=Path, help="New exclusive run directory.")
+    parser.add_argument("--summary-path", type=Path, help="New summary file (default: inside the run directory).")
     args = parser.parse_args()
-    res = run_clean_v4(seed=args.seed, device=args.device)
-    print(f"\nSaved clean v4 summary to {SUMMARY_PATH} ({res['elapsed_seconds']:.1f}s)", flush=True)
+    res = run_clean_v4(seed=args.seed, device=args.device, output_dir=args.output_dir, summary_path=args.summary_path)
+    print(f"\nSaved clean v4 summary to {res['summary_path']} ({res['elapsed_seconds']:.1f}s)", flush=True)
     print(f"CPU 1-req CleanStage5BaseNameRanker latency: {res['cpu_single_request_ranker_ms']}", flush=True)
 
 
