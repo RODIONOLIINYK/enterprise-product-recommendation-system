@@ -238,6 +238,8 @@ class StaticEnrichedRetriever(nn.Module):
         text_dim: int = TEXT_DIM,
         output_dim: int = OUTPUT_DIM,
         hidden_dim: int = 128,
+        max_seq_len: int = DEFAULT_SEQUENCE_LENGTH,
+        dim_feedforward: Optional[int] = None,
         temperature: float = DEFAULT_TEMPERATURE,
         num_familiarity_features: int = 4,
     ):
@@ -246,6 +248,7 @@ class StaticEnrichedRetriever(nn.Module):
         self.temperature = temperature
         cust_tab_dim = int(spec.customer_tabular_features)
         prod_dem_dim = int(spec.product_demand_features)
+        ffn_dim = int(dim_feedforward) if dim_feedforward is not None else int(hidden_dim) * 2
 
         if spec.is_control:
             # Exact S0 parameter construction & initialization order (or clean 0-tab / 12-container variant).
@@ -259,10 +262,10 @@ class StaticEnrichedRetriever(nn.Module):
                 num_tabular_features=cust_tab_dim,
                 catalog_history_encoder="attention",
                 history_gap_reference_days=74.0,
-                max_seq_len=32,
+                max_seq_len=int(max_seq_len),
                 num_heads=4,
                 num_layers=2,
-                dim_feedforward=256,
+                dim_feedforward=ffn_dim,
                 dropout=0.1,
                 seq_feature_dim=2,
             )
@@ -308,10 +311,10 @@ class StaticEnrichedRetriever(nn.Module):
                 extra_attr_vocab_sizes=c_sizes,
                 num_tabular_features=cust_tab_dim,
                 history_gap_reference_days=74.0,
-                max_seq_len=32,
+                max_seq_len=int(max_seq_len),
                 num_heads=4,
                 num_layers=2,
-                dim_feedforward=256,
+                dim_feedforward=ffn_dim,
                 dropout=0.1,
             )
             self.product_tower = StaticEnrichedProductTower(

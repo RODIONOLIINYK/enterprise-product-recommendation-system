@@ -57,7 +57,7 @@ def load_source_purchases(input_path: str | Path) -> pd.DataFrame:
     for column in ["transaction_type", "item_type"]:
         purchases[column] = purchases[column].str.upper()
     purchases["purchase_date"] = pd.to_datetime(
-        purchases["purchase_date"], errors="coerce"
+        purchases["purchase_date"], errors="coerce", format="mixed"
     ).dt.normalize()
     purchases["quantity"] = pd.to_numeric(purchases["quantity"], errors="coerce")
     return purchases

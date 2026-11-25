@@ -1,0 +1,303 @@
+{
+  "experiment": "v2_full_stage5_v5_shared_uv_baseline",
+  "dataset": "v2_full",
+  "train_cutoff": "2026-02-01 00:00:00",
+  "test_start": "2026-07-01 00:00:00",
+  "heldout_access": false,
+  "seed": 42,
+  "amp_bf16": true,
+  "data_manifest": {
+    "dataset": "v2_full",
+    "train_cutoff": "2026-02-01 00:00:00",
+    "test_start": "2026-07-01 00:00:00",
+    "heldout_access": false,
+    "num_skus": 1660,
+    "num_base_names": 1141,
+    "trained_base_names": 1056,
+    "source_sha256": {
+      "dataset_xlsx": "859378b39f3c35c1439c6bcb8b9cfabe7a580c908062d99ad880d34367be8b4f",
+      "customers_csv": "c75987aa2b133d533e9d5c33f83ee2b4608bca517bfea12c9d3733db3634704d",
+      "items_csv": "bbe4700786bfe22746a9e62a8a633dd52c529855455edda059b2390dd51de720",
+      "cleaned_purchases_csv": "219c113aaeac8a1462376c3214a6176de5b102527a8309d3d52d217c52cf64e4",
+      "commercial_dev_parquet": "ab7f37a1889f60ae929a38f9f301b5d51ecbedc4a003d538b9d696119ea4b296"
+    },
+    "splits": {
+      "train": {
+        "baskets": 137765,
+        "first_observed_baskets": 7792,
+        "returning_baskets": 129973,
+        "total_bn_targets": 340948,
+        "new_bn_targets": 59031,
+        "cand_38_memmap": "data/v2_full/interim/prepared_v2_full/train_cand_38.npy",
+        "cand_38_shape": [
+          137765,
+          1141,
+          38
+        ]
+      },
+      "val": {
+        "baskets": 16623,
+        "first_observed_baskets": 408,
+        "returning_baskets": 16215,
+        "total_bn_targets": 40435,
+        "new_bn_targets": 4496,
+        "cand_38_memmap": "data/v2_full/interim/prepared_v2_full/val_cand_38.npy",
+        "cand_38_shape": [
+          16623,
+          1141,
+          38
+        ]
+      }
+    },
+    "elapsed_seconds": 1455.024220709005
+  },
+  "stage1_two_tower": {
+    "best_epoch": 11,
+    "val_unseen_hits@25": 2770,
+    "val_unseen_hits@50": 3305,
+    "val_unseen_hits@100": 3690,
+    "val_total_new_targets": 4496,
+    "trainable_params": 869593,
+    "tower_checkpoint_sha256": "6a0e252075281ae2e1e289f716eefcaa2a34974b4c09a3756f36bb994cc0d21c",
+    "training_seconds": 165.38679462500295
+  },
+  "stage2_ranker": {
+    "trainable_params": 567442,
+    "training_seconds": 1552.542352707,
+    "epoch_history": [
+      {
+        "epoch": 1,
+        "loss": 3.71764293288122,
+        "bn_recall@5": 0.6783860398562912,
+        "bn_recall@10": 0.8170787157898254,
+        "bn_ndcg@10": 0.6478079072191253,
+        "true_new_bn_hits@10": 1161
+      },
+      {
+        "epoch": 2,
+        "loss": 3.5984367587108133,
+        "bn_recall@5": 0.680373974999877,
+        "bn_recall@10": 0.8171538836156225,
+        "bn_ndcg@10": 0.6491086033565795,
+        "true_new_bn_hits@10": 1106
+      },
+      {
+        "epoch": 3,
+        "loss": 3.5736951150601954,
+        "bn_recall@5": 0.6817925716176306,
+        "bn_recall@10": 0.8187723298466889,
+        "bn_ndcg@10": 0.6516662243556351,
+        "true_new_bn_hits@10": 1139
+      },
+      {
+        "epoch": 4,
+        "loss": 3.557790629821678,
+        "bn_recall@5": 0.6802770011771982,
+        "bn_recall@10": 0.8187444845195675,
+        "bn_ndcg@10": 0.6506422912675508,
+        "true_new_bn_hits@10": 1169
+      },
+      {
+        "epoch": 5,
+        "loss": 3.5434427305627114,
+        "bn_recall@5": 0.6809132512622039,
+        "bn_recall@10": 0.8187481531353915,
+        "bn_ndcg@10": 0.6517851779276533,
+        "true_new_bn_hits@10": 1144
+      },
+      {
+        "epoch": 6,
+        "loss": 3.5313907552894443,
+        "bn_recall@5": 0.6829002719944159,
+        "bn_recall@10": 0.8198561852742747,
+        "bn_ndcg@10": 0.652420499006865,
+        "true_new_bn_hits@10": 1165
+      },
+      {
+        "epoch": 7,
+        "loss": 3.51949202914756,
+        "bn_recall@5": 0.6805906692491284,
+        "bn_recall@10": 0.8185774565317914,
+        "bn_ndcg@10": 0.6521468503525203,
+        "true_new_bn_hits@10": 1133
+      },
+      {
+        "epoch": 8,
+        "loss": 3.507821364876509,
+        "bn_recall@5": 0.6814457189479924,
+        "bn_recall@10": 0.8181045853493966,
+        "bn_ndcg@10": 0.6517145392271058,
+        "true_new_bn_hits@10": 1129
+      },
+      {
+        "epoch": 9,
+        "loss": 3.4987648230741284,
+        "bn_recall@5": 0.6818444070339211,
+        "bn_recall@10": 0.8193236966151738,
+        "bn_ndcg@10": 0.6531389186767326,
+        "true_new_bn_hits@10": 1151
+      },
+      {
+        "epoch": 10,
+        "loss": 3.4923089092931154,
+        "bn_recall@5": 0.6818368654045657,
+        "bn_recall@10": 0.8188108062530495,
+        "bn_ndcg@10": 0.6531494523777482,
+        "true_new_bn_hits@10": 1147
+      }
+    ],
+    "ndcg": {
+      "bn_metrics": {
+        "queries": 16623,
+        "total_bn_targets": 40435,
+        "true_new_bn_targets": 4496,
+        "bn_recall@5": 0.6818368654045657,
+        "bn_recall@10": 0.8188108062530495,
+        "bn_recall@25": 0.9203248131777523,
+        "bn_recall@50": 0.9550683559645539,
+        "bn_micro_recall@10": 0.7946580932360578,
+        "bn_ndcg@10": 0.6531494523777482,
+        "true_new_bn_hits@5": 626,
+        "true_new_bn_hits@10": 1147,
+        "true_new_bn_hits@25": 2351,
+        "true_new_bn_hits@50": 3198,
+        "true_new_bn_recall@10": 0.25511565836298933,
+        "true_new_bn_recall@25": 0.5229092526690391,
+        "true_new_bn_recall@50": 0.7112989323843416
+      },
+      "cohorts": {
+        "first_observed": {
+          "queries": 408,
+          "total_bn_targets": 866,
+          "true_new_bn_targets": 866,
+          "bn_recall@5": 0.3750239399369795,
+          "bn_recall@10": 0.5170310987534625,
+          "bn_recall@25": 0.6992192092629171,
+          "bn_recall@50": 0.797957260389536,
+          "bn_micro_recall@10": 0.5773672055427251,
+          "bn_ndcg@10": 0.3688112147048572,
+          "true_new_bn_hits@5": 347,
+          "true_new_bn_hits@10": 500,
+          "true_new_bn_hits@25": 661,
+          "true_new_bn_hits@50": 738,
+          "true_new_bn_recall@10": 0.5773672055427251,
+          "true_new_bn_recall@25": 0.7632794457274826,
+          "true_new_bn_recall@50": 0.8521939953810623
+        },
+        "returning": {
+          "queries": 16215,
+          "total_bn_targets": 39569,
+          "true_new_bn_targets": 3630,
+          "bn_recall@5": 0.6895568576087454,
+          "bn_recall@10": 0.8264041531947596,
+          "bn_recall@25": 0.9258882474298185,
+          "bn_recall@50": 0.9590215676200954,
+          "bn_micro_recall@10": 0.7994136824281635,
+          "bn_ndcg@10": 0.6603039390240968,
+          "true_new_bn_hits@5": 279,
+          "true_new_bn_hits@10": 647,
+          "true_new_bn_hits@25": 1690,
+          "true_new_bn_hits@50": 2460,
+          "true_new_bn_recall@10": 0.17823691460055097,
+          "true_new_bn_recall@25": 0.465564738292011,
+          "true_new_bn_recall@50": 0.6776859504132231
+        }
+      },
+      "resolved_sku_metrics": {
+        "sku_recall@10": 0.5509351022940892,
+        "sku_ndcg@10": 0.454374500453082,
+        "sku_new_hits@10": 613
+      },
+      "predictions_npz": "checkpoints/v2_full/baseline_v5_shared_uv-seed42/ranker_v5_control/predictions_ndcg.npz",
+      "epoch": 10
+    },
+    "discovery": {
+      "bn_metrics": {
+        "queries": 16623,
+        "total_bn_targets": 40435,
+        "true_new_bn_targets": 4496,
+        "bn_recall@5": 0.6802770011771982,
+        "bn_recall@10": 0.8187444845195675,
+        "bn_recall@25": 0.9209427224144243,
+        "bn_recall@50": 0.9546714714191211,
+        "bn_micro_recall@10": 0.7948806726845554,
+        "bn_ndcg@10": 0.6506422912675508,
+        "true_new_bn_hits@5": 623,
+        "true_new_bn_hits@10": 1169,
+        "true_new_bn_hits@25": 2385,
+        "true_new_bn_hits@50": 3192,
+        "true_new_bn_recall@10": 0.260008896797153,
+        "true_new_bn_recall@25": 0.5304715302491103,
+        "true_new_bn_recall@50": 0.7099644128113879
+      },
+      "cohorts": {
+        "first_observed": {
+          "queries": 408,
+          "total_bn_targets": 866,
+          "true_new_bn_targets": 866,
+          "bn_recall@5": 0.37799721257936975,
+          "bn_recall@10": 0.5126655726387105,
+          "bn_recall@25": 0.708866898748068,
+          "bn_recall@50": 0.7853475049488982,
+          "bn_micro_recall@10": 0.581986143187067,
+          "bn_ndcg@10": 0.36000609925425736,
+          "true_new_bn_hits@5": 355,
+          "true_new_bn_hits@10": 504,
+          "true_new_bn_hits@25": 669,
+          "true_new_bn_hits@50": 731,
+          "true_new_bn_recall@10": 0.581986143187067,
+          "true_new_bn_recall@25": 0.7725173210161663,
+          "true_new_bn_recall@50": 0.8441108545034642
+        },
+        "returning": {
+          "queries": 16215,
+          "total_bn_targets": 39569,
+          "true_new_bn_targets": 3630,
+          "bn_recall@5": 0.6878829311030642,
+          "bn_recall@10": 0.8264460075567177,
+          "bn_recall@25": 0.9262789503549653,
+          "bn_recall@50": 0.9589319819538019,
+          "bn_micro_recall@10": 0.7995400439738178,
+          "bn_ndcg@10": 0.6579552463302349,
+          "true_new_bn_hits@5": 268,
+          "true_new_bn_hits@10": 665,
+          "true_new_bn_hits@25": 1716,
+          "true_new_bn_hits@50": 2461,
+          "true_new_bn_recall@10": 0.18319559228650137,
+          "true_new_bn_recall@25": 0.4727272727272727,
+          "true_new_bn_recall@50": 0.677961432506887
+        }
+      },
+      "resolved_sku_metrics": {
+        "sku_recall@10": 0.5502189216963819,
+        "sku_ndcg@10": 0.4516007699219605,
+        "sku_new_hits@10": 623
+      },
+      "predictions_npz": "checkpoints/v2_full/baseline_v5_shared_uv-seed42/ranker_v5_control/predictions_discovery.npz",
+      "epoch": 4
+    }
+  },
+  "cpu_single_request_ranker_ms": {
+    "median_ms": 6.701227500116147,
+    "p95_ms": 7.13794249992361,
+    "mean_ms": 6.762485669994476
+  },
+  "v1_preserved_hashes_verified": false,
+  "elapsed_seconds": 1603.644019064,
+  "summary_path": "experiments/v2_full/stage5_v5_baseline_seed42.json",
+  "run_settings": {
+    "selection_version": 2,
+    "seed": 42,
+    "epochs": 10,
+    "stage1_epochs": 30,
+    "batch_size": 128,
+    "in_memory": true,
+    "bf16": true
+  },
+  "output_sha256": {
+    "best_ndcg.pt": "b1ef31ea11fedd0de4849e3e511d66bac524347f29398cc292dea7579f79b534",
+    "best_discovery.pt": "430fb14ce2339009f4f92ae2bdb48394424bf15a03f6a580ab01cf34fd91c028",
+    "predictions_ndcg.npz": "d678948d856b64abbfa74df21080d14faf1289f3dda976c121c3954152b72ed3",
+    "predictions_discovery.npz": "e71323878fb55edbfa8211a924255f21c63cd8d44c4486cc1118d0459def5aaa"
+  }
+}

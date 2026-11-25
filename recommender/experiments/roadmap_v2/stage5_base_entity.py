@@ -47,6 +47,8 @@ def build_base_name_universe(
     product_ids: Sequence[str],
     catalogue: pd.DataFrame,
     purchases: pd.DataFrame,
+    *,
+    train_cutoff: pd.Timestamp = TRAIN_CUTOFF,
 ) -> Dict[str, Any]:
     """Build deterministic canonical base_name universe (585 unique bodies) from the 841 active SKUs."""
     cat_dedup = catalogue.copy()
@@ -58,9 +60,9 @@ def build_base_name_universe(
     if any(not b for b in prod_bns):
         raise ValueError("All canonical product_ids must have non-empty base_name.")
 
-    # Order: base_names seen strictly < TRAIN_CUTOFF first (trained_base_names), then val-only base_names
+    # Order: base_names seen strictly < train_cutoff first (trained_base_names), then val-only base_names
     train_pids = set(
-        purchases.loc[pd.to_datetime(purchases["purchase_date"], format="mixed") < TRAIN_CUTOFF, "product_id"]
+        purchases.loc[pd.to_datetime(purchases["purchase_date"], format="mixed") < train_cutoff, "product_id"]
         .astype(str)
         .str.strip()
     )
@@ -98,6 +100,7 @@ def evaluate_base_name_predictions(
     customer_ids: Sequence[str],
     *,
     save_path: Optional[Path] = None,
+    prediction_days: Optional[Sequence[int]] = None,
 ) -> Dict[str, Any]:
     """Apples-to-apples base_name-level evaluator (NDCG@10, Recall@K, truly new base_name discovery@K).
 
@@ -160,12 +163,12 @@ def evaluate_base_name_predictions(
         "queries": int(n_rows),
         "total_bn_targets": total_targets,
         "true_new_bn_targets": total_new,
-        "bn_recall@5": float(per_q_r5.mean()),
-        "bn_recall@10": float(per_q_r10.mean()),
-        "bn_recall@25": float(per_q_r25.mean()),
-        "bn_recall@50": float(per_q_r50.mean()),
+        "bn_recall@5": float(per_q_r5.sum() / max(n_rows, 1)),
+        "bn_recall@10": float(per_q_r10.sum() / max(n_rows, 1)),
+        "bn_recall@25": float(per_q_r25.sum() / max(n_rows, 1)),
+        "bn_recall@50": float(per_q_r50.sum() / max(n_rows, 1)),
         "bn_micro_recall@10": float(hits_at[10] / max(total_targets, 1)),
-        "bn_ndcg@10": float(per_q_ndcg10.mean()),
+        "bn_ndcg@10": float(per_q_ndcg10.sum() / max(n_rows, 1)),
         "true_new_bn_hits@5": int(new_hits_at[5]),
         "true_new_bn_hits@10": int(new_hits_at[10]),
         "true_new_bn_hits@25": int(new_hits_at[25]),
@@ -190,6 +193,7 @@ def evaluate_base_name_predictions(
             new_hits_10=per_q_new_hits10,
             new_targets=per_q_new_targets,
             targets=per_q_targets,
+            **({"prediction_days": np.asarray(prediction_days)} if prediction_days is not None else {}),
         )
     return metrics
 
@@ -203,21 +207,28 @@ def collapse_sku_scores_to_base_name_ranking(
     max_k: int = 50,
 ) -> np.ndarray:
     """Collapse ranked SKU scores (full pool or slate) to unique base_name indices by first-occurrence order."""
-    scores_np = sku_scores.detach().cpu().numpy().copy()
+    if max_k < 0:
+        raise ValueError("max_k must be nonnegative.")
+    scores_np = sku_scores.detach().cpu().float().numpy() if sku_scores.dtype == torch.bfloat16 else sku_scores.detach().cpu().numpy()
+    valid = np.isfinite(scores_np)
     if allowed_mask is not None:
-        scores_np[~allowed_mask.detach().cpu().numpy().astype(bool)] = -1e18
+        valid &= allowed_mask.detach().cpu().numpy().astype(bool)
     order = np.argsort(-scores_np, axis=-1, kind="stable")
     cand_np = candidate_indices.detach().cpu().numpy() if candidate_indices is not None else None
 
     n_rows = scores_np.shape[0]
     out = np.full((n_rows, max_k), -1, dtype=np.int64)
+    if max_k == 0:
+        return out
     for i in range(n_rows):
         seen: set[int] = set()
         pos = 0
         for col in order[i]:
-            if scores_np[i, col] <= -1e17:
-                break
+            if not valid[i, col]:
+                continue
             p_idx = int(cand_np[i, col]) if cand_np is not None else int(col)
+            if p_idx < 0:
+                continue
             b_idx = int(pid_idx_to_bn_idx[p_idx])
             if b_idx not in seen:
                 seen.add(b_idx)
@@ -241,6 +252,10 @@ def paired_base_name_bootstrap_ci(
     cids = a["customer_ids"].tolist()
     if cids != b["customer_ids"].tolist():
         raise ValueError("Customer ID alignment mismatch for paired bootstrap.")
+
+    for key in ("targets", "new_targets", "prediction_days"):
+        if key in a and key in b and not np.array_equal(a[key], b[key]):
+            raise ValueError(f"Basket alignment mismatch for paired bootstrap: {key}")
 
     # Group row indices by customer
     by_c: Dict[str, List[int]] = {}
@@ -300,8 +315,10 @@ def build_base_name_sequences(
     line_vocab: Mapping[str, int],
     seq_len: int = 32,
     *,
+    quantity_reference_length: Optional[int] = None,
     allow_heldout_test: bool = False,
     frozen_v5_replay: bool = False,
+    test_start: pd.Timestamp = TEST_START,
 ) -> Dict[str, torch.Tensor]:
     """Build strictly point-in-time (< as_of_date) base_name-unified 32-event purchase sequences.
 
@@ -310,7 +327,7 @@ def build_base_name_sequences(
     """
     df = purchases.copy()
     df["purchase_date"] = pd.to_datetime(df["purchase_date"], format="mixed").dt.normalize()
-    if not allow_heldout_test and bool(df["purchase_date"].ge(TEST_START).any()):
+    if not allow_heldout_test and bool(df["purchase_date"].ge(test_start).any()):
         raise ValueError("Development purchases only.")
     df["customer_id"] = df["customer_id"].astype(str).str.strip()
     df["product_id"] = df["product_id"].astype(str).str.strip()
@@ -355,6 +372,8 @@ def build_base_name_sequences(
 
     n_rows = len(customer_ids)
     sequence = np.zeros((n_rows, seq_len, 9), dtype=np.float32)
+    seq_rel_qty = np.zeros((n_rows, seq_len), dtype=np.float32)
+    cust_median_gap_days = np.full((n_rows,), 30.0, dtype=np.float32)
     attn_mask = np.zeros((n_rows, seq_len), dtype=np.int64)
     seq_bn_ids = np.zeros((n_rows, seq_len), dtype=np.int64)
     seq_cat_ids = np.zeros((n_rows, seq_len), dtype=np.int64)
@@ -376,11 +395,24 @@ def build_base_name_sequences(
             continue
         # Running prior counts & total volume up to each event in the last `seq_len` window
         prior_evs = evs[:stop]
+        uniq_days = []
+        for ev in prior_evs:
+            if not uniq_days or ev[0] != uniq_days[-1]:
+                uniq_days.append(ev[0])
+        if len(uniq_days) >= 2:
+            day_gaps = [b - a for a, b in zip(uniq_days, uniq_days[1:])]
+            cust_median_gap_days[row] = float(np.median(day_gaps))
         bn_counts: Dict[str, int] = {}
         bn_vols: Dict[str, float] = {}
         cum_vol = 0.0
         # Compute running stats chronologically across prior_evs, retaining last `seq_len`
         start_keep = max(0, stop - seq_len)
+        # Longer-history ablations keep the prepared 32-event quantity scale.
+        qty_start = max(0, stop - quantity_reference_length) if quantity_reference_length else start_keep
+        max_window_log_q = max(
+            (math.log1p(max(0.0, ev[3])) for ev in prior_evs[qty_start:]),
+            default=0.0,
+        )
         prev_day = prior_evs[0][0]
         last_day = prior_evs[-1][0]
         for idx_e, (d_i, bn_s, b_id, q_v, c_i, sc_i, bl_i, m_i) in enumerate(prior_evs):
@@ -401,6 +433,11 @@ def build_base_name_sequences(
                 seq_subcat_ids[row, slot] = sc_i
                 seq_line_ids[row, slot] = bl_i
                 seq_dates[row, slot] = float(d_i) / 365.25
+                seq_rel_qty[row, slot] = (
+                    min(1.0, math.log1p(max(0.0, q_v)) / max_window_log_q)
+                    if max_window_log_q > 0.0
+                    else 0.0
+                )
 
                 age_rel_last = max(0, last_day - d_i)
                 angle = 2.0 * math.pi * (m_i - 1) / 12.0
@@ -416,6 +453,8 @@ def build_base_name_sequences(
 
     return {
         "sequence": torch.from_numpy(sequence),
+        "seq_rel_qty": torch.from_numpy(seq_rel_qty),
+        "cust_median_gap_days": torch.from_numpy(cust_median_gap_days),
         "attention_mask": torch.from_numpy(attn_mask),
         "seq_product_ids": torch.from_numpy(seq_bn_ids),
         "seq_category_ids": torch.from_numpy(seq_cat_ids),

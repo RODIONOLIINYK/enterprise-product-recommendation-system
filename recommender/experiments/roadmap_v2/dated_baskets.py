@@ -84,12 +84,19 @@ class DatedBasket(NamedTuple):
     sku_allowed: np.ndarray
 
 
-def aligned_commercial_events(events, purchases):
+def aligned_commercial_events(events, purchases, *, test_start: pd.Timestamp = TEST_START):
     """Require the commercial lines to reconstruct exactly the cleaned paid-sale timeline."""
     paid = events.loc[actual_purchase_mask(events)].copy()
     keys = ["customer_id", "purchase_date", "product_id"]
+    paid["customer_id"] = paid["customer_id"].astype(str).str.strip()
+    paid["product_id"] = paid["product_id"].astype(str).str.strip()
+    paid["purchase_date"] = pd.to_datetime(paid["purchase_date"], format="mixed").dt.normalize().astype("datetime64[ns]")
+    purch = purchases[keys + ["quantity"]].copy()
+    purch["customer_id"] = purch["customer_id"].astype(str).str.strip()
+    purch["product_id"] = purch["product_id"].astype(str).str.strip()
+    purch["purchase_date"] = pd.to_datetime(purch["purchase_date"], format="mixed").dt.normalize().astype("datetime64[ns]")
     totals = paid.groupby(keys).quantity.sum().sort_index()
-    expected = purchases.set_index(keys).quantity.sort_index()
+    expected = purch.set_index(keys).quantity.sort_index()
     if not totals.index.equals(expected.index) or not np.allclose(
         totals, expected, rtol=1e-7, atol=1e-7
     ):
@@ -97,7 +104,7 @@ def aligned_commercial_events(events, purchases):
     # A dated basket is fully settled only after all its paid lines have settled.
     # An unknown settlement must behave exactly like a settlement still in the future.
     settlements = pd.to_datetime(paid["full_payment_date"], errors="coerce")
-    incomplete = settlements.isna() | settlements.ge(TEST_START)
+    incomplete = settlements.isna() | settlements.ge(test_start)
     incomplete_basket = incomplete.groupby(
         [paid.customer_id, paid.purchase_date]
     ).transform("any")
@@ -116,11 +123,19 @@ def first_observed_pack_indices(product_ids, members, first_sales):
     )
 
 
-def basket_cases(purchases, product_ids, universe, pool):
+def basket_cases(
+    purchases,
+    product_ids,
+    universe,
+    pool,
+    *,
+    train_cutoff: pd.Timestamp = TRAIN_CUTOFF,
+    test_start: pd.Timestamp = TEST_START,
+):
     """Keep each dated basket once. Targets and prior ownership are independent of eligibility."""
     if (
         purchases.purchase_date.isna().any()
-        or purchases.purchase_date.ge(TEST_START).any()
+        or purchases.purchase_date.ge(test_start).any()
     ):
         raise ValueError("Expected dated development events only.")
     by_bn = universe["bn_to_idx"]
@@ -135,7 +150,7 @@ def basket_cases(purchases, product_ids, universe, pool):
         allowed_sku = np.isin(pids, list(pool.eligible_on(date)))
         allowed = np.zeros(n, bool)
         allowed[idx[allowed_sku]] = True
-        split = "train" if date < TRAIN_CUTOFF else "val"
+        split = "train" if date < train_cutoff else "val"
         for cid, basket in daily.groupby("customer_id", sort=True):
             first = cid not in seen
             prior = seen.setdefault(cid, np.zeros(n, bool))
@@ -166,26 +181,36 @@ def basket_cases(purchases, product_ids, universe, pool):
     return cases, counts
 
 
-def validate_dated_split(data, split):
+def validate_dated_split(
+    data,
+    split,
+    *,
+    train_cutoff: pd.Timestamp = TRAIN_CUTOFF,
+    test_start: pd.Timestamp = TEST_START,
+):
     """Verify row dates and the paid-history contract before fitting or replay."""
     days = data["prediction_days"]
+    if split not in ("train", "val") or train_cutoff >= test_start:
+        raise ValueError("Invalid development partition or split boundaries.")
+    if days.ndim != 1 or not torch.isfinite(days).all() or (days != days.round()).any():
+        raise ValueError("Prediction days must be finite integer calendar days.")
     dates = PURCHASE_DATE_ORIGIN + pd.to_timedelta(days.numpy(), unit="D")
-    if (dates >= TEST_START).any() or (
-        (dates < TRAIN_CUTOFF) != (split == "train")
+    if (dates >= test_start).any() or (
+        (dates < train_cutoff) != (split == "train")
     ).any():
         raise ValueError("Basket outside its development partition.")
     if len(set(zip(data["customer_ids"], days.tolist(), strict=True))) != len(days):
         raise ValueError("Duplicate customer/date prediction.")
     valid = data["attention_mask"].bool()
     event_days = (data["seq_purchase_dates"] * DAYS_PER_YEAR).round()
-    if ((event_days >= days[:, None]) & valid).any():
+    if not torch.isfinite(event_days[valid]).all() or ((event_days >= days[:, None]) & valid).any():
         raise ValueError("History contains a same-day or future event.")
     cold = data["first_observed"]
     if valid[cold].any() or data["familiarity_bn"][cold].any():
         raise ValueError("First observed basket contains customer history.")
     target, new = data["target_bn"], data["new_target_bn"]
     allowed, unseen = data["allowed_bn"], data["unseen_bn"]
-    if (new & ~target).any() or not torch.equal(new & allowed, target & unseen):
+    if (unseen & ~allowed).any() or (new & ~target).any() or not torch.equal(new & allowed, target & unseen):
         raise ValueError("Target novelty and eligible unseen masks disagree.")
     if not torch.equal(new[cold], target[cold]) or not torch.equal(
         unseen[cold], allowed[cold]

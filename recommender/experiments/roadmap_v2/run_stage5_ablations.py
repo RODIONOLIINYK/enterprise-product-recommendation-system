@@ -93,7 +93,8 @@ def _evaluate_with_cohorts_and_sku(
     save_path: Path,
 ) -> Dict[str, Any]:
     all_m = evaluate_base_name_predictions(
-        ranked_bn, val_bn["target_bn"], val_bn["new_target_bn"], val_bn["customer_ids"], save_path=save_path
+        ranked_bn, val_bn["target_bn"], val_bn["new_target_bn"], val_bn["customer_ids"],
+        save_path=save_path, prediction_days=val_bn["prediction_days"],
     )
     cohorts = {}
     for cname, mask in (("first_observed", val_bn["first_observed"]), ("returning", ~val_bn["first_observed"])):
@@ -133,8 +134,8 @@ def _evaluate_with_cohorts_and_sku(
         "bn_metrics": all_m,
         "cohorts": cohorts,
         "resolved_sku_metrics": {
-            "sku_recall@10": float(np.mean(sku_r10)),
-            "sku_ndcg@10": float(np.mean(sku_ndcg10)),
+            "sku_recall@10": float(np.mean(sku_r10)) if sku_r10 else 0.0,
+            "sku_ndcg@10": float(np.mean(sku_ndcg10)) if sku_ndcg10 else 0.0,
             "sku_new_hits@10": int(sku_new10),
         },
         "predictions_npz": str(save_path),

@@ -17,6 +17,7 @@ private/
 runs/
 artifacts/
 checkpoints/
+exports/
 config.local.yaml
 configs/local*.yaml
 .env

@@ -1,7 +1,11 @@
-"""Interactive live demo dashboard for Stage 5 No-MLP Full-Pool UPS-CANR on real held-out Test cases.
+"""Interactive live demo dashboard for the active recommendation model (`v2_full` default, `v1` optional).
 
-Usage (requires explicit --allow-heldout-test flag since cases come from >= 2026-02-19):
-    PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.demo_dashboard --allow-heldout-test --port 8765
+Usage:
+    # Default: canonical v2_full single-stage E2E Wave2BE2ERanker + Option A (strictly Validation, zero Test access):
+    PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.demo_dashboard --port 8765
+
+    # Legacy v1 Stage 5 Shared-UV model on held-out Test baskets (>= 2026-02-19):
+    PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.demo_dashboard --model v1 --allow-heldout-test --port 8765
 """
 
 import argparse
@@ -13,7 +17,7 @@ from pathlib import Path
 import random
 import threading
 import time
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional
 from urllib.parse import parse_qs, urlparse
 
 import numpy as np
@@ -29,7 +33,7 @@ from recommender.sequences import PURCHASE_DATE_ORIGIN
 from recommender.split import TEST_START, TRAIN_CUTOFF
 from recommender.text import load_cached_embeddings
 from recommender.train_ranker import company_embeddings_path
-from recommender.train_retriever import build_customer_metadata, get_device
+from recommender.train_retriever import build_customer_metadata
 
 from .clean_ranker import CleanStage5BaseNameRanker, SharedUVStage5Ranker
 from .config import EVIDENCE_ROOT
@@ -369,6 +373,8 @@ class Stage5LiveDemoEngine:
     def _fast_build_sequence(self, cid: str, pday: int, seq_len: int = 32, *, frozen_v5_replay=False) -> Dict[str, torch.Tensor]:
         """Bit-exact single-customer base_name 32-event sequence builder (<0.1 ms)."""
         sequence = np.zeros((1, seq_len, 9), dtype=np.float32)
+        seq_rel_qty = np.zeros((1, seq_len), dtype=np.float32)
+        cust_median_gap_days = np.full((1,), 30.0, dtype=np.float32)
         attn_mask = np.zeros((1, seq_len), dtype=np.int64)
         seq_bn_ids = np.zeros((1, seq_len), dtype=np.int64)
         seq_cat_ids = np.zeros((1, seq_len), dtype=np.int64)
@@ -384,10 +390,21 @@ class Stage5LiveDemoEngine:
                 log60 = math.log1p(60.0)
                 log50 = math.log1p(50.0)
                 prior_evs = evs[:stop]
+                uniq_days = []
+                for ev in prior_evs:
+                    if not uniq_days or ev[0] != uniq_days[-1]:
+                        uniq_days.append(ev[0])
+                if len(uniq_days) >= 2:
+                    day_gaps = [b - a for a, b in zip(uniq_days, uniq_days[1:])]
+                    cust_median_gap_days[0] = float(np.median(day_gaps))
                 bn_counts: Dict[str, int] = {}
                 bn_vols: Dict[str, float] = {}
                 cum_vol = 0.0
                 start_keep = max(0, stop - seq_len)
+                max_window_log_q = max(
+                    (math.log1p(max(0.0, ev[3])) for ev in prior_evs[start_keep:]),
+                    default=0.0,
+                )
                 prev_day = prior_evs[0][0]
                 last_day = prior_evs[-1][0]
                 for idx_e, (d_i, bn_s, b_id, q_v, c_i, sc_i, bl_i, m_i) in enumerate(prior_evs):
@@ -407,6 +424,11 @@ class Stage5LiveDemoEngine:
                         seq_subcat_ids[0, slot] = sc_i
                         seq_line_ids[0, slot] = bl_i
                         seq_dates[0, slot] = float(d_i) / 365.25
+                        seq_rel_qty[0, slot] = (
+                            math.log1p(max(0.0, q_v)) / max_window_log_q
+                            if max_window_log_q > 0.0
+                            else 0.0
+                        )
                         age_rel = max(0, last_day - d_i)
                         angle = 2.0 * math.pi * (m_i - 1) / 12.0
                         sequence[0, slot, 0] = min(1.0, math.log1p(q_v) / log60)
@@ -420,6 +442,8 @@ class Stage5LiveDemoEngine:
                         sequence[0, slot, 8] = 1.0
         return {
             "sequence": torch.from_numpy(sequence),
+            "seq_rel_qty": torch.from_numpy(seq_rel_qty),
+            "cust_median_gap_days": torch.from_numpy(cust_median_gap_days),
             "attention_mask": torch.from_numpy(attn_mask),
             "seq_product_ids": torch.from_numpy(seq_bn_ids),
             "seq_category_ids": torch.from_numpy(seq_cat_ids),
@@ -479,6 +503,18 @@ class Stage5LiveDemoEngine:
 
     def metadata_payload(self) -> Dict[str, Any]:
         return {
+            "model_family": "v1",
+            "title": "Stage 5 No-MLP Full-Pool UPS-CANR — Live Held-Out Test Demo",
+            "split_label": "Held-Out Test",
+            "split_window_note": f"Held-out Test window {self.cases[0].date.date()} → {self.cases[-1].date.date()}",
+            "pipeline_labels": {
+                "step2_title": "2. 38D Cand + 11D Cust + 32-Seq",
+                "step2_desc": "base_name + 3A fin + 3C mgr + 3E specs",
+                "step3_title": "3. Full-Pool UPS-CANR (No MLP)",
+                "step3_desc": f"Scores all {self.n_bn} formulations directly",
+            },
+            "supports_ranking_modes": False,
+            "ranking_modes": [],
             "reference_id": self.reference["reference_id"],
             "active_variant": self.active_variant,
             "active_epoch": self.active_epoch,
@@ -494,7 +530,7 @@ class Stage5LiveDemoEngine:
             "val_metrics": self.active_val_metrics,
         }
 
-    def evaluate_case(self, case_idx: int) -> Dict[str, Any]:
+    def evaluate_case(self, case_idx: int, *, mode: str = "blended") -> Dict[str, Any]:
         with self.lock:
             c = self.cases[case_idx]
             cid = c.customer
@@ -833,11 +869,16 @@ HTML_PAGE = r"""<!DOCTYPE html>
   .header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
   .header .sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
   .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  select, button {
+  select, button, input.case-input {
     font-family: var(--sans); font-size: 13px; border-radius: 8px;
     border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
     padding: 8px 12px; cursor: pointer;
   }
+  input.case-input {
+    width: 92px; font-family: var(--mono); cursor: text; padding: 8px 10px;
+  }
+  button.secondary { padding: 8px 11px; font-weight: 600; }
+  button.secondary:hover { border-color: var(--accent); }
   button.primary {
     background: var(--accent); border-color: #2563eb; color: #fff; font-weight: 600;
     padding: 8px 16px; transition: opacity 0.15s;
@@ -944,18 +985,21 @@ HTML_PAGE = r"""<!DOCTYPE html>
 <div class="container">
   <div class="header">
     <div>
-      <h1>Stage 5 No-MLP Full-Pool UPS-CANR — Live Held-Out Test Demo</h1>
+      <h1 id="page-title">Live Product Recommendation Demo</h1>
       <div class="sub" id="model-subtitle">Loading model metadata...</div>
     </div>
     <div class="controls">
-      <select id="cohort-filter" title="Filter held-out test baskets">
-        <option value="any">Any Test Basket (6,582)</option>
+      <select id="ranking-mode" title="Ranking head / calibration mode" style="display:none;"></select>
+      <select id="cohort-filter" title="Filter evaluation baskets">
+        <option value="any">Any Basket</option>
         <option value="returning">Returning Customers</option>
         <option value="first_observed">First-Observed (Cold-Start)</option>
         <option value="has_new">Returning w/ True New Product</option>
         <option value="multi_item">Multi-Product Baskets (≥2)</option>
       </select>
-      <button class="primary" id="btn-random">🎲 Pick Random Test Case</button>
+      <input type="number" min="0" id="case-idx-input" class="case-input" placeholder="Case #" title="Jump to specific case index" />
+      <button class="secondary" id="btn-go" title="Load specific case index">Go</button>
+      <button class="primary" id="btn-random">🎲 Pick Random Case</button>
     </div>
   </div>
 
@@ -966,14 +1010,14 @@ HTML_PAGE = r"""<!DOCTYPE html>
       <div class="d">Only orders &amp; settlements &lt; date</div>
     </div>
     <div class="pipe-step">
-      <div class="k">2. 38D Cand + 11D Cust + 32-Seq</div>
+      <div class="k" id="p-step2-title">2. Causal Features &amp; Sequence</div>
       <div class="v" id="p-feat-ms">—</div>
-      <div class="d">base_name + 3A fin + 3C mgr + 3E specs</div>
+      <div class="d" id="p-step2-desc">—</div>
     </div>
     <div class="pipe-step">
-      <div class="k">3. Full-Pool UPS-CANR (No MLP)</div>
+      <div class="k" id="p-step3-title">3. Full-Pool Neural Ranker</div>
       <div class="v" id="p-inf-ms">—</div>
-      <div class="d" id="p-pool">Scores all 585 formulations directly</div>
+      <div class="d" id="p-pool">—</div>
     </div>
     <div class="pipe-step">
       <div class="k">4. Causal Pack-Size Resolver</div>
@@ -984,14 +1028,14 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
   <div class="metrics-bar">
     <div class="metric-card">
-      <div class="label">Case Recall@10</div>
+      <div class="label" id="lbl-r10">Case Recall@10</div>
       <div class="val good" id="m-r10">—</div>
       <div class="hint" id="m-hits">—</div>
     </div>
     <div class="metric-card">
-      <div class="label">Case NDCG@10</div>
+      <div class="label" id="lbl-ndcg">Case NDCG@10</div>
       <div class="val" id="m-ndcg">—</div>
-      <div class="hint">Position-weighted ranking quality</div>
+      <div class="hint" id="m-ndcg-hint">Position-weighted ranking quality</div>
     </div>
     <div class="metric-card">
       <div class="label">True New Discoveries@10</div>
@@ -1091,66 +1135,131 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
 <script>
 const session = { count: 0, sumR10: 0, sumNdcg: 0, hits: 0, targets: 0, newHits: 0, newTargets: 0 };
+let activeMeta = null;
+let currentCaseIdx = null;
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
+function activeMode() {
+  const sel = document.getElementById('ranking-mode');
+  return (sel && sel.style.display !== 'none' && sel.value) ? sel.value : 'blended';
+}
+
 async function loadMeta() {
   const res = await fetch('/api/meta');
   const m = await res.json();
+  activeMeta = m;
+
+  if (m.title) {
+    document.title = m.title;
+    document.getElementById('page-title').textContent = m.title;
+  }
+  const paramStr = m.per_request_params
+    ? `${(m.per_request_params/1e3).toFixed(0)}K per-req / ${(m.trainable_params/1e6).toFixed(2)}M total`
+    : `${(m.trainable_params/1e3).toFixed(0)}K params`;
+  const splitNote = m.split_window_note || `${m.test_date_range[0]} → ${m.test_date_range[1]}`;
   document.getElementById('model-subtitle').textContent =
-    `Model: ${m.active_variant} (ep ${m.active_epoch}, ${(m.trainable_params/1e3).toFixed(0)}K params, ${m.device}) · ` +
-    `${m.num_base_names} canonical base_names · Held-out Test window ${m.test_date_range[0]} → ${m.test_date_range[1]} (${m.test_baskets_total.toLocaleString()} baskets)`;
+    `Model: ${m.active_variant} (ep ${m.active_epoch}, ${paramStr}, ${m.device}) · ` +
+    `${m.num_base_names.toLocaleString()} canonical base_names · ${splitNote} (${m.test_baskets_total.toLocaleString()} baskets)`;
+
+  if (m.pipeline_labels) {
+    document.getElementById('p-step2-title').textContent = m.pipeline_labels.step2_title;
+    document.getElementById('p-step2-desc').textContent = m.pipeline_labels.step2_desc;
+    document.getElementById('p-step3-title').textContent = m.pipeline_labels.step3_title;
+    document.getElementById('p-pool').textContent = m.pipeline_labels.step3_desc;
+  }
+
+  const modeSel = document.getElementById('ranking-mode');
+  if (m.supports_ranking_modes && m.ranking_modes && m.ranking_modes.length) {
+    modeSel.innerHTML = m.ranking_modes.map(o => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');
+    modeSel.style.display = '';
+  } else {
+    modeSel.style.display = 'none';
+  }
+
   const sel = document.getElementById('cohort-filter');
-  sel.options[0].text = `Any Test Basket (${m.filter_counts.any.toLocaleString()})`;
+  const splitPrefix = m.model_family === 'v2_full' ? 'Validation' : 'Test';
+  sel.options[0].text = `Any ${splitPrefix} Basket (${m.filter_counts.any.toLocaleString()})`;
   sel.options[1].text = `Returning Customers (${m.filter_counts.returning.toLocaleString()})`;
   sel.options[2].text = `First-Observed / Cold-Start (${m.filter_counts.first_observed.toLocaleString()})`;
   sel.options[3].text = `Returning w/ True New Product (${m.filter_counts.has_new.toLocaleString()})`;
   sel.options[4].text = `Multi-Product Baskets ≥2 (${m.filter_counts.multi_item.toLocaleString()})`;
+
+  document.getElementById('case-idx-input').max = String(Math.max(0, m.test_baskets_total - 1));
+
   const vm = m.val_metrics || {};
   if (vm['bn_recall@10'] !== undefined) {
+    const pureTxt = vm['pure_unseen_hits@10'] !== undefined
+      ? ` · <strong>Pure Unseen@10 ${vm['pure_unseen_hits@10'].toLocaleString()}/${vm['true_new_bn_targets'].toLocaleString()} (${(100*vm['pure_unseen_recall@10']).toFixed(1)}%)</strong>`
+      : '';
+    const nValStr = m.model_family === 'v2_full' ? m.test_baskets_total.toLocaleString() : '6,480';
     document.getElementById('benchmark-footer').innerHTML =
-      `Validation (6,480 baskets): <strong>Recall@10 ${(100*vm['bn_recall@10']).toFixed(2)}%</strong> · ` +
+      `Validation (${nValStr} baskets): <strong>Recall@10 ${(100*vm['bn_recall@10']).toFixed(2)}%</strong> · ` +
       `<strong>NDCG@10 ${vm['bn_ndcg@10'].toFixed(5)}</strong> · ` +
-      `<strong>New@10 ${vm['true_new_bn_hits@10']}/${vm['true_new_bn_targets']}</strong>`;
+      `<strong>New@10 ${vm['true_new_bn_hits@10'].toLocaleString()}/${vm['true_new_bn_targets'].toLocaleString()}</strong>${pureTxt}`;
+  }
+}
+
+async function fetchCase(url, { countSession = true } = {}) {
+  const btn = document.getElementById('btn-random');
+  btn.disabled = true;
+  btn.textContent = 'Computing live...';
+  try {
+    const res = await fetch(url);
+    const d = await res.json();
+    renderCase(d, { countSession });
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🎲 Pick Random Case';
   }
 }
 
 async function loadRandomCase() {
-  const btn = document.getElementById('btn-random');
   const flt = document.getElementById('cohort-filter').value;
-  btn.disabled = true;
-  btn.textContent = 'Computing live...';
-  try {
-    const res = await fetch(`/api/case?filter=${encodeURIComponent(flt)}`);
-    const d = await res.json();
-    renderCase(d);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '🎲 Pick Random Test Case';
-  }
+  const mode = activeMode();
+  await fetchCase(`/api/case?filter=${encodeURIComponent(flt)}&mode=${encodeURIComponent(mode)}`, { countSession: true });
 }
 
-function renderCase(d) {
-  session.count += 1;
-  session.sumR10 += d.case_metrics.recall_at_10;
-  session.sumNdcg += d.case_metrics.ndcg_at_10;
-  session.hits += d.case_metrics.hits_at_10;
-  session.targets += d.case_metrics.total_targets;
-  session.newHits += d.case_metrics.new_hits_at_10;
-  session.newTargets += d.case_metrics.total_new_targets;
+async function loadCaseByIdx(idx, { countSession = true } = {}) {
+  const mode = activeMode();
+  await fetchCase(`/api/case?idx=${encodeURIComponent(idx)}&mode=${encodeURIComponent(mode)}`, { countSession });
+}
+
+function renderCase(d, { countSession = true } = {}) {
+  currentCaseIdx = d.case_idx;
+  document.getElementById('case-idx-input').value = String(d.case_idx);
+
+  const isPureUnseen = d.ranking_mode === 'pure_unseen';
+  if (countSession) {
+    session.count += 1;
+    session.sumR10 += d.case_metrics.recall_at_10;
+    session.sumNdcg += d.case_metrics.ndcg_at_10;
+    session.hits += d.case_metrics.hits_at_10;
+    session.targets += d.case_metrics.total_targets;
+    session.newHits += d.case_metrics.new_hits_at_10;
+    session.newTargets += d.case_metrics.total_new_targets;
+  }
 
   document.getElementById('p-date').textContent = `${d.prediction_date} (Case #${d.case_idx})`;
-  document.getElementById('p-feat-ms').textContent = `${d.timings_ms.features_and_sequence.toFixed(1)} ms`;
+  document.getElementById('p-feat-ms').textContent = `${d.timings_ms.features_and_sequence.toFixed(2)} ms`;
   document.getElementById('p-inf-ms').textContent = `${d.timings_ms.fullpool_ups_canr.toFixed(2)} ms`;
-  document.getElementById('p-pool').textContent = `${d.eligible_formulations} eligible / ${d.total_formulations} formulations`;
+  const abNote = (d.affine_blend && d.ranking_mode === 'blended')
+    ? ` · OOF a=${d.affine_blend.a}, b=${d.affine_blend.b}`
+    : (isPureUnseen ? ' · Pure Unseen (repeats masked)' : (d.ranking_mode === 'main_only' ? ' · Main Head only' : ''));
+  document.getElementById('p-pool').textContent =
+    `${d.eligible_formulations.toLocaleString()} eligible / ${d.total_formulations.toLocaleString()} formulations${abNote}`;
   document.getElementById('p-res-ms').textContent = `${d.timings_ms.pack_resolution.toFixed(2)} ms`;
 
   const cm = d.case_metrics;
-  document.getElementById('m-r10').textContent = `${(100 * cm.recall_at_10).toFixed(1)}%`;
-  document.getElementById('m-hits').textContent = `${cm.hits_at_10} of ${cm.total_targets} bought formulations in Top-10`;
-  document.getElementById('m-ndcg').textContent = cm.ndcg_at_10.toFixed(3);
+  document.getElementById('lbl-r10').textContent = isPureUnseen ? 'Pure Unseen Recall@10' : 'Case Recall@10';
+  document.getElementById('lbl-ndcg').textContent = isPureUnseen ? 'Pure Unseen NDCG@10' : 'Case NDCG@10';
+  document.getElementById('m-r10').textContent = cm.total_targets > 0 ? `${(100 * cm.recall_at_10).toFixed(1)}%` : 'N/A';
+  document.getElementById('m-hits').textContent = isPureUnseen
+    ? `${cm.hits_at_10} of ${cm.total_targets} truly new formulations in Top-10`
+    : `${cm.hits_at_10} of ${cm.total_targets} bought formulations in Top-10`;
+  document.getElementById('m-ndcg').textContent = cm.total_targets > 0 ? cm.ndcg_at_10.toFixed(3) : 'N/A';
   document.getElementById('m-new').textContent = `${cm.new_hits_at_10} / ${cm.total_new_targets}`;
 
   const c = d.customer;
@@ -1161,7 +1270,9 @@ function renderCase(d) {
     ? '0 prior purchases — profile & market only'
     : `${c.prior_order_days} prior orders · ${c.prior_distinct_formulations} formulations`;
 
-  document.getElementById('m-sess-r10').textContent = `${(100 * session.sumR10 / session.count).toFixed(1)}%`;
+  document.getElementById('m-sess-r10').textContent = session.count > 0
+    ? `${(100 * session.sumR10 / session.count).toFixed(1)}%`
+    : '—';
   document.getElementById('m-sess-cnt').textContent =
     `${session.count} sampled · ${session.hits}/${session.targets} hits · ${session.newHits}/${session.newTargets} new`;
 
@@ -1175,6 +1286,7 @@ function renderCase(d) {
           ? '<span class="pill hit">✓ HIT · Repeat</span>'
           : (p.is_repeat_candidate ? '<span class="pill">Repeat</span>' : '<span class="pill newtag">New Candidate</span>'));
     const drvHtml = p.drivers.map(x => `<span class="drv">${esc(x)}</span>`).join('');
+    const skuMark = p.resolved_sku_hit ? ' <span style="color:var(--hit-text);font-weight:700;">✓</span>' : '';
     return `<tr class="${cls}">
       <td class="rank-num">#${p.rank}</td>
       <td>
@@ -1182,7 +1294,7 @@ function renderCase(d) {
         <div class="prod-meta">${esc(p.brand)} · ${esc(p.category)}</div>
         <div class="drivers">${drvHtml}</div>
       </td>
-      <td style="font-family:var(--mono);font-size:11.5px;color:#cbd5e1;">${esc(p.resolved_sku)}</td>
+      <td style="font-family:var(--mono);font-size:11.5px;color:#cbd5e1;">${esc(p.resolved_sku)}${skuMark}</td>
       <td class="prob-wrap">
         <div class="prob-txt">${(100*p.probability).toFixed(1)}%</div>
         <div class="prob-bar"><div class="prob-fill" style="width:${Math.min(100, Math.round(100*p.probability))}%"></div></div>
@@ -1192,13 +1304,16 @@ function renderCase(d) {
   }).join('');
 
   // Ground truth basket
+  const basketTotal = cm.basket_total_targets !== undefined ? cm.basket_total_targets : cm.total_targets;
   document.getElementById('gt-date').textContent = d.prediction_date;
-  document.getElementById('gt-count').textContent = `${cm.total_targets} formulations (${cm.total_new_targets} new)`;
+  document.getElementById('gt-count').textContent = `${basketTotal} formulations (${cm.total_new_targets} new)`;
   document.getElementById('gt-list').innerHTML = d.ground_truth_basket.map(g => {
     const cls = g.hit_top10 ? (g.is_new ? 'newhit' : 'hit') : '';
     const rkTxt = g.predicted_rank !== null
       ? (g.hit_top10 ? `Rank #${g.predicted_rank} ✓` : `Rank #${g.predicted_rank}`)
-      : (g.is_modeled ? 'Ineligible on date' : 'Outside modeled catalogue');
+      : (isPureUnseen && !g.is_new
+          ? 'Masked (Repeat)'
+          : (g.is_modeled ? 'Ineligible on date' : 'Outside modeled catalogue'));
     const tag = g.is_new ? '<span class="pill newtag">Truly New</span>' : '<span class="pill">Repeat</span>';
     return `<div class="gt-item ${cls}">
       <div>
@@ -1233,7 +1348,7 @@ function renderCase(d) {
     c.is_first_observed ? '0 prior orders' : `Showing ${d.prior_history.length} of ${c.prior_line_items} prior lines`;
   const hbody = document.getElementById('hist-tbody');
   if (!d.prior_history.length) {
-    hbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:14px;">First observed order — zero prior purchase history. Predictions come from company profile, industry affinity, equipment match &amp; rolling market signals.</td></tr>';
+    hbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:14px;">First observed order — zero prior purchase history. Predictions come from company profile, industry/regional affinity, equipment match &amp; rolling market signals.</td></tr>';
   } else {
     hbody.innerHTML = d.prior_history.map(h => `<tr>
       <td style="font-family:var(--mono);font-size:11.5px;white-space:nowrap;">${esc(h.date)}<div style="color:var(--muted);font-size:10.5px;">-${h.days_ago}d</div></td>
@@ -1245,6 +1360,23 @@ function renderCase(d) {
 
 document.getElementById('btn-random').addEventListener('click', loadRandomCase);
 document.getElementById('cohort-filter').addEventListener('change', loadRandomCase);
+document.getElementById('ranking-mode').addEventListener('change', () => {
+  if (currentCaseIdx !== null) {
+    loadCaseByIdx(currentCaseIdx, { countSession: false });
+  } else {
+    loadRandomCase();
+  }
+});
+document.getElementById('btn-go').addEventListener('click', () => {
+  const val = parseInt(document.getElementById('case-idx-input').value, 10);
+  if (!Number.isNaN(val)) loadCaseByIdx(val, { countSession: true });
+});
+document.getElementById('case-idx-input').addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter') {
+    const val = parseInt(ev.target.value, 10);
+    if (!Number.isNaN(val)) loadCaseByIdx(val, { countSession: true });
+  }
+});
 
 loadMeta().then(loadRandomCase);
 </script>
@@ -1253,7 +1385,9 @@ loadMeta().then(loadRandomCase);
 """
 
 
-def create_server(engine: Stage5LiveDemoEngine, host: str, port: int) -> ThreadingHTTPServer:
+def create_server(engine: Any, host: str, port: int) -> ThreadingHTTPServer:
+    n_cases = int(getattr(engine, "n_cases", 0) or len(engine.cases))
+
     class DemoHandler(BaseHTTPRequestHandler):
         def _send_json(self, payload: Mapping[str, Any], status: int = 200) -> None:
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -1276,13 +1410,14 @@ def create_server(engine: Stage5LiveDemoEngine, host: str, port: int) -> Threadi
                 self._send_json(engine.metadata_payload())
             elif parsed.path == "/api/case":
                 qs = parse_qs(parsed.query)
+                mode = qs.get("mode", ["blended"])[0]
                 if "idx" in qs:
-                    idx = max(0, min(len(engine.cases) - 1, int(qs["idx"][0])))
+                    idx = max(0, min(n_cases - 1, int(qs["idx"][0])))
                 else:
                     flt = qs.get("filter", ["any"])[0]
                     pool_ids = engine.filter_indices.get(flt, engine.filter_indices["any"])
                     idx = random.choice(pool_ids)
-                self._send_json(engine.evaluate_case(idx))
+                self._send_json(engine.evaluate_case(idx, mode=mode))
             else:
                 self._send_json({"error": "Not found"}, status=404)
 
@@ -1295,25 +1430,48 @@ def create_server(engine: Stage5LiveDemoEngine, host: str, port: int) -> Threadi
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--model",
+        type=str,
+        choices=("v2_full", "v1"),
+        default="v2_full",
+        help="Model engine to serve: 'v2_full' (default, canonical Wave2BE2ERanker + Option A on Validation) or 'v1'.",
+    )
+    parser.add_argument(
+        "--checkpoint-kind",
+        type=str,
+        choices=("discovery", "ndcg"),
+        default="discovery",
+        help="v2_full checkpoint selection: 'discovery' (Ep 6 primary cal-Discovery==cal-Unseen) or 'ndcg' (Ep 10 companion).",
+    )
+    parser.add_argument(
         "--allow-heldout-test",
         action="store_true",
-        help="Explicitly authorize live demo inference over held-out Test baskets (>= 2026-02-19).",
+        help="Required only for legacy --model v1 live demo over held-out Test baskets (>= 2026-02-19).",
     )
     parser.add_argument("--host", type=str, default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--variant", type=str, default=None)
     parser.add_argument("--checkpoint", type=Path, default=None)
-    parser.add_argument("--replay-frozen-features", action="store_true", help="Reproduce the original v5 validation feature recipe.")
+    parser.add_argument("--replay-frozen-features", action="store_true", help="Legacy v1: reproduce original v5 validation feature recipe.")
     args = parser.parse_args()
 
-    engine = Stage5LiveDemoEngine(
-        allow_heldout_test=args.allow_heldout_test,
-        device=args.device,
-        variant_override=args.variant,
-        checkpoint_override=args.checkpoint,
-        frozen_v5_replay=args.replay_frozen_features,
-    )
+    if args.model == "v2_full":
+        from recommender.experiments.v2_full.demo_engine import V2FullLiveDemoEngine
+
+        engine: Any = V2FullLiveDemoEngine(
+            device=args.device,
+            checkpoint_kind=args.checkpoint_kind,
+            checkpoint_override=args.checkpoint,
+        )
+    else:
+        engine = Stage5LiveDemoEngine(
+            allow_heldout_test=args.allow_heldout_test,
+            device=args.device,
+            variant_override=args.variant,
+            checkpoint_override=args.checkpoint,
+            frozen_v5_replay=args.replay_frozen_features,
+        )
     server = create_server(engine, args.host, args.port)
     print(f"[demo] Live dashboard running at http://{args.host}:{args.port} (Ctrl+C to stop)", flush=True)
     try:

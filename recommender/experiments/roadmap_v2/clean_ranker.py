@@ -16,7 +16,7 @@ Key architectural improvements over legacy BiggerStage5BaseNameRanker:
 
 from __future__ import annotations
 
-from typing import Optional, Sequence, Tuple, Union
+from typing import Any, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
@@ -31,6 +31,21 @@ from .config import SEED
 # Exact 6 active history sequence stat indices (excluding month_sin=3, month_cos=4, is_repeat=7)
 ACTIVE_SEQ_STAT_INDICES: Tuple[int, ...] = (0, 1, 2, 5, 6, 8)
 NUM_ACTIVE_SEQ_STATS: int = len(ACTIVE_SEQ_STAT_INDICES)
+
+# Clean 5-feature cadence-normalized self-attention bias over [Token 0, History 1..32]
+SELF_ATTENTION_BIAS_NAMES: Tuple[str, ...] = (
+    "earlier_hh",
+    "later_hh",
+    "t0_key_age",
+    "key_rel_qty",
+    "key_is_token0",
+)
+NUM_SELF_ATTENTION_BIAS_FEATURES: int = len(SELF_ATTENTION_BIAS_NAMES)
+SELF_ATTENTION_BIAS_MODES: Tuple[str, ...] = ("none", "linear", "mlp")
+CADENCE_FLOOR_DAYS: float = 7.0
+CADENCE_DEFAULT_DAYS: float = 30.0
+HH_CYCLE_HALF_SAT: float = 5.0
+T0_CYCLE_HALF_SAT: float = 6.0
 
 
 class CleanStage5BaseNameRanker(nn.Module):
@@ -363,21 +378,42 @@ class SharedUVStage5Ranker(nn.Module):
         d_model: int = 128,
         num_heads: int = 8,
         memory_ffn_dim: int = 384,
+        memory_layers: int = 1,
+        max_seq_len: int = DEFAULT_SEQUENCE_LENGTH,
         mlp_widths: Sequence[int] = (384, 192, 96),
         dropout: float = 0.12,
         aux_60d_enabled: bool = True,
+        use_memory_encoder: bool = True,
+        self_attention_bias_mode: str = "none",
+        self_attention_bias_hidden: int = 16,
         seed: int = SEED,
     ):
         super().__init__()
+        if int(memory_layers) < 1:
+            raise ValueError(f"memory_layers must be >= 1, got {memory_layers}")
+        if int(max_seq_len) < 1:
+            raise ValueError(f"max_seq_len must be >= 1, got {max_seq_len}")
+        if self_attention_bias_mode not in SELF_ATTENTION_BIAS_MODES:
+            raise ValueError(
+                f"Unsupported self_attention_bias_mode={self_attention_bias_mode!r}; "
+                f"expected one of {SELF_ATTENTION_BIAS_MODES}"
+            )
+        if not use_memory_encoder and self_attention_bias_mode != "none":
+            raise ValueError("self_attention_bias_mode requires use_memory_encoder=True.")
         torch.manual_seed(int(seed))
         np.random.seed(int(seed))
 
         self.d_model = int(d_model)
         self.num_heads = int(num_heads)
+        self.memory_layers = int(memory_layers)
+        self.max_seq_len = int(max_seq_len)
         self.num_candidate_features = int(num_candidate_features)
         self.num_customer_features = int(num_customer_features)
         self.num_pairwise_bias_features = int(num_pairwise_bias_features)
         self.aux_60d_enabled = bool(aux_60d_enabled)
+        self.use_memory_encoder = bool(use_memory_encoder)
+        self.self_attention_bias_mode = str(self_attention_bias_mode)
+        self.self_attention_bias_hidden = int(self_attention_bias_hidden)
 
         # 1. Token 0: Stage 1 customer vector u_bn (128) + fresh 11D current customer stats -> residual MLP
         self.customer_u_drop = nn.Dropout(dropout)
@@ -390,8 +426,8 @@ class SharedUVStage5Ranker(nn.Module):
         )
         self.customer_norm = nn.LayerNorm(self.d_model)
 
-        # 2. Tokens 1..32: Direct precomputed Stage 1 v_bn[seq_product_ids] (no extra MLP!) + pos & type embeddings
-        self.pos_embedding = nn.Parameter(torch.randn(1, DEFAULT_SEQUENCE_LENGTH, self.d_model) * 0.02)
+        # 2. Tokens 1..S: Direct precomputed Stage 1 v_bn[seq_product_ids] (NO extra MLP!) + pos & type
+        self.pos_embedding = nn.Parameter(torch.randn(1, self.max_seq_len, self.d_model) * 0.02)
         self.type_embedding = nn.Embedding(2, self.d_model)
 
         # 3. Candidate Query Modifier: Stage 1 v_bn (128) + dynamic 38D cand features -> residual MLP
@@ -404,18 +440,37 @@ class SharedUVStage5Ranker(nn.Module):
         )
         self.candidate_norm = nn.LayerNorm(self.d_model)
 
-        # 4. 1-Layer 8-Head Memory Self-Attention (Token 0 NEVER masked)
-        enc_layer = nn.TransformerEncoderLayer(
-            d_model=self.d_model,
-            nhead=self.num_heads,
-            dim_feedforward=int(memory_ffn_dim),
-            dropout=float(dropout),
-            activation="gelu",
-            batch_first=True,
-        )
-        self.memory_encoder = nn.TransformerEncoder(
-            enc_layer, num_layers=1, enable_nested_tensor=False
-        )
+        # 4. Optional N-Layer 8-Head Memory Self-Attention (Token 0 NEVER masked)
+        if self.use_memory_encoder:
+            enc_layer = nn.TransformerEncoderLayer(
+                d_model=self.d_model,
+                nhead=self.num_heads,
+                dim_feedforward=int(memory_ffn_dim),
+                dropout=float(dropout),
+                activation="gelu",
+                batch_first=True,
+            )
+            self.memory_encoder: Optional[nn.TransformerEncoder] = nn.TransformerEncoder(
+                enc_layer, num_layers=self.memory_layers, enable_nested_tensor=False
+            )
+        else:
+            self.memory_encoder = None
+        if self.self_attention_bias_mode == "linear":
+            self.self_attention_bias_weights = nn.Parameter(
+                torch.zeros(self.num_heads, NUM_SELF_ATTENTION_BIAS_FEATURES)
+            )
+            self.self_attention_bias_mlp = None
+        elif self.self_attention_bias_mode == "mlp":
+            self.self_attention_bias_weights = None
+            hidden = self.self_attention_bias_hidden
+            fc1 = nn.Linear(NUM_SELF_ATTENTION_BIAS_FEATURES, hidden)
+            fc2 = nn.Linear(hidden, self.num_heads)
+            nn.init.zeros_(fc2.weight)
+            nn.init.zeros_(fc2.bias)
+            self.self_attention_bias_mlp = nn.Sequential(fc1, nn.GELU(), fc2)
+        else:
+            self.self_attention_bias_weights = None
+            self.self_attention_bias_mlp = None
 
         # 5. 8-Head Statistics-Biased Cross-Attention
         self.cross_attention = nn.MultiheadAttention(
@@ -451,6 +506,91 @@ class SharedUVStage5Ranker(nn.Module):
         self.main_head = nn.Linear(prev, 1)
         self.aux_60d_head: Optional[nn.Linear] = nn.Linear(prev, 1) if self.aux_60d_enabled else None
 
+    def optimizer_param_groups(self, weight_decay: float) -> list[dict[str, Any]]:
+        """Exempt compact self-attention bias parameters from AdamW weight decay."""
+        decay_params = []
+        no_decay_params = []
+        for name, param in self.named_parameters():
+            if not param.requires_grad:
+                continue
+            if name.startswith("self_attention_bias_"):
+                no_decay_params.append(param)
+            else:
+                decay_params.append(param)
+        groups = [{"params": decay_params, "weight_decay": float(weight_decay)}]
+        if no_decay_params:
+            groups.append({"params": no_decay_params, "weight_decay": 0.0})
+        return groups
+
+    def _build_self_attention_pair_features(
+        self,
+        *,
+        purchase_days: torch.Tensor,              # (B, S)
+        prediction_day: torch.Tensor,             # (B,)
+        attention_mask: torch.Tensor,             # (B, S)
+        rel_qty: torch.Tensor,                    # (B, S)
+        cust_median_gap_days: Optional[torch.Tensor],  # (B,)
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        """Build (B, S+1, S+1, 5) disjoint, customer-cadence-normalized pair features for self-attention bias.
+
+        Let g_c = max(cust_median_gap_days, 7.0) be the customer's strictly-prior median basket gap.
+        Features per (query i, key j) across [Token 0, History 1..S]:
+          0. earlier_hh:    History -> History (i>=1, j>=1): r / (r + 5), r = max(0, d_i - d_j) / g_c
+          1. later_hh:      History -> History (i>=1, j>=1): r / (r + 5), r = max(0, d_j - d_i) / g_c
+          2. t0_key_age:    Token 0 -> History (i==0, j>=1): r / (r + 6), r = max(0, t - d_j) / g_c
+          3. key_rel_qty:   Any     -> History (j>=1):       customer-relative event quantity of key j
+          4. key_is_token0: History -> Token 0 (i>=1, j==0): 1.0 else 0.0
+        """
+        b_size, seq_len = attention_mask.shape
+        mem_len = seq_len + 1
+        device = attention_mask.device
+
+        if cust_median_gap_days is None:
+            cadence = torch.full((b_size,), CADENCE_DEFAULT_DAYS, dtype=purchase_days.dtype, device=device)
+        else:
+            cadence = cust_median_gap_days.to(device=device, dtype=purchase_days.dtype).clamp_min(CADENCE_FLOOR_DAYS)
+
+        # 0 & 1: History -> History relative time in customer buying cycles (zero on Token 0 row/col)
+        hh_delta = purchase_days[:, :, None] - purchase_days[:, None, :]  # (B, S, S)
+        hh_earlier_r = hh_delta.clamp_min(0.0) / cadence[:, None, None]
+        hh_later_r = (-hh_delta).clamp_min(0.0) / cadence[:, None, None]
+        hh_earlier = hh_earlier_r / (hh_earlier_r + HH_CYCLE_HALF_SAT)
+        hh_later = hh_later_r / (hh_later_r + HH_CYCLE_HALF_SAT)
+
+        earlier_hh = torch.zeros((b_size, mem_len, mem_len), dtype=dtype, device=device)
+        later_hh = torch.zeros((b_size, mem_len, mem_len), dtype=dtype, device=device)
+        earlier_hh[:, 1:, 1:] = hh_earlier.to(dtype)
+        later_hh[:, 1:, 1:] = hh_later.to(dtype)
+
+        # 2: Token 0 -> History live age in customer buying cycles (zero for i>=1 and j==0)
+        t0_age_days = (prediction_day[:, None].to(purchase_days.dtype) - purchase_days).clamp_min(0.0)
+        t0_r = t0_age_days / cadence[:, None]
+        t0_age_norm = t0_r / (t0_r + T0_CYCLE_HALF_SAT)
+        t0_key_age = torch.zeros((b_size, mem_len, mem_len), dtype=dtype, device=device)
+        t0_key_age[:, 0, 1:] = (t0_age_norm.to(dtype) * attention_mask.to(dtype))
+
+        # 3: Customer-relative normalized event quantity of key j (zero for Token 0 / padding)
+        valid_rel_qty = rel_qty.to(dtype) * attention_mask.to(dtype)
+        key_rel_qty = F.pad(valid_rel_qty, (1, 0), value=0.0)[:, None, :].expand(b_size, mem_len, mem_len)
+
+        # 4: History -> Token 0 indicator (1.0 only when i>=1 and j==0)
+        key_is_token0 = torch.zeros((b_size, mem_len, mem_len), dtype=dtype, device=device)
+        key_is_token0[:, 1:, 0] = 1.0
+
+        return torch.stack(
+            [earlier_hh, later_hh, t0_key_age, key_rel_qty, key_is_token0],
+            dim=-1,
+        )
+
+    def _compute_self_attention_bias(self, pair_feats: torch.Tensor) -> torch.Tensor:
+        """Map (B, L, L, 5) pair features to per-head bias (B, H, L, L)."""
+        if self.self_attention_bias_weights is not None:
+            return (pair_feats @ self.self_attention_bias_weights.transpose(0, 1)).permute(0, 3, 1, 2)
+        if self.self_attention_bias_mlp is not None:
+            return self.self_attention_bias_mlp(pair_feats).permute(0, 3, 1, 2)
+        raise RuntimeError("Self-attention bias requested when self_attention_bias_mode='none'.")
+
     def forward(
         self,
         *,
@@ -464,12 +604,19 @@ class SharedUVStage5Ranker(nn.Module):
         prediction_day: torch.Tensor,          # (B,)
         candidate_features: torch.Tensor,      # (B, C, 38)
         candidate_mask: Optional[torch.Tensor] = None,
+        seq_rel_qty: Optional[torch.Tensor] = None,            # (B, 32) customer-relative normalized quantity
+        cust_median_gap_days: Optional[torch.Tensor] = None,   # (B,) strictly-prior customer median order gap
         return_aux: bool = False,
         return_diagnostics: bool = False,
     ) -> Union[RankerOutput, Tuple[RankerOutput, torch.Tensor]]:
         b_size = customer_vector.size(0)
         seq_len = attention_mask.size(1)
         c_slate = catalog_product_vectors.size(0)
+
+        purchase_days = (seq_purchase_dates * DAYS_PER_YEAR).round()
+        age_days = (prediction_day[:, None] - purchase_days).clamp_min(0)
+        age = age_days / (age_days + 90.0)
+        rel_qty = seq_rel_qty if seq_rel_qty is not None else sequence[..., 0]
 
         # Token 0: Stage 1 u_bn modified by residual MLP with fresh 11D current customer stats
         u_in = self.customer_u_drop(customer_vector)
@@ -493,7 +640,23 @@ class SharedUVStage5Ranker(nn.Module):
         k_mask = torch.zeros((b_size, seq_len + 1), dtype=torch.bool, device=attention_mask.device)
         k_mask[:, 1:] = attention_mask == 0
 
-        memory = self.memory_encoder(m_raw, src_key_padding_mask=k_mask)
+        if self.memory_encoder is None:
+            memory = m_raw
+        elif self.self_attention_bias_mode != "none":
+            pair_feats = self._build_self_attention_pair_features(
+                purchase_days=purchase_days,
+                prediction_day=prediction_day,
+                attention_mask=attention_mask,
+                rel_qty=rel_qty,
+                cust_median_gap_days=cust_median_gap_days,
+                dtype=m_raw.dtype,
+            )
+            self_bias = self._compute_self_attention_bias(pair_feats)
+            self_bias = self_bias.masked_fill(k_mask[:, None, None, :], -torch.inf)
+            self_attn_mask = self_bias.reshape(b_size * self.num_heads, seq_len + 1, seq_len + 1)
+            memory = self.memory_encoder(m_raw, mask=self_attn_mask)
+        else:
+            memory = self.memory_encoder(m_raw, src_key_padding_mask=k_mask)
         memory = torch.nan_to_num(memory, nan=0.0)
 
         # Candidate Queries: Precomputed Stage 1 v_bn modified by residual MLP with dynamic 38D candidate info!
@@ -503,9 +666,6 @@ class SharedUVStage5Ranker(nn.Module):
         )
 
         # Statistics-biased 8-head cross-attention
-        purchase_days = (seq_purchase_dates * DAYS_PER_YEAR).round()
-        age_days = (prediction_day[:, None] - purchase_days).clamp_min(0)
-        age = age_days / (age_days + 90.0)
         seq_clean = sequence.clone()
         seq_clean[..., HISTORY_AGE_INDEX] = age
         active_hist_stats = seq_clean[..., ACTIVE_SEQ_STAT_INDICES]

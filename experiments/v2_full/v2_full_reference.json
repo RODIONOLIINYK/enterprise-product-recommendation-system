@@ -1,0 +1,457 @@
+{
+  "reference_id": "v2-full-arm4-w2c-clean-sep-w10-cal-disc-ep6",
+  "scope": "Active v2_full canonical formulation reference (arm4_e2e_unseen_attn_aux / w2c_exp1_clean_sep_w10 cal-Discovery == cal-Unseen unified primary Ep 6; single-stage E2E Wave2BE2ERanker on strictly 42 candidate features cand_42 + CUST_7 + SEQ_5 with Pure-Q Q = v_bn, Full-42 cross-attention bias, clean conflict-free separated Main/Option A targets, OptionAUnseenHead on cand_37 with 0% dropout, unseen_head_weight=1.0, and 2-parameter customer-grouped OOF affine blend)",
+  "selection": "User-promoted arm4 / w2c_exp1_clean_sep_w10 (cal-Discovery == cal-Unseen) unified primary checkpoint (Epoch 6, Wave2BE2ERanker, 1,205,188 trainable / 1,204,994 inference / 963,122 per-request params, 6.40 ms median CPU 1-req over all 1,141 formulations, zero Stage 1 pretraining, zero held-out Test >= 2026-07-01 access). Primary Ep 6 cal-Discovery == cal-Unseen (best_discovery.pt == best_unseen.pt + OOF affine blend, full-fit a=1.200, b=-2.123): R@5=68.28%, R@10=82.12% (all-time high), R@25=92.77% (all-time high), R@50=96.36%, NDCG@10=0.65380, New@10=1,219/4,496 (27.11%: Returning 721/3,630 + First-Observed 498/866; +26 hits / +0.58 pp [+0.02 pp, +1.15 pp]* vs w05), New@25=2,584/4,496 (57.47%, all-time high), Pure Unseen@10=2,298/4,496 (51.11%: Returning 1,800/3,630 + First-Observed 498/866), Pure Unseen@25=3,218/4,496 (71.57%, all-time high), Pure Unseen NDCG@10=0.30730, Resolved SKU R@10=55.15% / NDCG@10=0.45456 / New@10=630. Companion Ep 10 cal-NDCG (best_ndcg.pt + OOF affine blend, full-fit a=0.910, b=-2.323): R@5=68.17%, R@10=82.10%, NDCG@10=0.65437, New@10=1,160 (Ret 665 / FO 495), Pure Unseen@10=2,276, Pure Unseen@25=3,203, Pure Unseen NDCG@10=0.30662, Resolved SKU R@10=55.22% / NDCG@10=0.45461 / New@10=613.",
+  "seed": 42,
+  "dataset": "v2_full",
+  "train_cutoff": "2026-02-01",
+  "test_start": "2026-07-01",
+  "heldout_access": false,
+  "active_development_base": "arm4_e2e_unseen_attn_aux",
+  "training_baskets": 137765,
+  "validation_baskets": 16623,
+  "validation_returning_baskets": 16215,
+  "validation_first_observed_baskets": 408,
+  "validation_total_bn_targets": 40435,
+  "validation_true_new_bn_targets": 4496,
+  "num_formulations": 1141,
+  "trained_formulations": 1056,
+  "active_feature_schema": {
+    "candidate_schema": "cand_42",
+    "num_candidate_features": 42,
+    "extra_features": [
+      "mgr_base_name_share_30d",
+      "mgr_industry_base_name_share_90d",
+      "region_base_name_share_90d",
+      "full_cf_cosine",
+      "full_cf_recency_weighted"
+    ],
+    "dropped_features": [
+      "base_name_growth_30d",
+      "mgr_base_name_growth_30d_vs_90d"
+    ],
+    "customer_schema": "CUST_7",
+    "num_customer_features": 7,
+    "sequence_schema": "SEQ_5",
+    "active_seq_stat_indices": [
+      0,
+      1,
+      5,
+      6,
+      8
+    ],
+    "num_product_structured_specs": 65,
+    "sales_branch_enabled": false,
+    "month_features_enabled": false
+  },
+  "active_architecture": {
+    "arm": "w2c_exp1_clean_sep_w10",
+    "base_model": "arm4_e2e_unseen_attn_aux",
+    "class": "Wave2BE2ERanker",
+    "mode": "e2e",
+    "product_tower": "StaticEnrichedProductTower (end-to-end joint training, 1024D BGE-M3 + 65D structured specs + 6 categoricals -> 128D v_bn, cached offline for inference)",
+    "token0": "token0_fusion([cust_text_proj(1024->128), cust_tab_proj([city,region,industry,cust_7]->128)]) + type_emb[0]",
+    "tokens_1_32": "Direct E2E v_bn[seq_product_ids] (128) + pos_emb + type_emb[1]",
+    "candidate_queries": "Pure Q = v_bn (128D, zero candidate_mlp)",
+    "cross_attention_bias": "8-head bilinear bias over all 42 candidate features (+1 intercept = 43) x (SEQ_5 + CUST_7 = 12)",
+    "unseen_head": "OptionAUnseenHead([v_bn, h_att, v_bn * h_att, cand_non_repeat_37]) with 0% tabular dropout, conflict-free separated Main/Option A targets, unseen_head_weight=1.0, and 2-param customer-grouped OOF affine blend",
+    "d_model": 128,
+    "num_heads": 8,
+    "memory_layers": 1,
+    "memory_ffn_dim": 384,
+    "cross_attn_layers": 1,
+    "num_candidate_features": 42,
+    "num_customer_features": 7,
+    "active_seq_stat_indices": [
+      0,
+      1,
+      5,
+      6,
+      8
+    ],
+    "num_pairwise_bias_features": 42,
+    "pure_v_query": true,
+    "option_a_unseen_head": true,
+    "unseen_dropout_cold_prob": 0.0,
+    "separated_main_targets": true,
+    "unseen_head_weight": 1.0,
+    "unseen_attn_aux_enabled": false,
+    "unseen_attn_beta": 0.0,
+    "mlp_widths": [
+      384,
+      192,
+      96
+    ],
+    "dropout": 0.12,
+    "aux_lambda": 0.3,
+    "trainable_params": 1205188,
+    "inference_params": 1204994,
+    "per_request_params": 963122,
+    "cpu_single_request_median_ms": 6.402613999853202
+  },
+  "validation_metrics_primary_cal_discovery": {
+    "epoch": 6,
+    "bn_recall@5": 0.6827911016550716,
+    "bn_recall@10": 0.8211803880478965,
+    "bn_recall@25": 0.9277347693320831,
+    "bn_recall@50": 0.9639038359480641,
+    "bn_ndcg@10": 0.6538025182428766,
+    "true_new_bn_hits@10": 1219,
+    "true_new_bn_recall@10": 0.27112989323843417,
+    "true_new_bn_hits@25": 2584,
+    "true_new_bn_recall@25": 0.5747330960854092,
+    "returning_bn_recall@10": 0.828841830155174,
+    "returning_bn_ndcg@10": 0.6609435541277646,
+    "returning_true_new_bn_hits@10": 721,
+    "first_observed_bn_recall@10": 0.5166943984167622,
+    "first_observed_bn_ndcg@10": 0.36999884943537437,
+    "first_observed_true_new_bn_hits@10": 498,
+    "pure_unseen_hits@10": 2298,
+    "pure_unseen_recall@10": 0.5111209964412812,
+    "pure_unseen_hits@25": 3218,
+    "pure_unseen_recall@25": 0.7157473309608541,
+    "pure_unseen_ndcg@10_new_baskets": 0.30729860757301786,
+    "pure_unseen_returning_hits@10": 1800,
+    "pure_unseen_returning_hits@25": 2557,
+    "pure_unseen_first_observed_hits@10": 498,
+    "sku_recall@10": 0.5514781794551645,
+    "sku_ndcg@10": 0.45456484084105764,
+    "sku_new_hits@10": 630,
+    "affine_oof_calibration": {
+      "n_folds": 2,
+      "customer_grouped_oof": true,
+      "folds": [
+        {
+          "fold": 0,
+          "oof_baskets": 8186,
+          "fit_baskets": 8437,
+          "a": 1.29,
+          "b": -1.7069943578164364,
+          "fit_ndcg@10": 0.660580678183246,
+          "fit_new_hits@10": 643,
+          "fit_recall@10": 0.8263711439950056
+        },
+        {
+          "fold": 1,
+          "oof_baskets": 8437,
+          "fit_baskets": 8186,
+          "a": 1.08,
+          "b": -1.9740907838857924,
+          "fit_ndcg@10": 0.6472731940707144,
+          "fit_new_hits@10": 581,
+          "fit_recall@10": 0.8166809946703755
+        }
+      ],
+      "deployment_full_fit": {
+        "a": 1.2000000000000002,
+        "b": -2.117686314512056,
+        "ndcg@10": 0.6539845374200811,
+        "new_hits@10": 1202,
+        "recall@10": 0.8215498560540726
+      }
+    }
+  },
+  "validation_metrics_companion_cal_ndcg": {
+    "epoch": 10,
+    "bn_recall@5": 0.6816623214377504,
+    "bn_recall@10": 0.8210181238863119,
+    "bn_recall@25": 0.9267657452241851,
+    "bn_recall@50": 0.9623458709629199,
+    "bn_ndcg@10": 0.6543741810135428,
+    "true_new_bn_hits@10": 1160,
+    "true_new_bn_recall@10": 0.2580071174377224,
+    "true_new_bn_hits@25": 2540,
+    "true_new_bn_recall@25": 0.5649466192170819,
+    "returning_bn_recall@10": 0.8285479497095386,
+    "returning_bn_ndcg@10": 0.6614752155788982,
+    "returning_true_new_bn_hits@10": 665,
+    "first_observed_bn_recall@10": 0.5217629137793952,
+    "first_observed_bn_ndcg@10": 0.37216027053012085,
+    "first_observed_true_new_bn_hits@10": 495,
+    "pure_unseen_hits@10": 2276,
+    "pure_unseen_recall@10": 0.5062277580071174,
+    "pure_unseen_hits@25": 3203,
+    "pure_unseen_recall@25": 0.7124110320284698,
+    "pure_unseen_ndcg@10_new_baskets": 0.3066227361491442,
+    "pure_unseen_returning_hits@10": 1781,
+    "pure_unseen_returning_hits@25": 2541,
+    "pure_unseen_first_observed_hits@10": 495,
+    "sku_recall@10": 0.5521692261788237,
+    "sku_ndcg@10": 0.454613190147938,
+    "sku_new_hits@10": 613,
+    "affine_oof_calibration": {
+      "n_folds": 2,
+      "customer_grouped_oof": true,
+      "folds": [
+        {
+          "fold": 0,
+          "oof_baskets": 8186,
+          "fit_baskets": 8437,
+          "a": 0.87,
+          "b": -2.52781152148627,
+          "fit_ndcg@10": 0.6605609855036144,
+          "fit_new_hits@10": 605,
+          "fit_recall@10": 0.824823969974643
+        },
+        {
+          "fold": 1,
+          "oof_baskets": 8437,
+          "fit_baskets": 8186,
+          "a": 1.04,
+          "b": -2.5193873079187883,
+          "fit_ndcg@10": 0.6481581380930873,
+          "fit_new_hits@10": 560,
+          "fit_recall@10": 0.8174795132945218
+        }
+      ],
+      "deployment_full_fit": {
+        "a": 0.9100000000000001,
+        "b": -2.3231067981976494,
+        "ndcg@10": 0.6544633399359995,
+        "new_hits@10": 1169,
+        "recall@10": 0.821195159147267
+      }
+    }
+  },
+  "validation_metrics_companion_ndcg_main_only": {
+    "epoch": 10,
+    "bn_recall@5": 0.6620655563657691,
+    "bn_recall@10": 0.7849490696320488,
+    "bn_recall@25": 0.852663794513414,
+    "bn_recall@50": 0.8619927850913546,
+    "bn_ndcg@10": 0.6348475724388893,
+    "true_new_bn_hits@10": 0,
+    "true_new_bn_recall@10": 0.0,
+    "true_new_bn_hits@25": 3,
+    "true_new_bn_recall@25": 0.0006672597864768683,
+    "returning_bn_recall@10": 0.8046998695339839,
+    "returning_bn_ndcg@10": 0.6508215354086746,
+    "returning_true_new_bn_hits@10": 0,
+    "first_observed_bn_recall@10": 0.0,
+    "first_observed_bn_ndcg@10": 0.0,
+    "first_observed_true_new_bn_hits@10": 0,
+    "pure_unseen_hits@10": 2276,
+    "pure_unseen_recall@10": 0.5062277580071174,
+    "pure_unseen_hits@25": 3203,
+    "pure_unseen_recall@25": 0.7124110320284698,
+    "pure_unseen_ndcg@10_new_baskets": 0.3066227361491442,
+    "pure_unseen_returning_hits@10": 1781,
+    "pure_unseen_returning_hits@25": 2541,
+    "pure_unseen_first_observed_hits@10": 495,
+    "sku_recall@10": 0.5356613506960604,
+    "sku_ndcg@10": 0.44557193434601094,
+    "sku_new_hits@10": 8
+  },
+  "checkpoints": {
+    "ranker": {
+      "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w10/best_discovery.pt",
+      "sha256": "f2115e9b75d8be7ae0d732d2c1519a25259a54b7ef6868418829bb840604f1df"
+    },
+    "discovery_ranker": {
+      "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w10/best_discovery.pt",
+      "sha256": "f2115e9b75d8be7ae0d732d2c1519a25259a54b7ef6868418829bb840604f1df"
+    },
+    "unseen_ranker": {
+      "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w10/best_unseen.pt",
+      "sha256": "f2115e9b75d8be7ae0d732d2c1519a25259a54b7ef6868418829bb840604f1df"
+    },
+    "ndcg_ranker": {
+      "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w10/best_ndcg.pt",
+      "sha256": "69657d462f0a2c27394598a9104e5a0ac8e3b6c440d7b7044eb1fc49f916fe81"
+    },
+    "predictions_primary": {
+      "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w10/predictions_optionA_oof_discovery.npz",
+      "sha256": "fe7fbc41d53dd3ec56e10ca9901ffe296d58048df42e46409a565c6a24aa3f2d"
+    },
+    "predictions_ndcg": {
+      "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w10/predictions_ndcg.npz",
+      "sha256": "a6285e9c6d83dbb1dd16b67f25df6a1d944c2bae2c895e160f087f903ede84a5"
+    },
+    "predictions_cal_ndcg": {
+      "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w10/predictions_optionA_oof_ndcg.npz",
+      "sha256": "2259374c81b3f0b668ea3649bb9849b587d49dea8f9dcb71c2f9bf774f949d15"
+    },
+    "predictions_discovery_main": {
+      "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w10/predictions_discovery.npz",
+      "sha256": "8eb0f592ad87225c1be667d5ac116aba942406742cea86d366e227e7043e4a16"
+    },
+    "predictions_cal_unseen": {
+      "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w10/predictions_optionA_oof_unseen.npz",
+      "sha256": "fe7fbc41d53dd3ec56e10ca9901ffe296d58048df42e46409a565c6a24aa3f2d"
+    },
+    "arm_result": {
+      "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w10/arm_result.json",
+      "sha256": "3318632732ebd9b46d6d87fd6bb9b787a873e415e205a41d4b4e04ccb316ab90"
+    }
+  },
+  "prior_v2_full_baseline": {
+    "reference_id": "v2-full-arm4-w2c-clean-sep-w05-cal-disc-ep10",
+    "validation_metrics_primary_cal_discovery": {
+      "epoch": 10,
+      "bn_recall@5": 0.6825939233763195,
+      "bn_recall@10": 0.8206543412720329,
+      "bn_recall@25": 0.9256155013751982,
+      "bn_recall@50": 0.9631887724436503,
+      "bn_ndcg@10": 0.6543878477749615,
+      "true_new_bn_hits@10": 1193,
+      "true_new_bn_recall@10": 0.265346975088968,
+      "true_new_bn_hits@25": 2524,
+      "true_new_bn_recall@25": 0.5613879003558719,
+      "returning_bn_recall@10": 0.827877694381559,
+      "returning_bn_ndcg@10": 0.6614191482550373,
+      "returning_true_new_bn_hits@10": 691,
+      "first_observed_bn_recall@10": 0.5335791680588848,
+      "first_observed_bn_ndcg@10": 0.37494535443077026,
+      "first_observed_true_new_bn_hits@10": 502,
+      "pure_unseen_hits@10": 2235,
+      "pure_unseen_recall@10": 0.4971085409252669,
+      "pure_unseen_hits@25": 3152,
+      "pure_unseen_recall@25": 0.701067615658363,
+      "pure_unseen_ndcg@10_new_baskets": 0.29575702175969854,
+      "pure_unseen_returning_hits@10": 1733,
+      "pure_unseen_returning_hits@25": 2494,
+      "pure_unseen_first_observed_hits@10": 502,
+      "sku_recall@10": 0.5514805591740533,
+      "sku_ndcg@10": 0.4546163837802361,
+      "sku_new_hits@10": 623,
+      "affine_oof_calibration": {
+        "n_folds": 2,
+        "customer_grouped_oof": true,
+        "folds": [
+          {
+            "fold": 0,
+            "oof_baskets": 8186,
+            "fit_baskets": 8437,
+            "a": 0.97,
+            "b": -1.67340133161036,
+            "fit_ndcg@10": 0.6601117236252566,
+            "fit_new_hits@10": 639,
+            "fit_recall@10": 0.8246846220443149
+          },
+          {
+            "fold": 1,
+            "oof_baskets": 8437,
+            "fit_baskets": 8186,
+            "a": 1.06,
+            "b": -2.321890455479236,
+            "fit_ndcg@10": 0.6489841511800841,
+            "fit_new_hits@10": 563,
+            "fit_recall@10": 0.817560902810617
+          }
+        ],
+        "deployment_full_fit": {
+          "a": 1.2,
+          "b": -2.7786498202544787,
+          "ndcg@10": 0.6545880189654104,
+          "new_hits@10": 1162,
+          "recall@10": 0.820945973313349
+        }
+      }
+    },
+    "validation_metrics_companion_cal_ndcg": {
+      "epoch": 9,
+      "bn_recall@5": 0.6821380060431048,
+      "bn_recall@10": 0.8206644977521407,
+      "bn_recall@25": 0.9255294952058325,
+      "bn_recall@50": 0.9629659376481563,
+      "bn_ndcg@10": 0.6546521367213314,
+      "true_new_bn_hits@10": 1178,
+      "true_new_bn_recall@10": 0.26201067615658363,
+      "true_new_bn_hits@25": 2487,
+      "true_new_bn_recall@25": 0.5531583629893239,
+      "returning_bn_recall@10": 0.8277287889135045,
+      "returning_bn_ndcg@10": 0.6616421293820758,
+      "returning_true_new_bn_hits@10": 674,
+      "first_observed_bn_recall@10": 0.53991086740529,
+      "first_observed_bn_ndcg@10": 0.3768513254615958,
+      "first_observed_true_new_bn_hits@10": 504,
+      "pure_unseen_hits@10": 2241,
+      "pure_unseen_recall@10": 0.4984430604982206,
+      "pure_unseen_hits@25": 3152,
+      "pure_unseen_recall@25": 0.701067615658363,
+      "pure_unseen_ndcg@10_new_baskets": 0.29635398579995625,
+      "pure_unseen_returning_hits@10": 1737,
+      "pure_unseen_returning_hits@25": 2498,
+      "pure_unseen_first_observed_hits@10": 504,
+      "sku_recall@10": 0.5514099644887349,
+      "sku_ndcg@10": 0.4551770623190995,
+      "sku_new_hits@10": 612,
+      "affine_oof_calibration": {
+        "n_folds": 2,
+        "customer_grouped_oof": true,
+        "folds": [
+          {
+            "fold": 0,
+            "oof_baskets": 8186,
+            "fit_baskets": 8437,
+            "a": 1.25,
+            "b": -2.4517793152831358,
+            "fit_ndcg@10": 0.6604406977112441,
+            "fit_new_hits@10": 611,
+            "fit_recall@10": 0.8242355077277121
+          },
+          {
+            "fold": 1,
+            "oof_baskets": 8437,
+            "fit_baskets": 8186,
+            "a": 1.0000000000000002,
+            "b": -2.214301013981095,
+            "fit_ndcg@10": 0.6489296989808839,
+            "fit_new_hits@10": 570,
+            "fit_recall@10": 0.8176317308071719
+          }
+        ],
+        "deployment_full_fit": {
+          "a": 0.9000000000000001,
+          "b": -2.142963707662598,
+          "ndcg@10": 0.6547550979638108,
+          "new_hits@10": 1181,
+          "recall@10": 0.8209046985066889
+        }
+      }
+    },
+    "checkpoints": {
+      "ranker": {
+        "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w05/best_discovery.pt",
+        "sha256": "5c65c704b8fe7566ae7721fee76fcdf9a8b18054fdf59b7de9f51243c33025b2"
+      },
+      "discovery_ranker": {
+        "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w05/best_discovery.pt",
+        "sha256": "5c65c704b8fe7566ae7721fee76fcdf9a8b18054fdf59b7de9f51243c33025b2"
+      },
+      "ndcg_ranker": {
+        "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w05/best_ndcg.pt",
+        "sha256": "41f11e1bc3956f79c47d5b7364f8bd17bceb17e30e6d04152c9edee932ca7d43"
+      },
+      "unseen_ranker": {
+        "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w05/best_unseen.pt",
+        "sha256": "d8f92ce3190e9409f09e5104e802228c319f19785ec28fbf19be5aabbe91a688"
+      },
+      "predictions_primary": {
+        "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w05/predictions_optionA_oof_discovery.npz",
+        "sha256": "27350e192114cfb4b2e778077ed2b3242fe7a01da033ef64b8da10ae0b9eeb12"
+      },
+      "predictions_ndcg": {
+        "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w05/predictions_ndcg.npz",
+        "sha256": "602b951c7dc5e2546a0a3a48d64421a0405ef05a7a3bc42ed6ed88136366d0f7"
+      },
+      "predictions_cal_ndcg": {
+        "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w05/predictions_optionA_oof_ndcg.npz",
+        "sha256": "ef32492813d342341d6b40325c6f9d216707a3dcab9d2cc7faa844df20801f68"
+      },
+      "predictions_discovery_main": {
+        "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w05/predictions_discovery.npz",
+        "sha256": "faa55afdf61acca2006b7daaab4b900dadb742a12af1f213ba7e3ef3c2afe023"
+      },
+      "predictions_cal_unseen": {
+        "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w05/predictions_optionA_oof_unseen.npz",
+        "sha256": "5c0614ec88e2c70fede027acfc058e323784f39ca6bb2d5059816ff75ffb9a80"
+      },
+      "arm_result": {
+        "path": "checkpoints/v2_full/wave2c_arm4_e2e_unseen_attn_aux-seed42/w2c_exp1_clean_sep_w05/arm_result.json",
+        "sha256": "c553a6ef1d8e519b8a03d952c184733b716746cafcfe2b11e3ddb6c864193988"
+      }
+    }
+  },
+  "v1_frozen_reference": "experiments/roadmap_v2/stage5_reference.json"
+}

@@ -83,7 +83,8 @@ class PurchasePreparationTests(unittest.TestCase):
             sheet = workbook.active
             sheet.append([None] * len(COLUMN_MAPPING))
             sheet.append(list(COLUMN_MAPPING))
-            for row in sales_frame().to_dict("records"):
+            for i, row in enumerate(sales_frame().to_dict("records")):
+                row["purchase_date"] = "2026-01-10" if i == 0 else "2026-01-10 11:25:00"
                 sheet.append([row[column] for column in COLUMN_MAPPING.values()])
             workbook.save(path)
             write_item_catalogue(Path(directory) / "items.csv", sales_frame())

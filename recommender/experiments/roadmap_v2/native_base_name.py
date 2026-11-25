@@ -481,10 +481,12 @@ class NativeBaseNameFeatureEngine:
         frozen_v5_replay: bool = False,
         allow_non_monotonic: bool = False,
         allow_heldout_test: bool = False,
+        test_start: pd.Timestamp = TEST_START,
     ):
         self.frozen_v5_replay = frozen_v5_replay
         self.allow_non_monotonic = bool(allow_non_monotonic)
         self.allow_heldout_test = bool(allow_heldout_test)
+        self.test_start = pd.Timestamp(test_start).normalize()
         self.base_names = list(universe["base_names"])
         self.n_bn = len(self.base_names)
         self.bn_to_idx = dict(universe["bn_to_idx"])
@@ -494,8 +496,8 @@ class NativeBaseNameFeatureEngine:
 
         if not purchases.empty:
             p_dates = pd.to_datetime(purchases["purchase_date"], format="mixed").dt.normalize()
-            if bool(p_dates.isna().any()) or (not self.allow_heldout_test and not bool(p_dates.lt(TEST_START).all())):
-                raise ValueError(f"Development purchases only (< {TEST_START.date()}).")
+            if bool(p_dates.isna().any()) or (not self.allow_heldout_test and not bool(p_dates.lt(self.test_start).all())):
+                raise ValueError(f"Development purchases only (< {self.test_start.date()}).")
 
         # 1. Canonical per-base_name static attributes (category, subcategory, brand, line, family, viscosity, application)
         cat_df = catalogue.copy()
@@ -704,7 +706,7 @@ class NativeBaseNameFeatureEngine:
         # 4. Commercial rolling builder (order-date 3a_financial & current manager lookup)
         self._comm = CommercialRollingFeatureBuilder(
             commercial_events, catalogue, self.rep_pids, allow_heldout_test=self.allow_heldout_test,
-            historical_recipe=frozen_v5_replay,
+            historical_recipe=frozen_v5_replay, test_start=self.test_start,
         )
         # 4b. Manager rolling 90d shares strictly on MERGED (manager_id, customer_id, purchase_date, base_name) events!
         self._mgr_bn_events: Dict[str, Dict[str, np.ndarray]] = {}
@@ -906,7 +908,7 @@ class NativeBaseNameFeatureEngine:
     def build(self, customer_id: str, as_of_date: Union[str, pd.Timestamp]) -> np.ndarray:
         """Build (585, 53) float32 strictly-causal native base_name features (no month_sin/month_cos)."""
         date_ts = pd.Timestamp(as_of_date).normalize()
-        if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= TEST_START):
+        if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= self.test_start):
             raise ValueError("Development predictions only")
 
         if self._last_date is not None and date_ts < self._last_date:
@@ -1093,7 +1095,7 @@ class NativeBaseNameFeatureEngine:
     def build_merged_profile(self, customer_id: str, as_of_date: Union[str, pd.Timestamp]) -> np.ndarray:
         """Compute the 7 legacy profile features strictly over merged (customer_id, purchase_date, base_name) events."""
         date_ts = pd.Timestamp(as_of_date).normalize()
-        if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= TEST_START):
+        if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= self.test_start):
             raise ValueError("Development predictions only")
         cid = str(customer_id).strip()
         date_64 = date_ts.to_datetime64()

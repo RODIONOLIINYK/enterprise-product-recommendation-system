@@ -1,0 +1,2 @@
+# Optional historical classifier comparison; core requirements are unchanged.
+catboost==1.2.10

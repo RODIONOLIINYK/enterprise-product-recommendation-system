@@ -1,146 +1,150 @@
 # Enterprise Product Recommendation System
 
-Next-basket B2B product formulation recommender for industrial distribution, built around **canonical `base_name` entity unification**, **strictly point-in-time rolling commercial/behavioral features (`rolling_observed_v2`)**, and a **2-stage No-MLP Full-Pool `UPS-CANR` Neural Reranker** (with a standalone CatBoost tabular benchmark).
+Next-basket B2B product formulation recommender for industrial distribution, built around **canonical `base_name` entity unification**, **strictly point-in-time rolling commercial/behavioral features (`cand_42 + CUST_7 + SEQ_5`)**, and a **Single-Stage End-to-End Full-Pool `Wave2BE2ERanker` with a dedicated `OptionAUnseenHead` Cross-Sell Head** (zero separate Stage 1 pretraining, zero top-K shortlist truncation, `~4–6 ms` median single-request CPU latency across all `1,141` formulations).
 
 ---
 
-## Current Architecture & End-to-End Pipeline (`Stage 5: stage5-v5-shared-uv-ep10`)
+## Current Architecture & End-to-End Pipeline (`v2_full`: `v2-full-arm4-w2c-clean-sep-w10-cal-disc-ep6`)
 
-In B2B industrial distribution (lubricants, coolants, chemicals), the same product formulation is sold in multiple package sizes (e.g., 4L jug, 20L pail, 209L drum). Rather than letting 4–5 packaging variants of the same oil compete for Top-10 slots, the active **Stage 5** pipeline unifies **`841` development SKUs into `585` canonical `base_name` product formulations** across every stage, handles **both returning customers and cold-start (first-observed) companies** in one dated pipeline, grounds all Stage 2 tokens and candidate queries directly in Stage 1's shared `128D` embedding space (`567K` params, zero scratch text/ID tables), and scores **all `585` eligible formulations directly** (`~1.3 ms` ranker on CPU).
+In B2B industrial distribution (lubricants, coolants, chemicals), the same product formulation is sold across multiple package sizes (e.g., 4L jug, 20L pail, 209L drum). Rather than letting 4–5 pack variants of one oil crowd Top-10 slots, the active **`v2_full`** pipeline unifies **`1,660` development SKUs into `1,141` canonical `base_name` formulations** over 4 years of real paid sales (`2023-01-03` → `2026-06-30`), handles **both returning and cold-start (first-observed) companies** in a single dated pipeline, and trains a **single-stage end-to-end neural ranker** with cleanly separated specialist heads for repeat replenishment and new-product discovery.
 
 ```text
-Raw ERP / NAV Sales (dataset.xlsx) + Companies (customers.csv) + Catalogue (items.csv)
+Raw 4-Year ERP / NAV Sales (dataset.xlsx) + Companies (customers.csv) + Catalogue (items.csv)
   │
-  ▼  1. Paid-Sale & Multi-Line Settlement Reconciliation
-     • Filters to positive paid merchandise sales (ПРОДАЖА + ТОВАР; excludes gifts/returns)
-     • Merges same-(company, date, SKU) lines (summed quantity); 76,797 paid lines ↔ 71,916 cleaned rows
-     • Multi-line basket counts as paid only after EVERY paid line settles strictly < prediction date
-     • Collapses 841 dev SKUs → 585 canonical base_name formulations; all statistics computed natively on merged base_name events
+  ▼  1. Paid-Sale & Multi-Line Settlement Reconciliation (Strictly < TEST_START_V2 = 2026-07-01)
+     • Filters strictly to positive paid merchandise sales (ПРОДАЖА + ТОВАР; excludes gifts/returns)
+     • 460,109 dev records → 137,765 Train baskets (< 2026-02-01) & 16,623 Val baskets (2026-02-01..2026-06-30)
+     • Held-Out Test (>= 2026-07-01, ~13,190 baskets) remains STRICTLY UNTOUCHED
+     • Unifies 1,660 dev SKUs → 1,141 canonical base_name formulations (1,056 train-observed)
   │
-  ▼  2. Strictly Causal Native 585-Base-Name Feature & Sequence Engine (~0.55 ms/req)
-     • 32-event chronological base_name purchase sequence (same-day multi-packs collapsed to 1 event; 0 tokens for first orders; month & repeat excluded)
-     • Token 0 Customer Current State (11D — NOT broadcast to candidates!):
-         customer_age, customer_overdue_ratio, customer_30d/90d_activity, 6 financial/payment ratios (3a_financial), mgr_changed_recently
-     • 38D Strictly Candidate / Customer-Candidate Features per (company, date, base_name):
-         - 13D core pairwise/attention-bias features (repeat, recency, urgency, collapsed cat/subcat/brand shares, global pop, industry affinity)
-         -  5D category & family cadence/share (no binary never_seen duplicates)
-         -  7D global base_name velocity & share (7d, 30d, 90d, buyers_30d, growth_30d, category share, global sale age)
-         -  7D cross-company sequential transitions & same-basket complements (no formula duplicate hierarchical_backoff)
-         -  3D manager rolling 90d behavioral shares (base_name, brand, category)
-         -  3D pack-agnostic parsed specs (multi-value user_viscosity_order_share, app_matches_company_equipment, user_application_order_share)
+  ▼  2. Strictly Causal Feature & Sequence Engine (cand_42 + CUST_7 + SEQ_5, all < prediction_date)
+     • 32-event chronological base_name history (SEQ_5 active stats: qty, live_age, prior_cnt, vol_share, valid)
+     • Token 0 Customer Current State (CUST_7):
+         customer_age, 30d/90d activity, prepaid/cash ratio, avg/last deferral days, overdue unpaid ratio
+     • 42D Strictly Causal Candidate Features (cand_42 = pruned cand_38 + extra_cand_5):
+         -  5D repeat-SKU cadence (has_bought, order_count, qty_share, days_since_last, urgency)
+         - 32D non-repeat core/commercial/spec signals (cat/subcat/brand/family shares & cadence, global 7d/30d/90d
+               velocity & share, cross-company sequential & complement lifts, 90d manager shares, viscosity/equipment)
+         -  5D extra_cand_5 signals: mgr_base_name_share_30d, mgr_industry_base_name_share_90d,
+               region_base_name_share_90d, exact incremental full_cf_cosine & 180d full_cf_recency_weighted
   │
-  ▼  3. Stage 1 — Pure Pack-Free Two-Tower Encoder (No sales_branch, 65D Multi-Hot Specs)
-     • ProductTower: pure pack-free BGE-M3 text (585 distinct base_names) + 65D multi-hot [12 container + 8 vol + 11 app + 34 visc] + 6 product attrs → cached v_bn (585 × 128)
-     • CustomerTower: company BGE-M3 + city/region/industry + 32-event base_name Transformer → live u_bn (128D) recomputed per request
-     • Zero Stage 1 MLP & zero top-50/top-100 shortlist truncation (100% eligible candidate coverage)
+  ▼  3. Single-Stage E2E Wave2BE2ERanker (Zero Stage 1 Pretraining; 963K per-req / 1.20M total params)
+     • ProductTower (StaticEnrichedProductTower): pack-free BGE-M3 (1024D) + 65D multi-hot specs + 6 attrs → v_bn (1,141 × 128)
+       Trained end-to-end inside Stage 2 and precomputed once per catalogue refresh (0 ms per-request overhead)
+     • Token 0 (Customer): token0_fusion([BGE-M3 company_text → 128, city/region/industry + CUST_7 → 128])
+     • Tokens 1..32 (History): direct E2E v_bn[seq_product_ids] + pos_emb + type_emb[1]
+     • 1-layer 8-head TransformerEncoder (FFN=384) over 33 tokens → Pure-Q (Q = v_bn) 8-head cross-attention
+       with Full-42 bilinear statistics bias (43 × 12 per head)
+     • Cleanly Separated Specialist Heads (conflict-free targets, 0% tabular dropout, w_optA = 1.0):
+         - Main Head (repeats):      MLP([v_bn, h_att, v_bn ⊙ h_att, cand_42]) → s_main  (trained on returning repeats)
+         - OptionAUnseenHead (new):  MLP([v_bn, h_att, v_bn ⊙ h_att, cand_non_repeat_37]) → s_unseen (unseen only)
+     • Training-only 60d forward aux heads (λ = 0.3) stripped at inference
   │
-  ▼  4. Stage 2 — Unified Shared-UV Full-Pool UPS-CANR (SharedUVStage5Ranker, 567K params, zero scratch text/ID tables)
-     • Token 0 (Customer): LayerNorm(u_bn + MLP([u_bn (128), cust_11 (11)])) + type_emb[0]
-     • Tokens 1..32 (History): direct precomputed Stage-1 v_bn[seq_product_ids] (128) + pos_emb + type_emb[1] (no redundant MLP)
-     • Candidate Queries Q (all 585): LayerNorm(v_bn + MLP([v_bn (128), cand_38 (38)])) before 8-head statistics-biased cross-attention
-     • 1-layer 8-head TransformerEncoder (FFN=384) over 33 tokens → 8-head cross-attention → MLP [z_cand, h_att, z_cand ⊙ h_att, 38D] = 422D → 384 → 192 → 96 → 1
-     • Trained with RankerLoss + training-only 60-day forward auxiliary head (λ = 0.3, stripped at inference)
-     • Scores all 585 eligible formulations directly in 1.32 ms median on CPU (zero late-epoch overfitting through Ep 10)
+  ▼  4. 2-Parameter Out-of-Fold Affine Calibration & Full-Pool Ranking (~4–6 ms CPU)
+     • score(p) = s_main(p) if previously bought else a · s_unseen(p) + b
+     • Customer-grouped 2-fold OOF calibration (full-fit deployment: a = 1.200, b = -2.118)
+     • Scores all 1,141 eligible formulations directly (also supports Pure Unseen ranking via OptionAUnseenHead)
   │
-  ▼  5. Top-10 Ranked Product Formulations (+ Optional Causal Pack-Size Resolver → Concrete Eligible SKU, 0.08 ms)
-     • Per recommended base_name: customer's most frequent/recent eligible pack < t → dominant container type < t → rolling popular pack < t
+  ▼  5. Top-10 Ranked Formulations (+ Causal Pack-Size Resolver → Eligible Pack SKU, ~0.2 ms)
+     • Per formulation: customer's most frequent/recent eligible pack < t → dominant container < t → popular pack < t
 ```
 
-- **Active Reference Manifest:** [`experiments/roadmap_v2/stage5_reference.json`](experiments/roadmap_v2/stage5_reference.json) (`stage5-v5-shared-uv-ep10`, `seed=42`, trained on `29,095` dated baskets = `2,984` first observed + `26,111` returning; validated on `6,480` baskets = `289` first observed + `6,191` returning).
-- **Archived 3-Stage Reference (Evaluated on Held-Out Test):** [`experiments/roadmap_v2/stage5_3stage_reference.json`](experiments/roadmap_v2/stage5_3stage_reference.json) (`stage5-dated-first-baskets-v2`, which included Stage 1 MLP + `quota100_50` 100-item slate).
+- **Active Canonical Reference:** [`experiments/v2_full/v2_full_reference.json`](experiments/v2_full/v2_full_reference.json) (`v2-full-arm4-w2c-clean-sep-w10-cal-disc-ep6`, Ep 6 unified `cal-Discovery == cal-Unseen` primary + Ep 10 `cal-NDCG` companion; `seed=42`, zero held-out Test access).
+- **Frozen `v1` Reference (Preserved):** [`experiments/roadmap_v2/stage5_reference.json`](experiments/roadmap_v2/stage5_reference.json) (`stage5-v5-shared-uv-ep10`, `585` formulations) and archived 3-stage test-evaluated [`stage5_3stage_reference.json`](experiments/roadmap_v2/stage5_3stage_reference.json).
+
+---
+
+## Architecture Evolution & Milestone History
+
+| Milestone | Dataset & Universe | Architecture | Key Change | Validation Headline |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Initial SKU Baseline** | `v1` (`841` SKUs, `6,191` returning val) | Two-Tower → 50-item slate → `UPS-CANR` (`13` feats) | First neural retriever + statistics-biased cross-attention ranker | `R@10 76.15%`, `NDCG@10 0.5924`, `New@10 209/1,857` |
+| **2. Stage 5 Entity Unification (`v1`)** | `v1` (`585` `base_name`, `6,480` dated val incl. cold-start) | Two-Tower (`65D` specs) → Stage 1 MLP → `UPS-CANR` (`100`-slate) | Unified pack variants into canonical formulations; added commercial/financial/manager/spec features + first-observed baskets | `R@10 80.78%`, `NDCG@10 0.63345`, `New@10 359/1,721` *(Test Full Cat: `78.56%`)* |
+| **3. No-MLP Full-Pool Shared-UV (`v1`)** | `v1` (`585` `base_name`, `6,480` val) | 2-Stage `SharedUVStage5Ranker` (`567K` params, `1.32 ms`) | Dropped Stage 1 MLP & top-100 truncation; grounded Stage 2 directly in Stage 1 `u_bn`/`v_bn` (`cand_38 + CUST_11`) | `R@10 80.89%`, `NDCG@10 0.63457`, `New@10 372/1,721` (`21.62%`) |
+| **4. 4-Year `v2_full` Wave 1** | `v2_full` (`1,141` `base_name`, `137,765` train / `16,623` val) | 6-arm ablation: 2-stage vs. single-stage E2E (`arm4`) | Expanded to 4 years (`4.74×` baskets, `~6×` unseen positives); proved single-stage E2E matches/beats 2-stage with zero Stage 1 pretraining | `arm4`: `R@10 81.84%`, `NDCG@10 0.65232`, `New@10 1,168/4,496` (`25.98%`) |
+| **5. `v2_full` Wave 2B** | `v2_full` (`1,141` `base_name`, `16,623` val) | `Wave2BE2ERanker` (`cand_42`, Pure-Q, Full-42 bias, Option A 70/30) | Pruned dead features + added `extra_cand_5` (CF cosine/recency, mgr 30d, mgr×ind, region 90d), removed `candidate_mlp` (`Q = v_bn`), added `OptionAUnseenHead` + OOF affine blend | `R@10 82.02%`, `NDCG@10 0.65139`, `New@10 1,212/4,496`, `Pure U@10 2,312` |
+| **6. `v2_full` Wave 2C (Active Ref) ⭐** | `v2_full` (`1,141` `base_name`, `16,623` val) | `Wave2BE2ERanker` (`w2c_exp1_clean_sep_w10`, Ep 6) | Replaced 70/30 dropout with **clean conflict-free separated Main/Option A targets**, `0%` dropout, and `unseen_head_weight = 1.0` (eliminated synthetic masked-repeat augmentation after negative ablation) | **`R@10 82.12%`**, **`NDCG@10 0.65380`**, **`New@10 1,219/4,496 (27.11%)`**, **`Pure U@10 2,298 (51.11%)`** |
 
 ---
 
 ## Verified Performance
 
-### 1. Validation Benchmarks (`2025-10-01` to `2026-02-18`, `6,480` baskets, `10,163` targets, `1,721` truly new — Zero Test Access)
+### 1. Active `v2_full` Validation Benchmarks (`2026-02-01` → `2026-06-30`, `16,623` baskets, `40,435` targets, `4,496` truly new — Zero Held-Out Test Access)
 
-| Model (`585` Canonical Formulations) | Pipeline | `R@5` | `R@10` | `NDCG@10` | `New@10` *(of `1,721`)* | First-Obs `New@10` / `NDCG@10` | Returning `New@10` | 1-Req CPU Latency |
-| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
-| Archived 3-Stage Reference (NDCG, Ep 7) | 2T → S1 MLP → S2 (`100`-slate) | `70.51%` | `80.78%` | `0.63345` | `359` (`20.86%`) | `147` / `0.23750` | `212` | — |
-| Prior `v3` `modest_wider_mlp_384` (Ep 7) | 2T → Full-Pool S2 (`55D`, `769K`) | `70.54%` | `80.85%` | `0.63428` | `366` (`21.27%`) | `144` / `0.24414` | `222` | `~1.2 ms` |
-| Clean `v4b` `v4b_fullspec65_nosb` (Ep 6 / Ep 8) | 2T (`65D`) → Clean S2 (`755K`) | **`70.80%`** | **`81.10%`** | **`0.63485`** | `373` *(**381** ep8)* | `151` / `0.24399` | `222` *(**239** ep8)* | **`1.13 ms`** |
-| **`v5_shared_uv` (Active Ref, Ep 10 Disc)** ⭐ | **2T (`65D`) → Shared-UV S2 (`567K`)** | `70.54%` | `80.89%` | `0.63457` | **`372`** (`21.62%`) | `149` / `0.25231` | **`223`** | **`1.32 ms`** |
-| **`v5_shared_uv` (Companion, Ep 7 NDCG)** ⭐ | **2T (`65D`) → Shared-UV S2 (`567K`)** | `70.69%` | `80.94%` | **`0.63485`** | `366` (`21.27%`) | `148` / **`0.25926`** | `218` | **`1.32 ms`** |
-| **CatBoost Standalone (`72` feats, `661` trees)** | **Pure Tabular Full-Pool (0 neural)** | `70.69%` | `80.70%` | `0.63403` | `356` (`20.69%`) | `152` / **`0.27037`** | `204` | **`0.55 ms`** *(1.39ms w/ Pool)* |
+| Model (`1,141` Canonical Formulations) | `R@5` | `R@10` | `R@25` | `NDCG@10` | `New@10` *(Ret / FO)* | `Pure U@10` | `Pure U@25` | SKU `NDCG@10` (`New@10`) | 1-Req CPU |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
+| Wave 1 `baseline_2stage_v5` (2-stage, `cand_38`) | `68.18%` | `81.88%` | — | `0.65315` | `1,147` (`647 / 500`) | — | — | `0.45437` (`613`) | `6.70 ms` |
+| Wave 1 `arm4_e2e_unseen_attn_aux` (E2E, `cand_38`) | `68.26%` | `81.84%` | — | `0.65232` | `1,168` (`667 / 501`) | — | — | `0.45306` (`625`) | `6.50 ms` |
+| CatBoost `cb_mixed_cand42` (`1,500` trees) | — | `81.40%` | — | `0.64260` | `1,108` (`645 / 463`) | `2,171` | `3,051` | `0.44422` (`565`) | `1.78 ms` |
+| CatBoost `cb_optionA_oof_blend` (`cand_42`) | — | `81.61%` | — | `0.64379` | `1,139` (`643 / 496`) | `2,278` | `3,162` | `0.44512` (`589`) | — |
+| Wave 2B `w2b_cand42_optionA_pureQ_full42bias` (Ep 5) | — | `82.02%` | — | `0.65139` | `1,212` (`710 / 502`) | `2,312` | `3,197` | `0.45107` (`639`) | `6.80 ms` |
+| Wave 2C `w2c_exp1_clean_sep_w05` (`0.5× L_optA`, Ep 10) | `68.26%` | `82.07%` | `92.56%` | `0.65439` | `1,193` (`691 / 502`) | `2,235` | `3,152` | `0.45462` (`623`) | `~6.4 ms` |
+| **Active Primary: `w2c_exp1_clean_sep_w10` (`1.0× L_optA`, Ep 6) ⭐** | **`68.28%`** | **`82.12%`** | **`92.77%`** | `0.65380` | **`1,219`** (`721 / 498`) | **`2,298`** (`51.11%`) | **`3,218`** (`71.57%`) | `0.45456` (**`630`**) | **`6.40 ms`** |
+| **Companion: `w2c_exp1_clean_sep_w10` (`cal-NDCG`, Ep 10)** | `68.17%` | `82.10%` | `92.68%` | **`0.65437`** | `1,160` (`665 / 495`) | `2,276` (`50.62%`) | `3,203` (`71.24%`) | **`0.45461`** (`613`) | `6.40 ms` |
 
-- **Resolved Exact-SKU Validation (`v5_shared_uv`):** Active Ep 10 reaches `sku_Recall@10 = 66.77%`, `sku_NDCG@10 = 0.53504`, `sku_New@10 = 214`; Companion Ep 7 sets all-time resolved-SKU highs (`sku_Recall@10 = 66.93%`, `sku_NDCG@10 = 0.53624`, `sku_New@10 = 220`).
-- **Takeaway:** `v5_shared_uv` deletes `188K` redundant Stage 2 parameters (`755K → 567K`), eliminates late-epoch overfitting (`NDCG@10` holds `0.63485 → 0.63457` through epoch 10), boosts cold-start `NDCG@10` (`+0.0153` over `v4b`), and sets new resolved exact-SKU records while scoring all `585` formulations in `1.32 ms` on CPU.
+- **Held-out Test Policy (`v2_full`):** All baskets `>= 2026-07-01` remain strictly locked and untouched while Wave 2A capacity/sequence experiments proceed.
 
-### 2. Final Held-Out Test Evaluation (`2026-02-19` to `2026-07-17`, Inference-Only on Archived 3-Stage Reference)
-
-Strictly inference-only evaluation on the five-month forward Test split (`stage5-dated-first-baskets-v2`, primary NDCG checkpoint Ep 7; zero retraining/tuning; `stage5-fullpool-nomlp-v3` was developed strictly on validation and has not touched Test):
-
-| Cohort / Metric | Validation (`6,480`) | Test — Modeled `585`-BN (`6,497`) | Test — Full Catalogue (`6,582`) |
-| :--- | ---: | ---: | ---: |
-| **All — Recall@10** | `80.78%` | `79.89%` | `78.56%` |
-| **All — NDCG@10** | `0.63345` | `0.61852` | `0.60895` |
-| **All — Truly New Hits@10** | `359 / 1,721` (`20.86%`) | `353 / 1,779` (`19.84%`) | `353 / 1,913` (`18.45%`) |
-| **Returning — Recall@10 / NDCG@10** | `82.69%` / `0.65194` | `81.57%` / `0.63408` | `80.24%` / `0.62452` |
-| **First Observed — Recall@10 / NDCG@10** | `39.75%` / `0.23750` | `37.72%` / `0.22811` | `36.81%` / `0.22264` |
-| **100-Slate Coverage (Total / New)** | `97.06%` / `82.68%` | `97.12%` / `83.70%` | `95.57%` / `77.84%` |
-| **Resolved Exact-SKU Recall@10 / NDCG@10** | `66.62%` / `0.53376` | `65.93%` / `0.51880` | `64.15%` / `0.50595` |
-
-*Full-Catalogue Test counts all `166` targets from `58` new formulations launched after `2026-02-18` as misses (`85` test baskets contain only newly launched formulations). See [`experiments/roadmap_v2/REPORT.md`](experiments/roadmap_v2/REPORT.md) and [`stage5_dated_first_baskets_test_seed42.json`](experiments/roadmap_v2/stage5_dated_first_baskets_test_seed42.json).*
+### 2. Frozen `v1` Reference Summary (`585` Formulations — Preserved)
+- **Validation (`2025-10-01` → `2026-02-18`, `6,480` baskets):** Active `v1` `v5_shared_uv` Ep 10 (`567K` params, `1.32 ms` CPU) achieves `R@10 = 80.89%`, `NDCG@10 = 0.63457`, `New@10 = 372/1,721 (21.62%)`, Resolved SKU `R@10 = 66.77%` / `NDCG@10 = 0.53504`.
+- **Historical Held-Out Test (`2026-02-19` → `2026-07-17`, inference-only on archived 3-stage reference):** `79.89%` Modeled / `78.56%` Full-Catalogue `R@10` (`6,582` baskets). See [`experiments/roadmap_v2/REPORT.md`](experiments/roadmap_v2/REPORT.md).
 
 ---
 
-## Repository Structure
+## Repository Structure (Active Pipeline)
 
 ```text
 .
 ├── configs/
-│   ├── datasets_links.toml                # Local paths to raw dataset.xlsx, customers.csv, items.csv
-│   └── product_scope.toml                 # Paid-sale & sellable merchandise rules (ПРОДАЖА + ТОВАР)
-├── recommender/                           # Core library & active experimental pipelines
+│   ├── datasets_links.toml                  # Local paths to raw dataset.xlsx, customers.csv, items.csv
+│   └── product_scope.toml                   # Paid-sale & sellable merchandise rules (ПРОДАЖА + ТОВАР)
+├── recommender/
 │   ├── data.py, merging.py, scope.py, preparation.py
-│   │                                      # Raw Excel/CSV parsing, paid-sale filtering, quantity-summing merge
-│   ├── company.py, catalogue.py           # Company & item master loading, RollingCandidatePool
-│   ├── split.py, development.py           # Strict temporal splits (TRAIN_CUTOFF=2025-10-01, TEST_START=2026-02-19)
-│   ├── features.py, sequences.py, text.py, familiarity.py
-│   │                                      # Point-in-time profile normalizer, 32-event sequences, BGE-M3 cache, familiarity
-│   ├── models.py, candidates.py, ranker.py
-│   │                                      # Base TwoTowerModel, PointInTimeFeatureStore, UPSCANRRanker & RankerLoss
-│   ├── train_retriever.py, train_ranker.py, evaluate.py, evaluate_stage1.py
-│   │                                      # Legacy SKU-level training & evaluation entrypoints
+│   │                                        # Raw Excel/CSV parsing, paid-sale filtering, quantity-summing merge
+│   ├── company.py, catalogue.py             # Company & item master loading, RollingCandidatePool
+│   ├── split.py, development.py             # Strict temporal split & development-only purchase loader
+│   ├── features.py, sequences.py, text.py, familiarity.py, ranker.py
+│   │                                        # Sequence utilities, BGE-M3 cache, RankerLoss & RankerOutput
 │   └── experiments/
-│       ├── roadmap_v2/                    # ACTIVE Stage 5 canonical base_name pipeline
-│       │   ├── dated_baskets.py           # Unified dated first + returning basket builder & commercial reconciler
-│       │   ├── stage5_base_entity.py      # 585 base_name universe, base_name sequences, evaluator, SKU resolver
-│       │   ├── base_name_features.py      # 19D strictly-causal base_name rolling/transition/complement builder
-│       │   ├── commercial_features.py     # 3A financial, 3B pricing, 3C rolling 90d manager, 3D warehouse builders
-│       │   ├── parsed_spec_features.py    # 3E deterministic viscosity/pack/application & company equipment matcher
-│       │   ├── augmentation.py            # Leak-free 60-day forward auxiliary label builder (< TRAIN_CUTOFF)
-│       │   ├── stage1_mlp.py              # RoadmapStage1Selector (used in 3-stage comparison)
-│       │   ├── run_stage5.py              # Canonical 3-stage Stage 5 trainer & --replay-reference verifier
-│       │   ├── run_stage5_ablations.py    # No-MLP full-pool UPS-CANR & CatBoost (standalone / +Two-Tower) ablations
-│       │   ├── run_stage5_bigger_ranker.py# Modest & scaled No-MLP full-pool UPS-CANR (active reference trainer)
-│       │   ├── evaluate_stage5_test.py    # Locked (--allow-heldout-test) inference-only held-out Test evaluator
-│       │   └── demo_dashboard.py          # Interactive local web dashboard sampling live held-out Test baskets
-│       ├── dynamic_selector/              # 41D rolling feature schema, DynamicFeatureBuilder, slate selection
-│       ├── rolling_candidate_v2/          # rolling_observed_v2 feature bundle & preserved-hash guardrails
-│       ├── static_enrichment/             # StaticEnrichedRetriever (E_no_brand Two-Tower), t1_fam text cache
-│       └── catboost_comparison/           # Historical & standalone SKU-level CatBoost comparisons
+│       ├── v2_full/                         # ACTIVE 4-year v2_full single-stage E2E pipeline
+│       │   ├── config.py                    # Splits (TRAIN_CUTOFF_V2=2026-02-01, TEST_START_V2=2026-07-01) & ref loader
+│       │   ├── prepare_v2_full.py           # Leak-free 4-year ingestion, 1,141 base_name universe & cand_38 memmaps
+│       │   ├── extra_features.py            # Strictly causal extra_cand_5 (CF, mgr 30d, mgr×ind, region 90d) & cand_42/CUST_7/SEQ_5
+│       │   ├── wave2b_models.py             # Wave2BE2ERanker, OptionAUnseenHead, Pure Unseen metrics & 2-fold OOF affine blend
+│       │   ├── e2e_ranker.py                # Wave 1 EndToEndStage2Ranker & TwoStageAdaptiveRanker
+│       │   ├── run_v2_full_wave2c.py        # Wave 2C clean separated Option A runner (active reference trainer)
+│       │   ├── run_v2_full_wave2b.py        # Wave 2B cand_42 + Pure-Q + Option A runner & shared batching
+│       │   ├── run_v2_full_wave2.py         # Wave 2A capacity / history-length / recency experiment runner
+│       │   ├── run_v2_full_catboost.py      # Standalone 42-feature CatBoost + Option A OOF blend & ensemble
+│       │   ├── run_v2_full_experiments.py   # Wave 1 6-arm 2-stage vs. E2E benchmark
+│       │   ├── train_v2_full_baseline.py    # AMP context, full-pool ranking & sync helpers
+│       │   ├── wave2_utils.py, provenance.py# Shared Wave 2 utilities & dataset/artifact SHA-256 provenance
+│       │   └── demo_engine.py               # Live V2FullLiveDemoEngine serving w2c_exp1_clean_sep_w10 on Validation
+│       ├── roadmap_v2/                      # Shared base_name / commercial / spec builders & live demo UI
+│       │   ├── demo_dashboard.py            # Interactive web dashboard (defaults to v2_full; --model v1 optional)
+│       │   ├── dated_baskets.py, stage5_base_entity.py, native_base_name.py, commercial_features.py
+│       │   ├── parsed_spec_features.py, augmentation.py, clean_ranker.py, stage5_artifacts.py
+│       │   └── run_stage5.py, run_stage5_ablations.py, evaluate_stage5_test.py
+│       └── static_enrichment/               # StaticEnrichedProductTower & enriched metadata loaders
 ├── experiments/
-│   └── roadmap_v2/                        # Tracked JSON summaries, reference manifests, and REPORT.md
-│       ├── stage5_reference.json          # Active canonical reference (stage5-fullpool-nomlp-v3)
-│       ├── stage5_3stage_reference.json   # Archived 3-stage reference (stage5-dated-first-baskets-v2)
-│       ├── stage5_modest_ranker_seed42.json
-│       ├── stage5_nomlp_and_catboost_seed42.json
-│       ├── stage5_dated_first_baskets_seed42.json
-│       ├── stage5_dated_first_baskets_test_seed42.json
-│       └── REPORT.md                      # Complete Stage 0–5, Held-Out Test, No-MLP & CatBoost report
-├── tests/                                 # 634 unit, causality, leakage-guard & parity tests (6 protected skips)
-├── AGENTS.md                              # Agent engineering handbook & strict non-leakage rules
-├── EVALUATION_RESULTS.md                  # Historical SKU validation record
-└── plan.md                                # Project roadmap & milestone log
+│   ├── v2_full/                             # Active v2_full reference manifest & Wave 1/2B/2C/CatBoost JSON results
+│   │   ├── v2_full_reference.json           # Canonical active pointer (v2-full-arm4-w2c-clean-sep-w10-cal-disc-ep6)
+│   │   ├── v2_full_wave2c_arm4_e2e_unseen_attn_aux_seed42.json
+│   │   ├── v2_full_wave2b_arm4_e2e_unseen_attn_aux_seed42.json
+│   │   ├── v2_full_catboost_wave2b_seed42.json
+│   │   └── v2_full_experiments_seed42.json
+│   └── roadmap_v2/                          # Frozen v1 Stage 5 reference manifests & REPORT.md
+├── notebooks/
+│   └── colab_v2_full_experiments.ipynb      # Native bf16 Colab L4/A100 training & Drive auto-sync notebook
+├── tests/                                   # Unit, causality, parity & leakage-guard test suite
+├── AGENTS.md                                # Agent engineering handbook & strict non-leakage rules
+└── plan.md                                  # Active roadmap, completed Wave 1/2B/2C results & Wave 2A plan
 ```
 
 ---
 
-## Setup & Data Preparation
+## Setup, Live Demo & Commands
 
-Use Python 3.12 (`./venv/bin/python`; Apple Silicon `mps` is detected automatically when available):
+Use Python 3.12 (`./venv/bin/python`; Apple Silicon `mps` or CUDA `bf16` detected automatically):
 
 ```bash
 python3.12 -m venv venv
@@ -150,55 +154,42 @@ python3.12 -m venv venv
 ./venv/bin/pip install -r requirements-catboost.txt
 ```
 
-Private raw inputs live locally under `data/raw/` (git-ignored, configured in [`configs/datasets_links.toml`](configs/datasets_links.toml)):
-`data/raw/dataset.xlsx`, `data/raw/customers.csv`, `data/raw/items.csv`.
+### Interactive Live Demo Dashboard (`http://127.0.0.1:8765`)
+Serves the active `v2_full` model (`w2c_exp1_clean_sep_w10`, Ep 6) live on CPU (~4–6 ms/req) over the `16,623` out-of-time Validation baskets (`2026-02-02` → `2026-06-30`, zero held-out Test access), with cohort filters, Case `#` jump, and a live **Ranking Mode** switcher (`Blended (Main + Option A OOF)`, `Pure Unseen Only (Option A Head)`, `Main Repeat Head Only`):
 
 ```bash
-# Export cleaned paid merchandise purchases to data/interim/cleaned_purchases.csv
-./venv/bin/python -m recommender --export-purchases data/interim/cleaned_purchases.csv
+# Default: active v2_full Ep 6 cal-Discovery == cal-Unseen reference (zero Test access)
+PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.demo_dashboard --port 8765
+
+# Optional: Ep 10 cal-NDCG companion checkpoint
+PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.demo_dashboard --checkpoint-kind ndcg --port 8765
+
+# Legacy v1 Stage 5 Shared-UV model on held-out Test baskets (>= 2026-02-19)
+PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.demo_dashboard --model v1 --allow-heldout-test --port 8765
 ```
 
-- **Chronological splits ([`recommender/split.py`](recommender/split.py)):**
-  - **Train:** `< 2025-10-01` (`50,414` events; `29,095` dated Stage 5 baskets = `2,984` first observed + `26,111` returning)
-  - **Validation:** `2025-10-01` to `2026-02-18` (`10,634` events; `6,480` dated Stage 5 baskets = `289` first observed + `6,191` returning)
-  - **Held-Out Test:** `>= 2026-02-19` (`10,868` events; `6,582` baskets = `255` first observed + `6,327` returning — **strictly locked behind explicit opt-in flags**)
-
----
-
-## Training, Replay & Test Commands
-
-Run from the repository root with `./venv/bin/python`:
+### `v2_full` Preparation, Training & Testing
 
 ```bash
-# Train the active No-MLP Full-Pool UPS-CANR variants (modest_wider_mlp_384 & modest_8h_ffn384_mlp384)
-PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.run_stage5_bigger_ranker --mode modest
+# 1. Prepare leak-free 4-year v2_full dataset (< 2026-07-01) & seal extra_cand_5
+PYTHONPATH=. ./venv/bin/python -m recommender.experiments.v2_full.prepare_v2_full
+PYTHONPATH=. ./venv/bin/python -m recommender.experiments.v2_full.extra_features
 
-# Run No-MLP standard full-pool UPS-CANR + CatBoost (standalone & +Two-Tower) validation ablations
-PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.run_stage5_ablations
+# 2. Train Wave 2C clean separated Option A (use --amp --in-memory on native bf16 CUDA L4/A100)
+PYTHONPATH=. ./venv/bin/python -m recommender.experiments.v2_full.run_v2_full_wave2c \
+    --base arm4_e2e_unseen_attn_aux --seed 42 --amp --in-memory --skip-v1-verify
 
-# Replay and checksum-verify the archived 3-stage Stage 5 reference on validation
-PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.run_stage5 --replay-reference
+# 3. Run standalone 42-feature CatBoost benchmark + OOF affine blend
+PYTHONPATH=. ./venv/bin/python -m recommender.experiments.v2_full.run_v2_full_catboost \
+    --task-type auto --seed 42 --in-memory --skip-v1-verify
 
-# Run authorized inference-only held-out Test evaluation (refuses without --allow-heldout-test)
-PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.evaluate_stage5_test --allow-heldout-test
-
-# Launch the interactive live held-out Test demo dashboard (http://127.0.0.1:8765)
-PYTHONPATH=. ./venv/bin/python -m recommender.experiments.roadmap_v2.demo_dashboard --allow-heldout-test --port 8765
-
-# Run the test suite (ordinary pytest skips 6 protected real-data readers; zero held-out Test access)
-PYTHONPATH=. ./venv/bin/pytest tests/ -q
-PYTHONPATH=. ./venv/bin/pytest tests/ --synthetic-only -q
+# 4. Run active v2_full + Stage 5 audit tests (zero held-out Test access)
+PYTHONPATH=. ./venv/bin/pytest tests/test_v2_full_pipeline.py tests/test_v2_full_wave2b.py \
+    tests/test_v2_full_wave2c.py tests/test_v2_full_wave2.py tests/test_stage5_audit_fixes.py tests/test_data.py -q
 ```
 
 ---
-
-## Documentation Map & Historical Audits
-
-- **[experiments/roadmap_v2/REPORT.md](experiments/roadmap_v2/REPORT.md):** Full Stage 0–5 ablation progression, dated first/returning basket audit, final held-out Test evaluation, No-MLP full-pool vs. CatBoost comparison, and modest scaling results.
-- **[AGENTS.md](AGENTS.md):** Active reference pointers, module map, checkpoint/cache provenance, and temporal-leakage guardrails.
-- **[EVALUATION_RESULTS.md](EVALUATION_RESULTS.md)** & **[plan.md](plan.md):** Historical SKU validation progression and roadmap context.
-- **[AUDIT_REPORT.md](AUDIT_REPORT.md)**, **[HARDENING_REPORT.md](HARDENING_REPORT.md)**, **[DYNAMIC_SELECTOR_EXPERIMENTS.md](DYNAMIC_SELECTOR_EXPERIMENTS.md)**, **[SHARED_STAGE1_EXPERIMENTS.md](SHARED_STAGE1_EXPERIMENTS.md)**, **[E1_E5_EXPERIMENTS.md](E1_E5_EXPERIMENTS.md):** Historical SKU-level audits, hardening changes, and controlled ablation records (preserved untouched).
 
 ## Data Handling
 
-Raw data (`data/raw/`), interim caches (`data/interim/`), cached embeddings, precomputed predictions (`.npz`), and model checkpoints (`checkpoints/`) remain strictly local and git-ignored. Only aggregate JSON summaries, reference manifests, code, and tests are tracked in Git.
+Raw data (`data/`), interim caches, BGE-M3 embeddings, precomputed predictions (`.npz`), Colab bundles (`exports/`), and model checkpoints (`checkpoints/`) remain strictly local and git-ignored. Only aggregate JSON summaries, SHA-256 reference manifests, code, notebook source (outputs cleared), and tests are tracked in Git.

@@ -116,9 +116,11 @@ class CommercialRollingFeatureBuilder:
         *,
         allow_heldout_test: bool = False,
         historical_recipe: bool = False,
+        test_start: pd.Timestamp = TEST_START,
     ):
         self.allow_heldout_test = bool(allow_heldout_test)
         self.historical_recipe = historical_recipe
+        self.test_start = pd.Timestamp(test_start).normalize()
         self.product_ids = [str(p).strip() for p in product_ids]
         self.num_products = len(self.product_ids)
         self.pid_to_idx = {pid: i for i, pid in enumerate(self.product_ids)}
@@ -162,14 +164,14 @@ class CommercialRollingFeatureBuilder:
             df = events.copy()
             df["purchase_date"] = pd.to_datetime(df["purchase_date"], format="mixed").dt.normalize()
             if bool(df["purchase_date"].isna().any()) or (
-                not self.allow_heldout_test and not bool(df["purchase_date"].lt(TEST_START).all())
+                not self.allow_heldout_test and not bool(df["purchase_date"].lt(self.test_start).all())
             ):
-                raise ValueError(f"Development events only (< {TEST_START.date()}).")
+                raise ValueError(f"Development events only (< {self.test_start.date()}).")
             if "full_payment_date" in df.columns:
                 df["full_payment_date"] = pd.to_datetime(df["full_payment_date"], errors="coerce").dt.normalize()
                 if not self.allow_heldout_test:
                     # Strict pre-test clamp on settlement dates during development
-                    df.loc[df["full_payment_date"] >= TEST_START, "full_payment_date"] = pd.NaT
+                    df.loc[df["full_payment_date"] >= self.test_start, "full_payment_date"] = pd.NaT
             else:
                 df["full_payment_date"] = pd.NaT
 
@@ -421,7 +423,7 @@ class CommercialRollingFeatureBuilder:
     def build(self, customer_id: str, as_of_date: Union[str, pd.Timestamp]) -> np.ndarray:
         """Build (P, 21) float32 strictly-causal Stage 3A-3D features for all canonical products."""
         date_ts = pd.Timestamp(as_of_date).normalize()
-        if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= TEST_START):
+        if pd.isna(date_ts) or (not self.allow_heldout_test and date_ts >= self.test_start):
             raise ValueError("Development predictions only")
 
         cid = str(customer_id).strip()
@@ -577,7 +579,7 @@ def prepare_or_load_commercial_feature_bundle(
     else:
         if not build:
             raise FileNotFoundError(f"commercial_21d cache missing in {root}; build=True required.")
-        events = pd.read_parquet(parquet_path)
+        events = pd.read_parquet(parquet_path, filters=[("purchase_date", "<", TEST_START)])
         builder = CommercialRollingFeatureBuilder(events, catalogue, product_ids)
         splits = ("train", "val")
         arrays = [

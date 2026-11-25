@@ -18,21 +18,31 @@ def build_strict_60d_aux_labels(
     *,
     horizon_days: int = 60,
     train_cutoff: pd.Timestamp = TRAIN_CUTOFF,
+    test_start: pd.Timestamp = TEST_START,
 ) -> torch.Tensor:
-    """Build (N_train, P) bool matrix of products purchased in [t, min(t + horizon_days, TRAIN_CUTOFF)).
+    """Build (N_train, P) bool matrix of products purchased in [t, min(t + horizon_days, train_cutoff)).
 
     Zero leakage guarantees:
     - Refuses any query date >= train_cutoff (strictly training rows only).
-    - Refuses any purchase date >= TEST_START.
-    - Hard-caps every query's future window strictly at `< train_cutoff`, so even a September 2025
-      training transition NEVER reads any October+ validation purchase.
+    - Refuses any purchase date >= test_start.
+    - Hard-caps every query's future window strictly at `< train_cutoff`, so no validation purchase leaks.
     """
+    if len(customer_ids) != len(prediction_days):
+        raise ValueError("Each customer needs one prediction day.")
+    days = np.asarray(prediction_days, dtype=np.float64)
+    if days.ndim != 1 or not np.isfinite(days).all() or not np.equal(days, np.floor(days)).all():
+        raise ValueError("Prediction days must be finite integer calendar days.")
+    query_dates = pd.Timestamp("2025-01-01") + pd.to_timedelta(days, unit="D")
+    if (query_dates >= train_cutoff).any():
+        raise ValueError(f"60-day aux labels are training-only (< {train_cutoff.date()}).")
+    if horizon_days <= 0 or train_cutoff > test_start:
+        raise ValueError("Expected a positive horizon and ordered split boundaries.")
     if purchases.empty:
         return torch.zeros((len(customer_ids), len(product_ids)), dtype=torch.bool)
 
     dates_all = pd.to_datetime(purchases["purchase_date"], format="mixed")
-    if bool(dates_all.isna().any()) or not bool(dates_all.lt(TEST_START).all()):
-        raise ValueError(f"Development purchases only (< {TEST_START.date()}).")
+    if bool(dates_all.isna().any()) or not bool(dates_all.lt(test_start).all()):
+        raise ValueError(f"Development purchases only (< {test_start.date()}).")
 
     # Filter strictly to training-period purchases (< train_cutoff) BEFORE indexing
     train_mask = dates_all < train_cutoff
@@ -53,15 +63,11 @@ def build_strict_60d_aux_labels(
             cust_dates[cid] = dts[valid]
             cust_pids[cid] = idxs[valid]
 
-    origin = pd.Timestamp("2025-01-01")
     cutoff_64 = pd.Timestamp(train_cutoff).to_datetime64()
     horizon_td = pd.Timedelta(days=int(horizon_days))
 
     labels = np.zeros((len(customer_ids), len(product_ids)), dtype=bool)
-    for row, (cid_raw, day) in enumerate(zip(customer_ids, prediction_days)):
-        t = origin + pd.Timedelta(days=int(day))
-        if t >= train_cutoff:
-            raise ValueError(f"60-day aux labels are training-only (< {train_cutoff.date()}); got {t.date()}.")
+    for row, (cid_raw, t) in enumerate(zip(customer_ids, query_dates, strict=True)):
         cid = str(cid_raw).strip()
         dts = cust_dates.get(cid)
         if dts is None:

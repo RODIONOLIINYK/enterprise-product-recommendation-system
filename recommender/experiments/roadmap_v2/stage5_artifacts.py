@@ -76,7 +76,7 @@ def read_stage5_vectors(directory, *, allow_unsealed_legacy=False):
     return loaded, legacy
 
 
-def validate_stage5_vectors(loaded, splits, names, tower_hash, inputs, *, legacy=False):
+def validate_stage5_vectors(loaded, splits, names, tower_hash, inputs, *, legacy=False, d_model=128):
     inputs_hash = product_inputs_digest(inputs)
     for name, data in loaded.items():
         expected = vector_identity(splits[name], names, tower_hash, inputs_hash)
@@ -88,7 +88,7 @@ def validate_stage5_vectors(loaded, splits, names, tower_hash, inputs, *, legacy
             tensor = data.get(key)
             if (
                 not isinstance(tensor, torch.Tensor)
-                or tensor.shape != (count, 128)
+                or tensor.shape != (count, d_model)
                 or tensor.dtype != torch.float32
                 or not torch.isfinite(tensor).all()
             ):
