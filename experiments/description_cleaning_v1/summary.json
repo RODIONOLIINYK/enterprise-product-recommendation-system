@@ -1,0 +1,1475 @@
+{
+  "campaign": "description_cleaning_v1",
+  "baseline_target": "no-brand-v1",
+  "selector_recipe": "uv_47",
+  "selector_input_dim": 303,
+  "seed": 42,
+  "validation_only": true,
+  "heldout_access": false,
+  "stage2_executed": false,
+  "promoted": false,
+  "metadata_policy": "snapshot_unverified",
+  "cleaner_version": "desc_clean_v1",
+  "cleaner_rules_hash": "68f303d583dbe67535b5a73ab00714590c732a3e3d3c28634b691ba9d69d8afc",
+  "cleaning_rules": {
+    "version": "desc_clean_v1",
+    "csv_columns_used": [
+      0,
+      1,
+      2
+    ],
+    "csv_columns_excluded": [
+      3,
+      4
+    ],
+    "rules": [
+      {
+        "id": "R1_html_structure_and_hidden_removal",
+        "description": "Parse HTML with stdlib HTMLParser; strip tags, attributes, <script>, <style>, <noscript>, <template>, HTML comments, <img> elements, and hidden elements (hidden, aria-hidden=true, display:none, visibility:hidden). Preserve paragraph/heading/list block breaks and convert tables into Header: Value | Header2: Value2 (or Cell | Cell2) pairs."
+      },
+      {
+        "id": "R2_entities_encoded_markup_unicode_nfc",
+        "description": "Selectively decode genuine encoded HTML markup before parsing without mistaking numeric comparisons (<1%, >200\u00b0C) for HTML tags; decode HTML entities; normalize Unicode to NFC; convert NBSP/figure/narrow spaces to ASCII spaces; remove zero-width/format chars (Cf) and C0/C1 control characters."
+      },
+      {
+        "id": "R3_decorative_emoji_and_bullet_cleanup",
+        "description": "Convert keycap step emojis (1\ufe0f\u20e3) to numbered markers (1.); remove decorative emojis, checkmarks (\u2705, \ud83d\udd39, \ud83d\udccc, \ud83d\udd27, \ud83d\ude97, etc.), variation selectors, and Quill leading bullet dots while preserving technical symbols (\u00b0, \u00b1, \u2248, \u2264, \u2265, \u00d7, \u00ae, \u2122, \u2116, %, /, -, :)."
+      },
+      {
+        "id": "R4_conservative_boilerplate_removal",
+        "description": "Remove non-technical CTA headings (e.g. '\u0427\u043e\u043c\u0443 \u0432\u0430\u0440\u0442\u043e \u043a\u0443\u043f\u0438\u0442\u0438 ...?', '\u042f\u043a \u043f\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u043e\u0440\u0438\u0433\u0456\u043d\u0430\u043b\u044c\u043d\u0456\u0441\u0442\u044c...?'), authenticity/QR/URL/email/phone/shipping/payment/cart notices, and pure price/promotional fluff sentences while preserving all technical paragraphs, viscosity/ISO/NLGI grades, API/ACEA/OEM approvals, formally-approved vs meets-requirements distinctions, temperatures, ratios, and negations such as '\u043d\u0435 \u043c\u0456\u0441\u0442\u0438\u0442\u044c'."
+      },
+      {
+        "id": "R5_within_product_exact_dedup",
+        "description": "Deduplicate exact repeated blocks and sentences (case-insensitive, whitespace-normalized) within each individual product while preserving first occurrence and performing zero cross-product dedup."
+      }
+    ]
+  },
+  "cleaning_totals": {
+    "csv_rows": 276,
+    "csv_nonempty_html": 253,
+    "csv_nonempty_clean_v1": 253,
+    "dev_skus_total": 841,
+    "dev_skus_in_csv": 159,
+    "dev_skus_nonempty_html": 155,
+    "dev_skus_nonempty_clean_v1": 155,
+    "dev_skus_pct_nonempty_html": 18.430439952437574,
+    "dev_skus_pct_nonempty_clean_v1": 18.430439952437574,
+    "spec_token_losses_vs_legacy": 0,
+    "tags_stripped": 13332,
+    "hidden_or_script_blocks_dropped": 0,
+    "tables_parsed": 3,
+    "emojis_removed": 1568,
+    "boilerplate_blocks_removed": 110,
+    "boilerplate_sentences_removed": 78,
+    "duplicate_blocks_removed": 8,
+    "duplicate_sentences_removed": 0
+  },
+  "validation_new_target_coverage": {
+    "total": 1857,
+    "in_description_csv": 526,
+    "nonempty_html": 514,
+    "nonempty_clean_v1": 514,
+    "without_description_html": 1343,
+    "without_description_clean_v1": 1343
+  },
+  "text_recipes_provenance": {
+    "t1_fam": {
+      "recipe": "t1_fam",
+      "cleaner_version": "none",
+      "cleaner_rules_hash": "none",
+      "raw_description_sha256": "a3db2131ff72d6b6584efa00015e66dce1f22eeabc052e74dac3dd84faa31955",
+      "recipe_hash": "98134e2f7fe45c60baaf2721cfee866005ac035ef410cc80e011047eab66b8e0",
+      "content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+      "base_content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+      "changed_text_count": 0,
+      "changed_trained_text_count": 0,
+      "reused_unchanged_count": 841,
+      "newly_encoded_count": 0,
+      "empty_text_count": 0,
+      "non_empty_text_count": 841,
+      "reused_from_baseline_cache": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+      "token_stats": {
+        "max_chars": 119,
+        "mean_chars": 80.89179548156956,
+        "non_empty_spec_products": 0,
+        "total_spec_tokens_in_descriptions": 0,
+        "tokenizer_measured": false,
+        "encoder_max_seq_length": 8192,
+        "max_tokens": null,
+        "mean_tokens": null,
+        "p95_tokens": null,
+        "truncated_count": 0,
+        "truncated_product_ids": [],
+        "truncation_policy": "prefix_plus_description_block_priority_v1"
+      },
+      "cache_path": "data/interim/description_cleaning_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+      "meta_path": "data/interim/description_cleaning_v1/text_embeddings/t1_fam_98134e2f7fe45c60.json",
+      "loaded_from_cache": true
+    },
+    "t1_fam_desc_html_v1": {
+      "recipe": "t1_fam_desc_html_v1",
+      "cleaner_version": "clean_html_description_v1",
+      "cleaner_rules_hash": "legacy_html_v1",
+      "raw_description_sha256": "a3db2131ff72d6b6584efa00015e66dce1f22eeabc052e74dac3dd84faa31955",
+      "recipe_hash": "9ed9c72e7684ff6253090a87b121b154d8e9af298ede0bc75d8ba012bc38a577",
+      "content_hash": "95735cbd2548664b38226b6723cf7f3a257ce5d74f24ffe0b39ac6f036e7c7c3",
+      "base_content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+      "changed_text_count": 155,
+      "changed_trained_text_count": 152,
+      "reused_unchanged_count": 686,
+      "newly_encoded_count": 155,
+      "empty_text_count": 0,
+      "non_empty_text_count": 841,
+      "reused_from_baseline_cache": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+      "token_stats": {
+        "max_chars": 4243,
+        "mean_chars": 379.12485136741975,
+        "non_empty_spec_products": 131,
+        "total_spec_tokens_in_descriptions": 897,
+        "tokenizer_measured": true,
+        "encoder_max_seq_length": 8192,
+        "max_tokens": 1383,
+        "mean_tokens": 121.97859690844233,
+        "p95_tokens": 622.0,
+        "truncated_count": 0,
+        "truncated_product_ids": [],
+        "truncation_policy": "prefix_plus_description_block_priority_v1"
+      },
+      "cache_path": "data/interim/description_cleaning_v1/text_embeddings/t1_fam_desc_html_v1_9ed9c72e7684ff62.parquet",
+      "meta_path": "data/interim/description_cleaning_v1/text_embeddings/t1_fam_desc_html_v1_9ed9c72e7684ff62.json",
+      "loaded_from_cache": true
+    },
+    "t1_fam_desc_clean_v1": {
+      "recipe": "t1_fam_desc_clean_v1",
+      "cleaner_version": "desc_clean_v1",
+      "cleaner_rules_hash": "68f303d583dbe67535b5a73ab00714590c732a3e3d3c28634b691ba9d69d8afc",
+      "raw_description_sha256": "a3db2131ff72d6b6584efa00015e66dce1f22eeabc052e74dac3dd84faa31955",
+      "recipe_hash": "a2e76c558a5c4bacbab87f46407eafd155a3a858cb1e1a454f8a282beea3c6c9",
+      "content_hash": "0c3104324b4f2ec8073fcae87878b271065cc21a6828934225d940e76e9ebe7c",
+      "base_content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+      "changed_text_count": 155,
+      "changed_trained_text_count": 152,
+      "reused_unchanged_count": 686,
+      "newly_encoded_count": 155,
+      "empty_text_count": 0,
+      "non_empty_text_count": 841,
+      "reused_from_baseline_cache": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+      "token_stats": {
+        "max_chars": 4131,
+        "mean_chars": 361.4780023781213,
+        "non_empty_spec_products": 131,
+        "total_spec_tokens_in_descriptions": 897,
+        "tokenizer_measured": true,
+        "encoder_max_seq_length": 8192,
+        "max_tokens": 1330,
+        "mean_tokens": 113.65755053507729,
+        "p95_tokens": 587.0,
+        "truncated_count": 0,
+        "truncated_product_ids": [],
+        "truncation_policy": "prefix_plus_description_block_priority_v1"
+      },
+      "cache_path": "data/interim/description_cleaning_v1/text_embeddings/t1_fam_desc_clean_v1_a2e76c558a5c4bac.parquet",
+      "meta_path": "data/interim/description_cleaning_v1/text_embeddings/t1_fam_desc_clean_v1_a2e76c558a5c4bac.json",
+      "loaded_from_cache": true
+    }
+  },
+  "bounded_cleaning_examples": [
+    {
+      "product_id": "\u0422\u041e\u0412-\u0423001541",
+      "raw_name": "Helix HX7 10W-40, 4\u043b",
+      "raw_chars": 3437,
+      "html_basic_chars": 2296,
+      "clean_v1_chars": 1820,
+      "counts": {
+        "tags_stripped": 68,
+        "tables_parsed": 0,
+        "emojis_removed": 12,
+        "boilerplate_blocks_removed": 2,
+        "boilerplate_sentences_removed": 3,
+        "duplicate_blocks_removed": 0,
+        "duplicate_sentences_removed": 0
+      },
+      "removed_items": [
+        {
+          "reason": "cta_heading",
+          "text": "\u0427\u043e\u043c\u0443 \u0432\u0430\u0440\u0442\u043e \u043a\u0443\u043f\u0438\u0442\u0438 Shell Helix HX7 10W-40?"
+        },
+        {
+          "reason": "cta_heading",
+          "text": "\u042f\u043a \u043f\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u043e\u0440\u0438\u0433\u0456\u043d\u0430\u043b\u044c\u043d\u0456\u0441\u0442\u044c \u043e\u043b\u0438\u0432\u0438?"
+        },
+        {
+          "reason": "boilerplate_sentence",
+          "text": "\u041f\u0435\u0440\u0435\u043a\u043e\u043d\u0430\u0442\u0438\u0441\u044f \u0432 \u043e\u0440\u0438\u0433\u0456\u043d\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u0456 Shell Helix HX7 10W-40 \u043c\u043e\u0436\u043d\u0430 \u0447\u0435\u0440\u0435\u0437 shellcheck, \u0432\u0438\u043a\u043e\u0440\u0438\u0441\u0442\u043e\u0432\u0443\u044e\u0447\u0438 QR-\u043a\u043e\u0434 \u043d\u0430 \u0447\u043e\u0442\u0438\u0440\u044c\u043e\u0445, \u0442\u0430 \u043f\u2019\u044f\u0442\u0438\u043b\u0456\u0442\u0440\u043e\u0432\u0438\u0445 \u043a\u0430\u043d\u0456\u0441\u0442\u0440\u0430\u0445."
+        },
+        {
+          "reason": "boilerplate_sentence",
+          "text": "\u042f\u043a\u0449\u043e \u0432\u0438 \u0448\u0443\u043a\u0430\u0454\u0442\u0435 \u043a\u0440\u0430\u0449\u0443 \u043c\u043e\u0442\u043e\u0440\u043d\u0443 \u043e\u043b\u0438\u0432\u0443 \u0437\u0430 \u0440\u043e\u0437\u0443\u043c\u043d\u043e\u044e \u0446\u0456\u043d\u043e\u044e, \u043f\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u0434\u043e\u043f\u0443\u0441\u043a\u0438 \u0442\u0430 \u0441\u043f\u0435\u0446\u0438\u0444\u0456\u043a\u0430\u0446\u0456\u0457 \u0432\u0430\u0448\u043e\u0433\u043e \u0430\u0432\u0442\u043e \u0456 \u043e\u0431\u0435\u0440\u0456\u0442\u044c \u043d\u0435\u043e\u0431\u0445\u0456\u0434\u043d\u0435 \u043c\u0430\u0441\u0442\u0438\u043b\u043e."
+        },
+        {
+          "reason": "boilerplate_sentence",
+          "text": "Shell Helix HX7 10W-40 \u2013 \u043f\u0435\u0440\u0435\u0432\u0456\u0440\u0435\u043d\u0430 \u044f\u043a\u0456\u0441\u0442\u044c \u0434\u043b\u044f \u0441\u0442\u0430\u0431\u0456\u043b\u044c\u043d\u043e\u0457 \u0440\u043e\u0431\u043e\u0442\u0438 \u0434\u0432\u0438\u0433\u0443\u043d\u0430!"
+        }
+      ],
+      "before_html_basic_excerpt": "\u041c\u043e\u0442\u043e\u0440\u043d\u0430 \u043e\u043b\u0438\u0432\u0430 Shell Helix HX7 10W-40 \u2013 \u0443\u043d\u0456\u0432\u0435\u0440\u0441\u0430\u043b\u044c\u043d\u0438\u0439 \u0437\u0430\u0445\u0438\u0441\u0442 \u0434\u043b\u044f \u0434\u0432\u0438\u0433\u0443\u043d\u0430 Shell Helix HX7 10W-40 \u2013 \u0446\u0435 \u043c\u043e\u0442\u043e\u0440\u043d\u0430 \u043e\u043b\u0438\u0432\u0430 \u043d\u0430 \u043e\u0441\u043d\u043e\u0432\u0456 \u0441\u0438\u043d\u0442\u0435\u0442\u0438\u0447\u043d\u043e\u0457 \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0456\u0457 , \u044f\u043a\u0430 \u0437\u0430\u0431\u0435\u0437\u043f\u0435\u0447\u0443\u0454 \u0435\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u0438\u0439 \u0437\u0430\u0445\u0438\u0441\u0442 \u0432\u0456\u0434 \u0437\u043d\u043e\u0448\u0435\u043d\u043d\u044f, \u0437\u043c\u0435\u043d\u0448\u0435\u043d\u0435 \u0442\u0435\u0440\u0442\u044f \u0442\u0430 \u0447\u0438\u0441\u0442\u043e\u0442\u0443 \u0434\u0432\u0438\u0433\u0443\u043d\u0430 . \u0412\u043e\u043d\u0430 \u043f\u0456\u0434\u0445\u043e\u0434\u0438\u0442\u044c \u0434\u043b\u044f \u0431\u0435\u043d\u0437\u0438\u043d\u043e\u0432\u0438\u0445, \u0434\u0438\u0437\u0435\u043b\u044c\u043d\u0438\u0445 (\u0431\u0435\u0437 DPF) \u0442\u0430 \u0433\u0430\u0437\u043e\u0432\u0438\u0445 \u0434\u0432\u0438\u0433\u0443\u043d\u0456\u0432 , \u0430 \u0442\u0430\u043a\u043e\u0436 \u043c\u043e\u0442\u043e\u0440\u0456\u0432, \u0449\u043e \u043f\u0440\u0430\u0446\u044e\u044e\u0442\u044c \u043d\u0430 \u0431\u0456\u043e\u0434\u0438\u0437\u0435\u043b\u0456 \u0430\u0431\u043e \u0441\u0443\u043c\u0456\u0448\u0456 \u0431\u0435\u043d\u0437\u0438\u043d\u0443 \u0437 \u0435\u0442\u0430\u043d\u043e\u043b\u043e\u043c . \ud83d\udd39 \u041e\u0441\u043d\u043e\u0432\u043d\u0456 \u0445\u0430\u0440\u0430\u043a\u0442\u0435\u0440\u0438\u0441\u0442\u0438\u043a\u0438: \u2705 API SP \u2013 \u043d\u043e\u0432\u0456\u0442\u043d\u0456\u0439 \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442, \u0449\u043e \u0437\u0430\u0431\u0435\u0437\u043f\u0435\u0447\u0443\u0454 \u0437\u0430\u0445\u0438\u0441\u0442 \u0432\u0456\u0434 \u043f\u0435\u0440\u0435\u0434\u0447\u0430\u0441\u043d\u043e\u0433\u043e \u0437\u0430\u043f\u0430\u043b\u044e\u0432\u0430\u043d\u043d\u044f LSPI, \u043f\u043e\u043a\u0440\u0430\u0449\u0435\u043d\u0443",
+      "after_clean_v1_excerpt": "\u041c\u043e\u0442\u043e\u0440\u043d\u0430 \u043e\u043b\u0438\u0432\u0430 Shell Helix HX7 10W-40 \u2013 \u0443\u043d\u0456\u0432\u0435\u0440\u0441\u0430\u043b\u044c\u043d\u0438\u0439 \u0437\u0430\u0445\u0438\u0441\u0442 \u0434\u043b\u044f \u0434\u0432\u0438\u0433\u0443\u043d\u0430\nShell Helix HX7 10W-40 \u2013 \u0446\u0435 \u043c\u043e\u0442\u043e\u0440\u043d\u0430 \u043e\u043b\u0438\u0432\u0430 \u043d\u0430 \u043e\u0441\u043d\u043e\u0432\u0456 \u0441\u0438\u043d\u0442\u0435\u0442\u0438\u0447\u043d\u043e\u0457 \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0456\u0457, \u044f\u043a\u0430 \u0437\u0430\u0431\u0435\u0437\u043f\u0435\u0447\u0443\u0454 \u0435\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u0438\u0439 \u0437\u0430\u0445\u0438\u0441\u0442 \u0432\u0456\u0434 \u0437\u043d\u043e\u0448\u0435\u043d\u043d\u044f, \u0437\u043c\u0435\u043d\u0448\u0435\u043d\u0435 \u0442\u0435\u0440\u0442\u044f \u0442\u0430 \u0447\u0438\u0441\u0442\u043e\u0442\u0443 \u0434\u0432\u0438\u0433\u0443\u043d\u0430. \u0412\u043e\u043d\u0430 \u043f\u0456\u0434\u0445\u043e\u0434\u0438\u0442\u044c \u0434\u043b\u044f \u0431\u0435\u043d\u0437\u0438\u043d\u043e\u0432\u0438\u0445, \u0434\u0438\u0437\u0435\u043b\u044c\u043d\u0438\u0445 (\u0431\u0435\u0437 DPF) \u0442\u0430 \u0433\u0430\u0437\u043e\u0432\u0438\u0445 \u0434\u0432\u0438\u0433\u0443\u043d\u0456\u0432, \u0430 \u0442\u0430\u043a\u043e\u0436 \u043c\u043e\u0442\u043e\u0440\u0456\u0432, \u0449\u043e \u043f\u0440\u0430\u0446\u044e\u044e\u0442\u044c \u043d\u0430 \u0431\u0456\u043e\u0434\u0438\u0437\u0435\u043b\u0456 \u0430\u0431\u043e \u0441\u0443\u043c\u0456\u0448\u0456 \u0431\u0435\u043d\u0437\u0438\u043d\u0443 \u0437 \u0435\u0442\u0430\u043d\u043e\u043b\u043e\u043c.\n\u041e\u0441\u043d\u043e\u0432\u043d\u0456 \u0445\u0430\u0440\u0430\u043a\u0442\u0435\u0440\u0438\u0441\u0442\u0438\u043a\u0438:\nAPI SP \u2013 \u043d\u043e\u0432\u0456\u0442\u043d\u0456\u0439 \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442, \u0449\u043e \u0437\u0430\u0431\u0435\u0437\u043f\u0435\u0447\u0443\u0454 \u0437\u0430\u0445\u0438\u0441\u0442 \u0432\u0456\u0434 \u043f\u0435\u0440\u0435\u0434\u0447\u0430\u0441\u043d\u043e\u0433\u043e \u0437\u0430\u043f\u0430\u043b\u044e\u0432\u0430\u043d\u043d\u044f LSPI, \u043f\u043e\u043a\u0440\u0430\u0449\u0435\u043d\u0443 \u0441\u0442\u0456\u0439\u043a\u0456\u0441"
+    },
+    {
+      "product_id": "\u0422\u041e\u0412-\u0423510621",
+      "raw_name": "Winter Screenwash (-55\u00b0C), 1\u043b",
+      "raw_chars": 8911,
+      "html_basic_chars": 1962,
+      "clean_v1_chars": 1944,
+      "counts": {
+        "tags_stripped": 130,
+        "tables_parsed": 1,
+        "emojis_removed": 16,
+        "boilerplate_blocks_removed": 1,
+        "boilerplate_sentences_removed": 0,
+        "duplicate_blocks_removed": 0,
+        "duplicate_sentences_removed": 0
+      },
+      "removed_items": [
+        {
+          "reason": "cta_heading",
+          "text": "\u0427\u043e\u043c\u0443 \u0432\u0430\u0440\u0442\u043e \u043a\u0443\u043f\u0438\u0442\u0438 Shell Winter Screenwash Concentrate -55\u00b0C?"
+        }
+      ],
+      "before_html_basic_excerpt": "\u041e\u043c\u0438\u0432\u0430\u0447 \u0441\u043a\u043b\u0430 Shell Winter Screenwash Concentrate -55\u00b0C \u2013 \u0435\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u0435 \u0437\u0438\u043c\u043e\u0432\u0435 \u043e\u0447\u0438\u0449\u0435\u043d\u043d\u044f Shell Winter Screenwash Concentrate -55\u00b0C \u2013 \u0446\u0435 \u043a\u043e\u043d\u0446\u0435\u043d\u0442\u0440\u043e\u0432\u0430\u043d\u0438\u0439 \u0437\u0438\u043c\u043e\u0432\u0438\u0439 \u043e\u043c\u0438\u0432\u0430\u0447 \u0441\u043a\u043b\u0430 , \u0441\u0442\u0432\u043e\u0440\u0435\u043d\u0438\u0439 \u0434\u043b\u044f \u0435\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u043e\u0433\u043e \u043e\u0447\u0438\u0449\u0435\u043d\u043d\u044f \u043b\u043e\u0431\u043e\u0432\u043e\u0433\u043e \u0441\u043a\u043b\u0430 \u0442\u0430 \u0444\u0430\u0440 \u0430\u0432\u0442\u043e\u043c\u043e\u0431\u0456\u043b\u044f \u0443 \u0445\u043e\u043b\u043e\u0434\u043d\u0443 \u043f\u043e\u0440\u0443 \u0440\u043e\u043a\u0443. \u0417\u0430\u0432\u0434\u044f\u043a\u0438 \u0432\u0438\u0441\u043e\u043a\u043e\u044f\u043a\u0456\u0441\u043d\u0438\u043c \u043e\u0447\u0438\u0449\u0443\u0432\u0430\u043b\u044c\u043d\u0438\u043c \u043a\u043e\u043c\u043f\u043e\u043d\u0435\u043d\u0442\u0430\u043c, \u0432\u0456\u043d \u0448\u0432\u0438\u0434\u043a\u043e \u0432\u0438\u0434\u0430\u043b\u044f\u0454 \u0434\u043e\u0440\u043e\u0436\u043d\u0456\u0439 \u0431\u0440\u0443\u0434, \u043c\u0430\u0441\u043b\u044f\u043d\u0438\u0441\u0442\u0443 \u043f\u043b\u0456\u0432\u043a\u0443, \u0441\u0456\u043b\u044c \u0456 \u0441\u043b\u0456\u0434\u0438 \u0440\u0435\u0430\u0433\u0435\u043d\u0442\u0456\u0432 , \u0437\u0430\u043f\u043e\u0431\u0456\u0433\u0430\u044e\u0447\u0438 \u0437\u0430\u043c\u0435\u0440\u0437\u0430\u043d\u043d\u044e \u0444\u043e\u0440\u0441\u0443\u043d\u043e\u043a \u0442\u0430 \u0431\u0430\u0447\u043a\u0430 \u043e\u043c\u0438\u0432\u0430\u0447\u0430. \ud83d\udd39 \u041e\u0441\u043d\u043e\u0432\u043d\u0456 \u043f\u0435\u0440\u0435\u0432\u0430\u0433\u0438: \u2705 \u041c\u0438\u0442\u0442\u0454\u0432\u0435 \u043e\u0447\u0438\u0449\u0435\u043d\u043d\u044f \u0432\u0456\u0434 \u0441\u043d\u0456\u0433\u0443, \u043b\u044c\u043e\u0434\u0443 \u0442\u0430 \u0434\u043e\u0440\u043e\u0436\u043d\u0456\u0445 \u0440\u0435",
+      "after_clean_v1_excerpt": "\u041e\u043c\u0438\u0432\u0430\u0447 \u0441\u043a\u043b\u0430 Shell Winter Screenwash Concentrate -55\u00b0C \u2013 \u0435\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u0435 \u0437\u0438\u043c\u043e\u0432\u0435 \u043e\u0447\u0438\u0449\u0435\u043d\u043d\u044f\nShell Winter Screenwash Concentrate -55\u00b0C \u2013 \u0446\u0435 \u043a\u043e\u043d\u0446\u0435\u043d\u0442\u0440\u043e\u0432\u0430\u043d\u0438\u0439 \u0437\u0438\u043c\u043e\u0432\u0438\u0439 \u043e\u043c\u0438\u0432\u0430\u0447 \u0441\u043a\u043b\u0430, \u0441\u0442\u0432\u043e\u0440\u0435\u043d\u0438\u0439 \u0434\u043b\u044f \u0435\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u043e\u0433\u043e \u043e\u0447\u0438\u0449\u0435\u043d\u043d\u044f \u043b\u043e\u0431\u043e\u0432\u043e\u0433\u043e \u0441\u043a\u043b\u0430 \u0442\u0430 \u0444\u0430\u0440 \u0430\u0432\u0442\u043e\u043c\u043e\u0431\u0456\u043b\u044f \u0443 \u0445\u043e\u043b\u043e\u0434\u043d\u0443 \u043f\u043e\u0440\u0443 \u0440\u043e\u043a\u0443. \u0417\u0430\u0432\u0434\u044f\u043a\u0438 \u0432\u0438\u0441\u043e\u043a\u043e\u044f\u043a\u0456\u0441\u043d\u0438\u043c \u043e\u0447\u0438\u0449\u0443\u0432\u0430\u043b\u044c\u043d\u0438\u043c \u043a\u043e\u043c\u043f\u043e\u043d\u0435\u043d\u0442\u0430\u043c, \u0432\u0456\u043d \u0448\u0432\u0438\u0434\u043a\u043e \u0432\u0438\u0434\u0430\u043b\u044f\u0454 \u0434\u043e\u0440\u043e\u0436\u043d\u0456\u0439 \u0431\u0440\u0443\u0434, \u043c\u0430\u0441\u043b\u044f\u043d\u0438\u0441\u0442\u0443 \u043f\u043b\u0456\u0432\u043a\u0443, \u0441\u0456\u043b\u044c \u0456 \u0441\u043b\u0456\u0434\u0438 \u0440\u0435\u0430\u0433\u0435\u043d\u0442\u0456\u0432, \u0437\u0430\u043f\u043e\u0431\u0456\u0433\u0430\u044e\u0447\u0438 \u0437\u0430\u043c\u0435\u0440\u0437\u0430\u043d\u043d\u044e \u0444\u043e\u0440\u0441\u0443\u043d\u043e\u043a \u0442\u0430 \u0431\u0430\u0447\u043a\u0430 \u043e\u043c\u0438\u0432\u0430\u0447\u0430.\n\u041e\u0441\u043d\u043e\u0432\u043d\u0456 \u043f\u0435\u0440\u0435\u0432\u0430\u0433\u0438:\n\u041c\u0438\u0442\u0442\u0454\u0432\u0435 \u043e\u0447\u0438\u0449\u0435\u043d\u043d\u044f \u0432\u0456\u0434 \u0441\u043d\u0456\u0433\u0443, \u043b\u044c\u043e\u0434\u0443 \u0442\u0430 \u0434\u043e\u0440\u043e\u0436\u043d\u0456\u0445 \u0440\u0435\u0430\u0433\u0435\u043d\u0442\u0456"
+    },
+    {
+      "product_id": "\u0422\u041e\u0412-\u0423510357",
+      "raw_name": "Premium Ant. LL RTU 774DF, 20\u043b",
+      "raw_chars": 8636,
+      "html_basic_chars": 4111,
+      "clean_v1_chars": 3886,
+      "counts": {
+        "tags_stripped": 155,
+        "tables_parsed": 0,
+        "emojis_removed": 9,
+        "boilerplate_blocks_removed": 1,
+        "boilerplate_sentences_removed": 1,
+        "duplicate_blocks_removed": 1,
+        "duplicate_sentences_removed": 0
+      },
+      "removed_items": [
+        {
+          "reason": "cta_heading",
+          "text": "\u0427\u043e\u043c\u0443 \u0432\u0430\u0440\u0442\u043e \u043a\u0443\u043f\u0438\u0442\u0438 Shell Premium Antifreeze Longlife Ready to use 774 D-F?"
+        },
+        {
+          "reason": "boilerplate_sentence",
+          "text": "Shell Premium Antifreeze Longlife Ready to use 774 D-F \u2013 \u043d\u0430\u0434\u0456\u0439\u043d\u0438\u0439 \u0432\u0438\u0431\u0456\u0440 \u0434\u043b\u044f \u0435\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u043e\u0457 \u0440\u043e\u0431\u043e\u0442\u0438 \u0441\u0438\u0441\u0442\u0435\u043c\u0438 \u043e\u0445\u043e\u043b\u043e\u0434\u0436\u0435\u043d\u043d\u044f!"
+        },
+        {
+          "reason": "duplicate_block",
+          "text": "Ford WSS-M97B44-D"
+        }
+      ],
+      "before_html_basic_excerpt": "\u0410\u043d\u0442\u0438\u0444\u0440\u0438\u0437 Shell Premium Antifreeze Longlife Ready to use 774 D-F PBT78F \u2013 \u0433\u043e\u0442\u043e\u0432\u0438\u0439 \u0434\u043e \u0432\u0438\u043a\u043e\u0440\u0438\u0441\u0442\u0430\u043d\u043d\u044f Shell Premium Antifreeze Longlife Ready to use 774 D-F \u2013 \u0446\u0435 \u0433\u043e\u0442\u043e\u0432\u0430 \u0434\u043e \u0432\u0438\u043a\u043e\u0440\u0438\u0441\u0442\u0430\u043d\u043d\u044f \u043e\u0445\u043e\u043b\u043e\u0434\u0436\u0443\u044e\u0447\u0430 \u0440\u0456\u0434\u0438\u043d\u0430, \u0441\u0442\u0432\u043e\u0440\u0435\u043d\u0430 \u043d\u0430 \u043e\u0441\u043d\u043e\u0432\u0456 \u043c\u043e\u043d\u043e\u0435\u0442\u0438\u043b\u0435\u043d\u0433\u043b\u0456\u043a\u043e\u043b\u044e \u0431\u0435\u0437 \u043d\u0456\u0442\u0440\u0438\u0442\u0456\u0432, \u0430\u043c\u0456\u043d\u0456\u0432, \u0444\u043e\u0441\u0444\u0430\u0442\u0456\u0432, \u0441\u0438\u043b\u0456\u043a\u0430\u0442\u0456\u0432 \u0442\u0430 \u0431\u043e\u0440\u0430\u0442\u0456\u0432 (NAP-free). \u0412\u043e\u043d\u0430 \u0437\u0430\u0431\u0435\u0437\u043f\u0435\u0447\u0443\u0454 \u0432\u0456\u0434\u043c\u0456\u043d\u043d\u0438\u0439 \u0437\u0430\u0445\u0438\u0441\u0442 \u0432\u0456\u0434 \u043a\u043e\u0440\u043e\u0437\u0456\u0457, \u043f\u0435\u0440\u0435\u0433\u0440\u0456\u0432\u0443 \u0442\u0430 \u0437\u0430\u043c\u0435\u0440\u0437\u0430\u043d\u043d\u044f, \u043f\u043e\u0434\u043e\u0432\u0436\u0443\u044e\u0447\u0438 \u0442\u0435\u0440\u043c\u0456\u043d \u0441\u043b\u0443\u0436\u0431\u0438 \u0441\u0438\u0441\u0442\u0435\u043c\u0438 \u043e\u0445\u043e\u043b\u043e\u0434\u0436\u0435\u043d\u043d\u044f. \u041e\u0441\u043d\u043e\u0432\u043d\u0456 \u0445\u0430\u0440\u0430\u043a\u0442\u0435\u0440\u0438\u0441\u0442\u0438\u043a\u0438: \u2705 \u041e\u0440\u0433\u0430\u043d\u0456\u0447\u043d\u0430 \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0456\u044f \u0456\u043d\u0433\u0456\u0431\u0456\u0442\u043e\u0440\u0456\u0432 \u043a\u043e\u0440\u043e\u0437\u0456\u0457 (OAT) \u2013 \u0437\u0430\u0445\u0438\u0449\u0430",
+      "after_clean_v1_excerpt": "\u0410\u043d\u0442\u0438\u0444\u0440\u0438\u0437 Shell Premium Antifreeze Longlife Ready to use 774 D-F PBT78F \u2013 \u0433\u043e\u0442\u043e\u0432\u0438\u0439 \u0434\u043e \u0432\u0438\u043a\u043e\u0440\u0438\u0441\u0442\u0430\u043d\u043d\u044f\nShell Premium Antifreeze Longlife Ready to use 774 D-F \u2013 \u0446\u0435 \u0433\u043e\u0442\u043e\u0432\u0430 \u0434\u043e \u0432\u0438\u043a\u043e\u0440\u0438\u0441\u0442\u0430\u043d\u043d\u044f \u043e\u0445\u043e\u043b\u043e\u0434\u0436\u0443\u044e\u0447\u0430 \u0440\u0456\u0434\u0438\u043d\u0430, \u0441\u0442\u0432\u043e\u0440\u0435\u043d\u0430 \u043d\u0430 \u043e\u0441\u043d\u043e\u0432\u0456 \u043c\u043e\u043d\u043e\u0435\u0442\u0438\u043b\u0435\u043d\u0433\u043b\u0456\u043a\u043e\u043b\u044e \u0431\u0435\u0437 \u043d\u0456\u0442\u0440\u0438\u0442\u0456\u0432, \u0430\u043c\u0456\u043d\u0456\u0432, \u0444\u043e\u0441\u0444\u0430\u0442\u0456\u0432, \u0441\u0438\u043b\u0456\u043a\u0430\u0442\u0456\u0432 \u0442\u0430 \u0431\u043e\u0440\u0430\u0442\u0456\u0432 (NAP-free). \u0412\u043e\u043d\u0430 \u0437\u0430\u0431\u0435\u0437\u043f\u0435\u0447\u0443\u0454 \u0432\u0456\u0434\u043c\u0456\u043d\u043d\u0438\u0439 \u0437\u0430\u0445\u0438\u0441\u0442 \u0432\u0456\u0434 \u043a\u043e\u0440\u043e\u0437\u0456\u0457, \u043f\u0435\u0440\u0435\u0433\u0440\u0456\u0432\u0443 \u0442\u0430 \u0437\u0430\u043c\u0435\u0440\u0437\u0430\u043d\u043d\u044f, \u043f\u043e\u0434\u043e\u0432\u0436\u0443\u044e\u0447\u0438 \u0442\u0435\u0440\u043c\u0456\u043d \u0441\u043b\u0443\u0436\u0431\u0438 \u0441\u0438\u0441\u0442\u0435\u043c\u0438 \u043e\u0445\u043e\u043b\u043e\u0434\u0436\u0435\u043d\u043d\u044f.\n\u041e\u0441\u043d\u043e\u0432\u043d\u0456 \u0445\u0430\u0440\u0430\u043a\u0442\u0435\u0440\u0438\u0441\u0442\u0438\u043a\u0438:\n\u041e\u0440\u0433\u0430\u043d\u0456\u0447\u043d\u0430 \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0456\u044f \u0456\u043d\u0433\u0456\u0431\u0456\u0442\u043e\u0440\u0456\u0432 \u043a\u043e\u0440\u043e\u0437\u0456\u0457 (OAT) \u2013 \u0437\u0430\u0445\u0438\u0449\u0430\u0454 "
+    },
+    {
+      "product_id": "\u0422\u041e\u0412-\u0423503715",
+      "raw_name": "Helix HX8 5W-30, 1\u043b",
+      "raw_chars": 7192,
+      "html_basic_chars": 1836,
+      "clean_v1_chars": 1679,
+      "counts": {
+        "tags_stripped": 91,
+        "tables_parsed": 0,
+        "emojis_removed": 10,
+        "boilerplate_blocks_removed": 1,
+        "boilerplate_sentences_removed": 1,
+        "duplicate_blocks_removed": 0,
+        "duplicate_sentences_removed": 0
+      },
+      "removed_items": [
+        {
+          "reason": "cta_heading",
+          "text": "\u0427\u043e\u043c\u0443 \u0432\u0430\u0440\u0442\u043e \u043a\u0443\u043f\u0438\u0442\u0438 Shell Helix HX8 5W-30?"
+        },
+        {
+          "reason": "boilerplate_sentence",
+          "text": "Shell Helix HX8 5W-30 \u2013 \u0432\u0430\u0448 \u0432\u0438\u0431\u0456\u0440 \u0434\u043b\u044f \u043d\u0430\u0434\u0456\u0439\u043d\u043e\u0433\u043e \u0437\u0430\u0445\u0438\u0441\u0442\u0443 \u0442\u0430 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0456 \u0434\u0432\u0438\u0433\u0443\u043d\u0430!"
+        }
+      ],
+      "before_html_basic_excerpt": "\u041c\u043e\u0442\u043e\u0440\u043d\u0430 \u043e\u043b\u0438\u0432\u0430 Shell Helix HX8 5W-30 \u2013 \u043e\u043f\u0442\u0438\u043c\u0430\u043b\u044c\u043d\u0438\u0439 \u0437\u0430\u0445\u0438\u0441\u0442 \u0434\u043b\u044f \u0431\u0443\u0434\u044c-\u044f\u043a\u0438\u0445 \u0443\u043c\u043e\u0432 Shell Helix HX8 5W-30 \u2013 \u0446\u0435 \u043f\u043e\u0432\u043d\u0456\u0441\u0442\u044e \u0441\u0438\u043d\u0442\u0435\u0442\u0438\u0447\u043d\u0430 \u043c\u043e\u0442\u043e\u0440\u043d\u0430 \u043e\u043b\u0438\u0432\u0430 \u0434\u043b\u044f \u0431\u0435\u043d\u0437\u0438\u043d\u043e\u0432\u0438\u0445, \u0434\u0438\u0437\u0435\u043b\u044c\u043d\u0438\u0445, \u0442\u0430 \u0433\u0430\u0437\u043e\u0432\u0438\u0445 \u0430\u0432\u0442\u043e, \u044f\u043a\u0430 \u043f\u043e\u0454\u0434\u043d\u0443\u0454 \u043f\u0435\u0440\u0435\u0434\u043e\u0432\u0456 \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0456\u0457 \u043e\u0447\u0438\u0449\u0435\u043d\u043d\u044f \u0442\u0430 \u0437\u0430\u0445\u0438\u0441\u0442\u0443 \u0434\u0432\u0438\u0433\u0443\u043d\u0430 . \u0417\u0430\u0432\u0434\u044f\u043a\u0438 \u0432\u0438\u0441\u043e\u043a\u0456\u0439 \u0441\u0442\u0456\u0439\u043a\u043e\u0441\u0442\u0456 \u0434\u043e \u043e\u043a\u0438\u0441\u043b\u0435\u043d\u043d\u044f \u0432\u043e\u043d\u0430 \u0434\u043e\u043f\u043e\u043c\u0430\u0433\u0430\u0454 \u0437\u0431\u0435\u0440\u0456\u0433\u0430\u0442\u0438 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u0438\u0432\u043d\u0456\u0441\u0442\u044c \u0434\u0432\u0438\u0433\u0443\u043d\u0430 \u043f\u0440\u043e\u0442\u044f\u0433\u043e\u043c \u0443\u0441\u044c\u043e\u0433\u043e \u0456\u043d\u0442\u0435\u0440\u0432\u0430\u043b\u0443 \u0437\u0430\u043c\u0456\u043d\u0438, \u0437\u043c\u0435\u043d\u0448\u0443\u044e\u0447\u0438 \u0443\u0442\u0432\u043e\u0440\u0435\u043d\u043d\u044f \u0432\u0456\u0434\u043a\u043b\u0430\u0434\u0435\u043d\u044c \u0456 \u0437\u0430\u043f\u043e\u0431\u0456\u0433\u0430\u044e\u0447\u0438 \u043f\u0435\u0440\u0435\u0434\u0447\u0430\u0441\u043d\u043e\u043c\u0443 \u0437\u043d\u043e\u0448\u0435\u043d\u043d\u044e. \ud83d\udd39 \u041e\u0441\u043d\u043e\u0432\u043d\u0456 \u0445\u0430\u0440\u0430\u043a\u0442\u0435\u0440\u0438\u0441\u0442\u0438\u043a\u0438: \u2705 ACEA A3/B3, A3/B4 \u2013 \u0456\u0434\u0435\u0430\u043b\u044c\u043d\u043e \u043f\u0456\u0434\u0445\u043e\u0434\u0438\u0442\u044c \u0434",
+      "after_clean_v1_excerpt": "\u041c\u043e\u0442\u043e\u0440\u043d\u0430 \u043e\u043b\u0438\u0432\u0430 Shell Helix HX8 5W-30 \u2013 \u043e\u043f\u0442\u0438\u043c\u0430\u043b\u044c\u043d\u0438\u0439 \u0437\u0430\u0445\u0438\u0441\u0442 \u0434\u043b\u044f \u0431\u0443\u0434\u044c-\u044f\u043a\u0438\u0445 \u0443\u043c\u043e\u0432\nShell Helix HX8 5W-30 \u2013 \u0446\u0435 \u043f\u043e\u0432\u043d\u0456\u0441\u0442\u044e \u0441\u0438\u043d\u0442\u0435\u0442\u0438\u0447\u043d\u0430 \u043c\u043e\u0442\u043e\u0440\u043d\u0430 \u043e\u043b\u0438\u0432\u0430 \u0434\u043b\u044f \u0431\u0435\u043d\u0437\u0438\u043d\u043e\u0432\u0438\u0445, \u0434\u0438\u0437\u0435\u043b\u044c\u043d\u0438\u0445, \u0442\u0430 \u0433\u0430\u0437\u043e\u0432\u0438\u0445 \u0430\u0432\u0442\u043e, \u044f\u043a\u0430 \u043f\u043e\u0454\u0434\u043d\u0443\u0454 \u043f\u0435\u0440\u0435\u0434\u043e\u0432\u0456 \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0456\u0457 \u043e\u0447\u0438\u0449\u0435\u043d\u043d\u044f \u0442\u0430 \u0437\u0430\u0445\u0438\u0441\u0442\u0443 \u0434\u0432\u0438\u0433\u0443\u043d\u0430. \u0417\u0430\u0432\u0434\u044f\u043a\u0438 \u0432\u0438\u0441\u043e\u043a\u0456\u0439 \u0441\u0442\u0456\u0439\u043a\u043e\u0441\u0442\u0456 \u0434\u043e \u043e\u043a\u0438\u0441\u043b\u0435\u043d\u043d\u044f \u0432\u043e\u043d\u0430 \u0434\u043e\u043f\u043e\u043c\u0430\u0433\u0430\u0454 \u0437\u0431\u0435\u0440\u0456\u0433\u0430\u0442\u0438 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u0438\u0432\u043d\u0456\u0441\u0442\u044c \u0434\u0432\u0438\u0433\u0443\u043d\u0430 \u043f\u0440\u043e\u0442\u044f\u0433\u043e\u043c \u0443\u0441\u044c\u043e\u0433\u043e \u0456\u043d\u0442\u0435\u0440\u0432\u0430\u043b\u0443 \u0437\u0430\u043c\u0456\u043d\u0438, \u0437\u043c\u0435\u043d\u0448\u0443\u044e\u0447\u0438 \u0443\u0442\u0432\u043e\u0440\u0435\u043d\u043d\u044f \u0432\u0456\u0434\u043a\u043b\u0430\u0434\u0435\u043d\u044c \u0456 \u0437\u0430\u043f\u043e\u0431\u0456\u0433\u0430\u044e\u0447\u0438 \u043f\u0435\u0440\u0435\u0434\u0447\u0430\u0441\u043d\u043e\u043c\u0443 \u0437\u043d\u043e\u0448\u0435\u043d\u043d\u044e.\n\u041e\u0441\u043d\u043e\u0432\u043d\u0456 \u0445\u0430\u0440\u0430\u043a\u0442\u0435\u0440\u0438\u0441\u0442\u0438\u043a\u0438:\nACEA A3/B3, A3/B4 \u2013 \u0456\u0434\u0435\u0430\u043b\u044c\u043d\u043e \u043f\u0456\u0434\u0445\u043e\u0434\u0438\u0442\u044c \u0434\u043b\u044f \u0431\u0435"
+    }
+  ],
+  "hashes_preserved": {
+    "audit_artifacts_count": 7,
+    "audit_artifacts_sha256": {
+      "checkpoints/retriever-discovery-reference/best_retriever.pt": "2dcfbc7eab6795ded6f25a6cb0ffe1f9e606f13c9885d4ee020b724d0a2b5ab7",
+      "checkpoints/retriever/best_retriever.pt": "863cb700afc7e8d4284b20d34f5f4f5345538146557375f1141cf9d5d77fae79",
+      "checkpoints/ranker/best_ranker.pt": "1701becf092e38e71a06152b124a832cabfa58172d6d497f305fe499757b0b17",
+      "checkpoints/ranker/best_discovery_ranker.pt": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+      "checkpoints/ranker/best_ndcg_ranker.pt": "2ff3e43dcd531d6604c536d93be1bbfce140f118e8f48fad88dbe99e1616701e",
+      "data/interim/ranker_train_slates_v3_repeat_0.5_rolling_v1.pt": "aaf0153b53d7dac35459562cbb87226fb0af6a7e5cbd103e198a0e108864c663",
+      "data/interim/ranker_val_slates_v3_repeat_0.5_rolling_v1.pt": "43aa986ed5c0ead13b1f4f3b321e28444fd846074b6a1192bd00b712789cad27"
+    },
+    "reference_artifacts_sha256": {
+      "checkpoints/stage1-mlp-reference/no-brand-v1/manifest.json": "4e223d3de158a79a1dfd08e65b372d699652239edb0d9462250a987e92e0be86",
+      "checkpoints/stage1-mlp-reference/no-brand-v1/best_retriever.pt": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+      "checkpoints/embedding-ablation-v1/runs/stage1-E_no_brand-seed42/best.pt": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+      "checkpoints/stage1-mlp-reference/no-brand-v1/best_selector.pt": "d083a5562d968e8e606f69d86e142e370567fa4f506f650e9e2234c53d66dad5",
+      "checkpoints/embedding-ablation-v1/runs/selector-E_no_brand-uv_47-seed42/best.pt": "d083a5562d968e8e606f69d86e142e370567fa4f506f650e9e2234c53d66dad5"
+    }
+  },
+  "baseline": {
+    "name": "no_brand_v1",
+    "reused_reference": true,
+    "reference_json": "experiments/embedding_ablation_v1/reference.json",
+    "reference_dir": "checkpoints/stage1-mlp-reference/no-brand-v1",
+    "hashes_verified": {
+      "audit_artifacts_count": 7,
+      "audit_artifacts_sha256": {
+        "checkpoints/retriever-discovery-reference/best_retriever.pt": "2dcfbc7eab6795ded6f25a6cb0ffe1f9e606f13c9885d4ee020b724d0a2b5ab7",
+        "checkpoints/retriever/best_retriever.pt": "863cb700afc7e8d4284b20d34f5f4f5345538146557375f1141cf9d5d77fae79",
+        "checkpoints/ranker/best_ranker.pt": "1701becf092e38e71a06152b124a832cabfa58172d6d497f305fe499757b0b17",
+        "checkpoints/ranker/best_discovery_ranker.pt": "6314f0500f002d26c9072bf199509a41593bf6d0c948123ad01cc7e8e2337c4e",
+        "checkpoints/ranker/best_ndcg_ranker.pt": "2ff3e43dcd531d6604c536d93be1bbfce140f118e8f48fad88dbe99e1616701e",
+        "data/interim/ranker_train_slates_v3_repeat_0.5_rolling_v1.pt": "aaf0153b53d7dac35459562cbb87226fb0af6a7e5cbd103e198a0e108864c663",
+        "data/interim/ranker_val_slates_v3_repeat_0.5_rolling_v1.pt": "43aa986ed5c0ead13b1f4f3b321e28444fd846074b6a1192bd00b712789cad27"
+      },
+      "reference_artifacts_sha256": {
+        "checkpoints/stage1-mlp-reference/no-brand-v1/manifest.json": "4e223d3de158a79a1dfd08e65b372d699652239edb0d9462250a987e92e0be86",
+        "checkpoints/stage1-mlp-reference/no-brand-v1/best_retriever.pt": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+        "checkpoints/embedding-ablation-v1/runs/stage1-E_no_brand-seed42/best.pt": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+        "checkpoints/stage1-mlp-reference/no-brand-v1/best_selector.pt": "d083a5562d968e8e606f69d86e142e370567fa4f506f650e9e2234c53d66dad5",
+        "checkpoints/embedding-ablation-v1/runs/selector-E_no_brand-uv_47-seed42/best.pt": "d083a5562d968e8e606f69d86e142e370567fa4f506f650e9e2234c53d66dad5"
+      }
+    },
+    "stage1": {
+      "selected_epoch": 16,
+      "parameters": 851213,
+      "selected_checkpoint": "checkpoints/stage1-mlp-reference/no-brand-v1/best_retriever.pt",
+      "sha256": "2ad87d114731015d9a4ddec992d5425b776774a962b6f365da6da6b87182c981",
+      "metrics": {
+        "val_recall@10": 0.36716402787397184,
+        "val_ndcg@10": 0.22231928329287842,
+        "new_hits@10": 307,
+        "new_recall@10": 0.16532040926225094,
+        "new_hits@25": 726,
+        "new_hits@50": 1016,
+        "new_targets": 1857,
+        "stage1_new_recall@25": 0.39095315024232635,
+        "stage1_new_recall@50": 0.5471190091545504
+      },
+      "upstream_dot_fullpool": {
+        "new_hits@25": 726,
+        "new_recall@25": 0.39095315024232635,
+        "new_hits@50": 1016,
+        "new_recall@50": 0.5471190091545504,
+        "new_hits@100": 1322,
+        "new_recall@100": 0.711900915455035,
+        "recall@10": 0.36716402787397184,
+        "ndcg@10": 0.22231928329287842
+      }
+    },
+    "selector_uv47": {
+      "selected_epoch": 1,
+      "parameters": 47617,
+      "selected_checkpoint": "checkpoints/stage1-mlp-reference/no-brand-v1/best_selector.pt",
+      "sha256": "d083a5562d968e8e606f69d86e142e370567fa4f506f650e9e2234c53d66dad5",
+      "saved_reference_metrics": {
+        "new_hits@10": 214,
+        "new_recall@10": 0.11523963381798599,
+        "new_hits@25": 741,
+        "new_recall@25": 0.3990306946688207,
+        "new_hits@50": 1037,
+        "new_recall@50": 0.5584275713516424,
+        "new_hits@100": 1324,
+        "new_recall@100": 0.7129779213785676,
+        "new_targets": 1857,
+        "recall@10": 0.7565593823119603,
+        "ndcg@10": 0.5782861484383223
+      },
+      "replayed_metrics": {
+        "recall@5": 0.6402507063493087,
+        "recall@10": 0.7565593823119603,
+        "ndcg@10": 0.5782861484383223,
+        "mrr": 0.5534454405631606,
+        "new_hits@10": 214,
+        "new_targets": 1857,
+        "new_recall@10": 0.11523963381798599,
+        "conditional_new_recall@10": 0.11823204419889503,
+        "repeat_recall@10_micro": 0.8824088371540563,
+        "repeat_recall@10_macro": 0.909575226452884,
+        "mixed_coverage_macro": 0.9946598108365191,
+        "mixed_coverage_micro": 0.9954262358894511,
+        "new_targets_in_slate": 1810,
+        "new_slate_coverage": 0.9746903607969843,
+        "new_reachable_lost_at10": 1596,
+        "new_hits@25": 741,
+        "new_recall@25": 0.3990306946688207,
+        "new_hits@50": 1037,
+        "new_recall@50": 0.5584275713516424,
+        "new_hits@100": 1324,
+        "new_recall@100": 0.7129779213785676,
+        "history_cohorts": {
+          "cold_0": {
+            "rows": 0,
+            "recall@10": null,
+            "new_hits@10": 0,
+            "new_targets": 0
+          },
+          "light_1_8": {
+            "rows": 1116,
+            "recall@10": 0.7113372589179041,
+            "new_hits@10": 152,
+            "new_targets": 574
+          },
+          "warm_9_31": {
+            "rows": 1808,
+            "recall@10": 0.794046002854078,
+            "new_hits@10": 55,
+            "new_targets": 594
+          },
+          "truncated_32": {
+            "rows": 3267,
+            "recall@10": 0.7512615799757553,
+            "new_hits@10": 7,
+            "new_targets": 689
+          }
+        },
+        "validation_months": {
+          "2025-10": {
+            "rows": 1616,
+            "recall@10": 0.754105767719629,
+            "ndcg@10": 0.5766467911459886,
+            "new_hits@10": 61,
+            "new_targets": 533
+          },
+          "2025-11": {
+            "rows": 1314,
+            "recall@10": 0.7674157611372224,
+            "ndcg@10": 0.5843380112600196,
+            "new_hits@10": 47,
+            "new_targets": 358
+          },
+          "2025-12": {
+            "rows": 1353,
+            "recall@10": 0.7735467501426189,
+            "ndcg@10": 0.595383875654473,
+            "new_hits@10": 47,
+            "new_targets": 380
+          },
+          "2026-01": {
+            "rows": 1149,
+            "recall@10": 0.7324497738988601,
+            "ndcg@10": 0.5557747713161021,
+            "new_hits@10": 30,
+            "new_targets": 351
+          },
+          "2026-02": {
+            "rows": 759,
+            "recall@10": 0.7492046929793966,
+            "ndcg@10": 0.5748993250215633,
+            "new_hits@10": 29,
+            "new_targets": 235
+          }
+        },
+        "new_target_cohorts": {
+          "first_snapshot_family": {
+            "targets": 681,
+            "hits@10": 60
+          },
+          "known_snapshot_family": {
+            "targets": 1176,
+            "hits@10": 154
+          },
+          "unknown_snapshot_family_metadata": {
+            "targets": 0,
+            "hits@10": 0
+          },
+          "sku_rare_frozen90d": {
+            "targets": 439,
+            "hits@10": 5
+          },
+          "sku_frequent_frozen90d": {
+            "targets": 1418,
+            "hits@10": 209
+          },
+          "sparse_transition": {
+            "targets": 1254,
+            "hits@10": 83
+          },
+          "supported_transition": {
+            "targets": 603,
+            "hits@10": 131
+          },
+          "unrepresented_catalogue": {
+            "targets": 0,
+            "hits@10": 0
+          }
+        }
+      },
+      "training_seconds": null
+    },
+    "mlp_per_query_predictions": "checkpoints/description-cleaning-v1/baseline_verified/no_brand_v1_mlp_fullpool_predictions.npz",
+    "mlp_subgroup_predictions": "checkpoints/description-cleaning-v1/baseline_verified/no_brand_v1_mlp_subgroup_predictions.npz",
+    "subgroups_html_mask": {
+      "pool_policy": "full_rolling_eligible_pool_fixed",
+      "overall": {
+        "queries": 6191,
+        "recall@10": 0.7565593823119603,
+        "ndcg@10": 0.5782861484383223,
+        "new_targets": 1857,
+        "new_hits@10": 214,
+        "new_recall@10": 0.11523963381798599,
+        "new_hits@25": 741,
+        "new_recall@25": 0.3990306946688207,
+        "new_hits@50": 1037,
+        "new_recall@50": 0.5584275713516424,
+        "new_hits@100": 1324,
+        "new_recall@100": 0.7129779213785676
+      },
+      "new_target_subgroups": {
+        "with_description": {
+          "new_targets": 514,
+          "new_hits@10": 37,
+          "new_recall@10": 0.07198443579766536,
+          "new_hits@25": 172,
+          "new_recall@25": 0.3346303501945525,
+          "new_hits@50": 268,
+          "new_recall@50": 0.5214007782101168,
+          "new_hits@100": 362,
+          "new_recall@100": 0.7042801556420234
+        },
+        "without_description": {
+          "new_targets": 1343,
+          "new_hits@10": 177,
+          "new_recall@10": 0.13179448994787787,
+          "new_hits@25": 569,
+          "new_recall@25": 0.4236783320923306,
+          "new_hits@50": 769,
+          "new_recall@50": 0.5725986597170514,
+          "new_hits@100": 962,
+          "new_recall@100": 0.7163067758749069
+        }
+      },
+      "query_overall_subgroups": {
+        "queries_with_described_positive": {
+          "queries": 1833,
+          "recall@10": 0.6830597498678298,
+          "ndcg@10": 0.48476447221762337
+        },
+        "queries_without_described_positive": {
+          "queries": 4358,
+          "recall@10": 0.7874737527273094,
+          "ndcg@10": 0.6176219062429439
+        }
+      }
+    },
+    "subgroups_clean_mask": {
+      "pool_policy": "full_rolling_eligible_pool_fixed",
+      "overall": {
+        "queries": 6191,
+        "recall@10": 0.7565593823119603,
+        "ndcg@10": 0.5782861484383223,
+        "new_targets": 1857,
+        "new_hits@10": 214,
+        "new_recall@10": 0.11523963381798599,
+        "new_hits@25": 741,
+        "new_recall@25": 0.3990306946688207,
+        "new_hits@50": 1037,
+        "new_recall@50": 0.5584275713516424,
+        "new_hits@100": 1324,
+        "new_recall@100": 0.7129779213785676
+      },
+      "new_target_subgroups": {
+        "with_description": {
+          "new_targets": 514,
+          "new_hits@10": 37,
+          "new_recall@10": 0.07198443579766536,
+          "new_hits@25": 172,
+          "new_recall@25": 0.3346303501945525,
+          "new_hits@50": 268,
+          "new_recall@50": 0.5214007782101168,
+          "new_hits@100": 362,
+          "new_recall@100": 0.7042801556420234
+        },
+        "without_description": {
+          "new_targets": 1343,
+          "new_hits@10": 177,
+          "new_recall@10": 0.13179448994787787,
+          "new_hits@25": 569,
+          "new_recall@25": 0.4236783320923306,
+          "new_hits@50": 769,
+          "new_recall@50": 0.5725986597170514,
+          "new_hits@100": 962,
+          "new_recall@100": 0.7163067758749069
+        }
+      },
+      "query_overall_subgroups": {
+        "queries_with_described_positive": {
+          "queries": 1833,
+          "recall@10": 0.6830597498678298,
+          "ndcg@10": 0.48476447221762337
+        },
+        "queries_without_described_positive": {
+          "queries": 4358,
+          "recall@10": 0.7874737527273094,
+          "ndcg@10": 0.6176219062429439
+        }
+      }
+    }
+  },
+  "variants": {
+    "D_html": {
+      "name": "D_html",
+      "text_diagnostics": {
+        "recipe": "t1_fam_desc_html_v1",
+        "cleaner_version": "clean_html_description_v1",
+        "cleaner_rules_hash": "legacy_html_v1",
+        "raw_description_sha256": "a3db2131ff72d6b6584efa00015e66dce1f22eeabc052e74dac3dd84faa31955",
+        "recipe_hash": "9ed9c72e7684ff6253090a87b121b154d8e9af298ede0bc75d8ba012bc38a577",
+        "content_hash": "95735cbd2548664b38226b6723cf7f3a257ce5d74f24ffe0b39ac6f036e7c7c3",
+        "base_content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+        "changed_text_count": 155,
+        "changed_trained_text_count": 152,
+        "reused_unchanged_count": 686,
+        "newly_encoded_count": 155,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "reused_from_baseline_cache": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+        "token_stats": {
+          "max_chars": 4243,
+          "mean_chars": 379.12485136741975,
+          "non_empty_spec_products": 131,
+          "total_spec_tokens_in_descriptions": 897,
+          "tokenizer_measured": true,
+          "encoder_max_seq_length": 8192,
+          "max_tokens": 1383,
+          "mean_tokens": 121.97859690844233,
+          "p95_tokens": 622.0,
+          "truncated_count": 0,
+          "truncated_product_ids": [],
+          "truncation_policy": "prefix_plus_description_block_priority_v1"
+        },
+        "cache_path": "data/interim/description_cleaning_v1/text_embeddings/t1_fam_desc_html_v1_9ed9c72e7684ff62.parquet",
+        "meta_path": "data/interim/description_cleaning_v1/text_embeddings/t1_fam_desc_html_v1_9ed9c72e7684ff62.json",
+        "loaded_from_cache": true
+      },
+      "upstream": {
+        "selected_epoch": 18,
+        "parameters": 851213,
+        "training_seconds": 43.87242325000989,
+        "metrics": {
+          "val_recall@10": 0.3574063348910538,
+          "val_ndcg@10": 0.213561319990102,
+          "new_hits@10": 315,
+          "new_recall@10": 0.16962843295638125,
+          "new_hits@25": 734,
+          "new_hits@50": 993,
+          "new_targets": 1857,
+          "stage1_new_recall@25": 0.39526117393645666,
+          "stage1_new_recall@50": 0.5347334410339257
+        },
+        "upstream_dot_fullpool": {
+          "new_hits@25": 734,
+          "new_recall@25": 0.39526117393645666,
+          "new_hits@50": 993,
+          "new_recall@50": 0.5347334410339257,
+          "new_hits@100": 1311,
+          "new_recall@100": 0.7059773828756059,
+          "recall@10": 0.3574063348910538,
+          "ndcg@10": 0.213561319990102
+        },
+        "selected_checkpoint": "checkpoints/description-cleaning-v1/runs/stage1-D_html-seed42/best.pt",
+        "checkpoint_sha256": "2bf1e796a5e73cc973d0740aa07fe5604979901eeebca059b083fbb9f9f15e43"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 109.8821842920006,
+        "metrics": {
+          "recall@5": 0.6396849849872701,
+          "recall@10": 0.7549289975851452,
+          "ndcg@10": 0.5765269028363448,
+          "mrr": 0.5516188766846213,
+          "new_hits@10": 207,
+          "new_targets": 1857,
+          "new_recall@10": 0.11147011308562198,
+          "conditional_new_recall@10": 0.1143646408839779,
+          "repeat_recall@10_micro": 0.8816961634398385,
+          "repeat_recall@10_macro": 0.90944170559072,
+          "mixed_coverage_macro": 0.9946598108365191,
+          "mixed_coverage_micro": 0.9954262358894511,
+          "new_targets_in_slate": 1810,
+          "new_slate_coverage": 0.9746903607969843,
+          "new_reachable_lost_at10": 1603,
+          "new_hits@25": 731,
+          "new_recall@25": 0.3936456650511578,
+          "new_hits@50": 1017,
+          "new_recall@50": 0.5476575121163166,
+          "new_hits@100": 1321,
+          "new_recall@100": 0.7113624124932687,
+          "history_cohorts": {
+            "cold_0": {
+              "rows": 0,
+              "recall@10": null,
+              "new_hits@10": 0,
+              "new_targets": 0
+            },
+            "light_1_8": {
+              "rows": 1116,
+              "recall@10": 0.7084549411162314,
+              "new_hits@10": 147,
+              "new_targets": 574
+            },
+            "warm_9_31": {
+              "rows": 1808,
+              "recall@10": 0.7938616370723671,
+              "new_hits@10": 54,
+              "new_targets": 594
+            },
+            "truncated_32": {
+              "rows": 3267,
+              "recall@10": 0.7492586072657118,
+              "new_hits@10": 6,
+              "new_targets": 689
+            }
+          },
+          "validation_months": {
+            "2025-10": {
+              "rows": 1616,
+              "recall@10": 0.7511502043061449,
+              "ndcg@10": 0.5738909505662123,
+              "new_hits@10": 59,
+              "new_targets": 533
+            },
+            "2025-11": {
+              "rows": 1314,
+              "recall@10": 0.7681387443944522,
+              "ndcg@10": 0.584480465604029,
+              "new_hits@10": 48,
+              "new_targets": 358
+            },
+            "2025-12": {
+              "rows": 1353,
+              "recall@10": 0.7773272966060922,
+              "ndcg@10": 0.594971750390015,
+              "new_hits@10": 47,
+              "new_targets": 380
+            },
+            "2026-01": {
+              "rows": 1149,
+              "recall@10": 0.7281858336035881,
+              "ndcg@10": 0.5538250752241878,
+              "new_hits@10": 28,
+              "new_targets": 351
+            },
+            "2026-02": {
+              "rows": 759,
+              "recall@10": 0.7406627518287597,
+              "ndcg@10": 0.5698565979325888,
+              "new_hits@10": 25,
+              "new_targets": 235
+            }
+          },
+          "new_target_cohorts": {
+            "first_snapshot_family": {
+              "targets": 681,
+              "hits@10": 63
+            },
+            "known_snapshot_family": {
+              "targets": 1176,
+              "hits@10": 144
+            },
+            "unknown_snapshot_family_metadata": {
+              "targets": 0,
+              "hits@10": 0
+            },
+            "sku_rare_frozen90d": {
+              "targets": 439,
+              "hits@10": 4
+            },
+            "sku_frequent_frozen90d": {
+              "targets": 1418,
+              "hits@10": 203
+            },
+            "sparse_transition": {
+              "targets": 1254,
+              "hits@10": 85
+            },
+            "supported_transition": {
+              "targets": 603,
+              "hits@10": 122
+            },
+            "unrepresented_catalogue": {
+              "targets": 0,
+              "hits@10": 0
+            }
+          }
+        },
+        "selected_checkpoint": "checkpoints/description-cleaning-v1/runs/selector-D_html-uv_47-seed42/best.pt",
+        "checkpoint_sha256": "6afbf745bbe217ae301bc5dce09aeb98ce21aa4a4aba360571c8f3f92d697724",
+        "per_query_predictions": "checkpoints/description-cleaning-v1/runs/selector-D_html-uv_47-seed42/mlp_fullpool_predictions.npz",
+        "subgroup_predictions": "checkpoints/description-cleaning-v1/runs/selector-D_html-uv_47-seed42/mlp_subgroup_predictions.npz",
+        "subgroups_html_mask": {
+          "pool_policy": "full_rolling_eligible_pool_fixed",
+          "overall": {
+            "queries": 6191,
+            "recall@10": 0.7549289975851452,
+            "ndcg@10": 0.5765269028363448,
+            "new_targets": 1857,
+            "new_hits@10": 207,
+            "new_recall@10": 0.11147011308562198,
+            "new_hits@25": 731,
+            "new_recall@25": 0.3936456650511578,
+            "new_hits@50": 1017,
+            "new_recall@50": 0.5476575121163166,
+            "new_hits@100": 1321,
+            "new_recall@100": 0.7113624124932687
+          },
+          "new_target_subgroups": {
+            "with_description": {
+              "new_targets": 514,
+              "new_hits@10": 28,
+              "new_recall@10": 0.054474708171206226,
+              "new_hits@25": 166,
+              "new_recall@25": 0.3229571984435798,
+              "new_hits@50": 262,
+              "new_recall@50": 0.5097276264591439,
+              "new_hits@100": 360,
+              "new_recall@100": 0.7003891050583657
+            },
+            "without_description": {
+              "new_targets": 1343,
+              "new_hits@10": 179,
+              "new_recall@10": 0.1332836932241251,
+              "new_hits@25": 565,
+              "new_recall@25": 0.4206999255398362,
+              "new_hits@50": 755,
+              "new_recall@50": 0.5621742367833209,
+              "new_hits@100": 961,
+              "new_recall@100": 0.7155621742367834
+            }
+          },
+          "query_overall_subgroups": {
+            "queries_with_described_positive": {
+              "queries": 1833,
+              "recall@10": 0.6782607920819652,
+              "ndcg@10": 0.4806712038508798
+            },
+            "queries_without_described_positive": {
+              "queries": 4358,
+              "recall@10": 0.7871760881513061,
+              "ndcg@10": 0.6168443641122412
+            }
+          }
+        },
+        "subgroups_clean_mask": {
+          "pool_policy": "full_rolling_eligible_pool_fixed",
+          "overall": {
+            "queries": 6191,
+            "recall@10": 0.7549289975851452,
+            "ndcg@10": 0.5765269028363448,
+            "new_targets": 1857,
+            "new_hits@10": 207,
+            "new_recall@10": 0.11147011308562198,
+            "new_hits@25": 731,
+            "new_recall@25": 0.3936456650511578,
+            "new_hits@50": 1017,
+            "new_recall@50": 0.5476575121163166,
+            "new_hits@100": 1321,
+            "new_recall@100": 0.7113624124932687
+          },
+          "new_target_subgroups": {
+            "with_description": {
+              "new_targets": 514,
+              "new_hits@10": 28,
+              "new_recall@10": 0.054474708171206226,
+              "new_hits@25": 166,
+              "new_recall@25": 0.3229571984435798,
+              "new_hits@50": 262,
+              "new_recall@50": 0.5097276264591439,
+              "new_hits@100": 360,
+              "new_recall@100": 0.7003891050583657
+            },
+            "without_description": {
+              "new_targets": 1343,
+              "new_hits@10": 179,
+              "new_recall@10": 0.1332836932241251,
+              "new_hits@25": 565,
+              "new_recall@25": 0.4206999255398362,
+              "new_hits@50": 755,
+              "new_recall@50": 0.5621742367833209,
+              "new_hits@100": 961,
+              "new_recall@100": 0.7155621742367834
+            }
+          },
+          "query_overall_subgroups": {
+            "queries_with_described_positive": {
+              "queries": 1833,
+              "recall@10": 0.6782607920819652,
+              "ndcg@10": 0.4806712038508798
+            },
+            "queries_without_described_positive": {
+              "queries": 4358,
+              "recall@10": 0.7871760881513061,
+              "ndcg@10": 0.6168443641122412
+            }
+          }
+        }
+      },
+      "paired_vs_baseline": {
+        "overall": {
+          "recall@10_delta": [
+            -0.004668812297416758,
+            -0.0016978881215451648,
+            0.0012307126198877524
+          ],
+          "ndcg@10_delta": [
+            -0.0034167580869838617,
+            -0.0018118992521247263,
+            -0.0002704864722576472
+          ],
+          "new_recall@10_delta": [
+            -0.011017838405036727,
+            -0.0038293228089800553,
+            0.0037880327666913027
+          ],
+          "new_recall@25_delta": [
+            -0.016639628397115917,
+            -0.005454050037451044,
+            0.005274292519328654
+          ],
+          "new_recall@50_delta": [
+            -0.021115608104501398,
+            -0.010735373054213635,
+            -0.0005440598068135842
+          ],
+          "new_recall@100_delta": [
+            -0.009595882871934157,
+            -0.00160042689434365,
+            0.006390374011949663
+          ]
+        },
+        "with_description": {
+          "new_recall@10_delta": [
+            -0.03117693345323741,
+            -0.017786561264822136,
+            -0.003913512853671471
+          ],
+          "new_recall@25_delta": [
+            -0.03467179654866883,
+            -0.011787819253438114,
+            0.011131828718529323
+          ],
+          "new_recall@50_delta": [
+            -0.035565245326187454,
+            -0.01182267157433723,
+            0.010245901639344262
+          ],
+          "new_recall@100_delta": [
+            -0.02376246674027549,
+            -0.004052689063898629,
+            0.01498268142265776
+          ]
+        },
+        "without_description": {
+          "new_recall@10_delta": [
+            -0.007153389054427162,
+            0.001513431923049173,
+            0.010226629545619589
+          ],
+          "new_recall@25_delta": [
+            -0.015516204964125495,
+            -0.0030534351145038168,
+            0.010269012191342438
+          ],
+          "new_recall@50_delta": [
+            -0.021771832316187154,
+            -0.010412794299876084,
+            0.0006960161396743092
+          ],
+          "new_recall@100_delta": [
+            -0.008320883642681185,
+            -0.000725689404934688,
+            0.007120309513505715
+          ]
+        }
+      },
+      "paired_vs_D_html": null
+    },
+    "D_clean": {
+      "name": "D_clean",
+      "text_diagnostics": {
+        "recipe": "t1_fam_desc_clean_v1",
+        "cleaner_version": "desc_clean_v1",
+        "cleaner_rules_hash": "68f303d583dbe67535b5a73ab00714590c732a3e3d3c28634b691ba9d69d8afc",
+        "raw_description_sha256": "a3db2131ff72d6b6584efa00015e66dce1f22eeabc052e74dac3dd84faa31955",
+        "recipe_hash": "a2e76c558a5c4bacbab87f46407eafd155a3a858cb1e1a454f8a282beea3c6c9",
+        "content_hash": "0c3104324b4f2ec8073fcae87878b271065cc21a6828934225d940e76e9ebe7c",
+        "base_content_hash": "40d083806d1e8ef1a8fa5bdb5faa1b73b6188ef1b31a66aba718fad20daab3a6",
+        "changed_text_count": 155,
+        "changed_trained_text_count": 152,
+        "reused_unchanged_count": 686,
+        "newly_encoded_count": 155,
+        "empty_text_count": 0,
+        "non_empty_text_count": 841,
+        "reused_from_baseline_cache": "data/interim/embedding_ablation_v1/text_embeddings/t1_fam_98134e2f7fe45c60.parquet",
+        "token_stats": {
+          "max_chars": 4131,
+          "mean_chars": 361.4780023781213,
+          "non_empty_spec_products": 131,
+          "total_spec_tokens_in_descriptions": 897,
+          "tokenizer_measured": true,
+          "encoder_max_seq_length": 8192,
+          "max_tokens": 1330,
+          "mean_tokens": 113.65755053507729,
+          "p95_tokens": 587.0,
+          "truncated_count": 0,
+          "truncated_product_ids": [],
+          "truncation_policy": "prefix_plus_description_block_priority_v1"
+        },
+        "cache_path": "data/interim/description_cleaning_v1/text_embeddings/t1_fam_desc_clean_v1_a2e76c558a5c4bac.parquet",
+        "meta_path": "data/interim/description_cleaning_v1/text_embeddings/t1_fam_desc_clean_v1_a2e76c558a5c4bac.json",
+        "loaded_from_cache": true
+      },
+      "upstream": {
+        "selected_epoch": 18,
+        "parameters": 851213,
+        "training_seconds": 44.17607075000706,
+        "metrics": {
+          "val_recall@10": 0.3598889511638494,
+          "val_ndcg@10": 0.21449350182335952,
+          "new_hits@10": 316,
+          "new_recall@10": 0.17016693591814755,
+          "new_hits@25": 726,
+          "new_hits@50": 988,
+          "new_targets": 1857,
+          "stage1_new_recall@25": 0.39095315024232635,
+          "stage1_new_recall@50": 0.5320409262250942
+        },
+        "upstream_dot_fullpool": {
+          "new_hits@25": 726,
+          "new_recall@25": 0.39095315024232635,
+          "new_hits@50": 988,
+          "new_recall@50": 0.5320409262250942,
+          "new_hits@100": 1309,
+          "new_recall@100": 0.7049003769520732,
+          "recall@10": 0.3598889511638494,
+          "ndcg@10": 0.21449350182335952
+        },
+        "selected_checkpoint": "checkpoints/description-cleaning-v1/runs/stage1-D_clean-seed42/best.pt",
+        "checkpoint_sha256": "eb2bc9bf9f8eedb5900358480df3079d00ca75d16ba48254655be7b26c96336b"
+      },
+      "mlp_uv47": {
+        "selected_epoch": 1,
+        "parameters": 47617,
+        "training_seconds": 111.16285333299311,
+        "metrics": {
+          "recall@5": 0.6390981115688671,
+          "recall@10": 0.7557379675953753,
+          "ndcg@10": 0.5768744083519863,
+          "mrr": 0.5516695111954069,
+          "new_hits@10": 210,
+          "new_targets": 1857,
+          "new_recall@10": 0.11308562197092084,
+          "conditional_new_recall@10": 0.11602209944751381,
+          "repeat_recall@10_micro": 0.8813398265827296,
+          "repeat_recall@10_macro": 0.9092538002520608,
+          "mixed_coverage_macro": 0.9946598108365191,
+          "mixed_coverage_micro": 0.9954262358894511,
+          "new_targets_in_slate": 1810,
+          "new_slate_coverage": 0.9746903607969843,
+          "new_reachable_lost_at10": 1600,
+          "new_hits@25": 726,
+          "new_recall@25": 0.39095315024232635,
+          "new_hits@50": 1012,
+          "new_recall@50": 0.5449649973074852,
+          "new_hits@100": 1318,
+          "new_recall@100": 0.7097469036079699,
+          "history_cohorts": {
+            "cold_0": {
+              "rows": 0,
+              "recall@10": null,
+              "new_hits@10": 0,
+              "new_targets": 0
+            },
+            "light_1_8": {
+              "rows": 1116,
+              "recall@10": 0.7102171872333163,
+              "new_hits@10": 148,
+              "new_targets": 574
+            },
+            "warm_9_31": {
+              "rows": 1808,
+              "recall@10": 0.7949908774853466,
+              "new_hits@10": 56,
+              "new_targets": 594
+            },
+            "truncated_32": {
+              "rows": 3267,
+              "recall@10": 0.7495646984808939,
+              "new_hits@10": 6,
+              "new_targets": 689
+            }
+          },
+          "validation_months": {
+            "2025-10": {
+              "rows": 1616,
+              "recall@10": 0.7541153445701714,
+              "ndcg@10": 0.5750895134310253,
+              "new_hits@10": 61,
+              "new_targets": 533
+            },
+            "2025-11": {
+              "rows": 1314,
+              "recall@10": 0.7682220958476667,
+              "ndcg@10": 0.5838649967738628,
+              "new_hits@10": 49,
+              "new_targets": 358
+            },
+            "2025-12": {
+              "rows": 1353,
+              "recall@10": 0.7767289789346038,
+              "ndcg@10": 0.5955737498070122,
+              "new_hits@10": 46,
+              "new_targets": 380
+            },
+            "2026-01": {
+              "rows": 1149,
+              "recall@10": 0.728403414108375,
+              "ndcg@10": 0.5532348783960557,
+              "new_hits@10": 29,
+              "new_targets": 351
+            },
+            "2026-02": {
+              "rows": 759,
+              "recall@10": 0.7415411005331956,
+              "ndcg@10": 0.5710250907454536,
+              "new_hits@10": 25,
+              "new_targets": 235
+            }
+          },
+          "new_target_cohorts": {
+            "first_snapshot_family": {
+              "targets": 681,
+              "hits@10": 64
+            },
+            "known_snapshot_family": {
+              "targets": 1176,
+              "hits@10": 146
+            },
+            "unknown_snapshot_family_metadata": {
+              "targets": 0,
+              "hits@10": 0
+            },
+            "sku_rare_frozen90d": {
+              "targets": 439,
+              "hits@10": 4
+            },
+            "sku_frequent_frozen90d": {
+              "targets": 1418,
+              "hits@10": 206
+            },
+            "sparse_transition": {
+              "targets": 1254,
+              "hits@10": 84
+            },
+            "supported_transition": {
+              "targets": 603,
+              "hits@10": 126
+            },
+            "unrepresented_catalogue": {
+              "targets": 0,
+              "hits@10": 0
+            }
+          }
+        },
+        "selected_checkpoint": "checkpoints/description-cleaning-v1/runs/selector-D_clean-uv_47-seed42/best.pt",
+        "checkpoint_sha256": "b9facd504f8faa574df3e322dee7a8f652f13364b6e5c351f069bdfc709fc1bc",
+        "per_query_predictions": "checkpoints/description-cleaning-v1/runs/selector-D_clean-uv_47-seed42/mlp_fullpool_predictions.npz",
+        "subgroup_predictions": "checkpoints/description-cleaning-v1/runs/selector-D_clean-uv_47-seed42/mlp_subgroup_predictions.npz",
+        "subgroups_html_mask": {
+          "pool_policy": "full_rolling_eligible_pool_fixed",
+          "overall": {
+            "queries": 6191,
+            "recall@10": 0.7557379675953753,
+            "ndcg@10": 0.5768744083519863,
+            "new_targets": 1857,
+            "new_hits@10": 210,
+            "new_recall@10": 0.11308562197092084,
+            "new_hits@25": 726,
+            "new_recall@25": 0.39095315024232635,
+            "new_hits@50": 1012,
+            "new_recall@50": 0.5449649973074852,
+            "new_hits@100": 1318,
+            "new_recall@100": 0.7097469036079699
+          },
+          "new_target_subgroups": {
+            "with_description": {
+              "new_targets": 514,
+              "new_hits@10": 30,
+              "new_recall@10": 0.058365758754863814,
+              "new_hits@25": 163,
+              "new_recall@25": 0.31712062256809337,
+              "new_hits@50": 258,
+              "new_recall@50": 0.5019455252918288,
+              "new_hits@100": 356,
+              "new_recall@100": 0.6926070038910506
+            },
+            "without_description": {
+              "new_targets": 1343,
+              "new_hits@10": 180,
+              "new_recall@10": 0.1340282948622487,
+              "new_hits@25": 563,
+              "new_recall@25": 0.41921072226358896,
+              "new_hits@50": 754,
+              "new_recall@50": 0.5614296351451973,
+              "new_hits@100": 962,
+              "new_recall@100": 0.7163067758749069
+            }
+          },
+          "query_overall_subgroups": {
+            "queries_with_described_positive": {
+              "queries": 1833,
+              "recall@10": 0.6788290772247185,
+              "ndcg@10": 0.48132807826407875
+            },
+            "queries_without_described_positive": {
+              "queries": 4358,
+              "recall@10": 0.7880862916085495,
+              "ndcg@10": 0.6170617472806543
+            }
+          }
+        },
+        "subgroups_clean_mask": {
+          "pool_policy": "full_rolling_eligible_pool_fixed",
+          "overall": {
+            "queries": 6191,
+            "recall@10": 0.7557379675953753,
+            "ndcg@10": 0.5768744083519863,
+            "new_targets": 1857,
+            "new_hits@10": 210,
+            "new_recall@10": 0.11308562197092084,
+            "new_hits@25": 726,
+            "new_recall@25": 0.39095315024232635,
+            "new_hits@50": 1012,
+            "new_recall@50": 0.5449649973074852,
+            "new_hits@100": 1318,
+            "new_recall@100": 0.7097469036079699
+          },
+          "new_target_subgroups": {
+            "with_description": {
+              "new_targets": 514,
+              "new_hits@10": 30,
+              "new_recall@10": 0.058365758754863814,
+              "new_hits@25": 163,
+              "new_recall@25": 0.31712062256809337,
+              "new_hits@50": 258,
+              "new_recall@50": 0.5019455252918288,
+              "new_hits@100": 356,
+              "new_recall@100": 0.6926070038910506
+            },
+            "without_description": {
+              "new_targets": 1343,
+              "new_hits@10": 180,
+              "new_recall@10": 0.1340282948622487,
+              "new_hits@25": 563,
+              "new_recall@25": 0.41921072226358896,
+              "new_hits@50": 754,
+              "new_recall@50": 0.5614296351451973,
+              "new_hits@100": 962,
+              "new_recall@100": 0.7163067758749069
+            }
+          },
+          "query_overall_subgroups": {
+            "queries_with_described_positive": {
+              "queries": 1833,
+              "recall@10": 0.6788290772247185,
+              "ndcg@10": 0.48132807826407875
+            },
+            "queries_without_described_positive": {
+              "queries": 4358,
+              "recall@10": 0.7880862916085495,
+              "ndcg@10": 0.6170617472806543
+            }
+          }
+        }
+      },
+      "paired_vs_baseline": {
+        "overall": {
+          "recall@10_delta": [
+            -0.003773621827245504,
+            -0.0008243464477899261,
+            0.0018092273004752491
+          ],
+          "ndcg@10_delta": [
+            -0.0029614659763590474,
+            -0.0014414313970422103,
+            3.722800515047113e-05
+          ],
+          "new_recall@10_delta": [
+            -0.009197957466425736,
+            -0.0021615781097142524,
+            0.0053396008468013754
+          ],
+          "new_recall@25_delta": [
+            -0.01894161962295766,
+            -0.008089212700442529,
+            0.002554754310372282
+          ],
+          "new_recall@50_delta": [
+            -0.02374894206212508,
+            -0.013363028953229399,
+            -0.003851663428473466
+          ],
+          "new_recall@100_delta": [
+            -0.011308562197092083,
+            -0.0031537452901031246,
+            0.004489435879850258
+          ]
+        },
+        "with_description": {
+          "new_recall@10_delta": [
+            -0.02658564463831673,
+            -0.013605455026255146,
+            -0.001814232700992507
+          ],
+          "new_recall@25_delta": [
+            -0.04023049386323787,
+            -0.017474883195407215,
+            0.004018968435726361
+          ],
+          "new_recall@50_delta": [
+            -0.044118458641734845,
+            -0.019762845849802372,
+            0.0021099281270113694
+          ],
+          "new_recall@100_delta": [
+            -0.03143449358095167,
+            -0.01184601351825432,
+            0.007783243354374951
+          ]
+        },
+        "without_description": {
+          "new_recall@10_delta": [
+            -0.005571538913666152,
+            0.0022446692254981435,
+            0.010956952880314598
+          ],
+          "new_recall@25_delta": [
+            -0.017924246096057434,
+            -0.004497753651896121,
+            0.008416796339811034
+          ],
+          "new_recall@50_delta": [
+            -0.022095509622238062,
+            -0.011135857461024499,
+            0.0
+          ],
+          "new_recall@100_delta": [
+            -0.00758812085939524,
+            0.0,
+            0.00823399618617229
+          ]
+        }
+      },
+      "paired_vs_D_html": {
+        "overall": {
+          "recall@10_delta": [
+            -0.0004572287514117236,
+            0.0008236090529444339,
+            0.00229057472377621
+          ],
+          "ndcg@10_delta": [
+            -0.00026680347765055867,
+            0.00035187619743330976,
+            0.0010076579465248764
+          ],
+          "new_recall@10_delta": [
+            -0.0017257839872141022,
+            0.0016051364365971107,
+            0.005225139849391696
+          ],
+          "new_recall@25_delta": [
+            -0.007988380561277415,
+            -0.002691065662002153,
+            0.002595524887505889
+          ],
+          "new_recall@50_delta": [
+            -0.007788465744237246,
+            -0.002696144709333938,
+            0.0027265799591744576
+          ],
+          "new_recall@100_delta": [
+            -0.005747276727744914,
+            -0.001607717041800643,
+            0.002333791989595059
+          ]
+        },
+        "with_description": {
+          "new_recall@10_delta": [
+            0.0,
+            0.0038240917782026767,
+            0.010082178727998421
+          ],
+          "new_recall@25_delta": [
+            -0.014862786285404526,
+            -0.005752641913208463,
+            0.002008133136166395
+          ],
+          "new_recall@50_delta": [
+            -0.017753236862147755,
+            -0.007707129094412331,
+            0.0017858742959549403
+          ],
+          "new_recall@100_delta": [
+            -0.015929379825829426,
+            -0.007561436672967864,
+            -0.0018551161012211985
+          ]
+        },
+        "without_description": {
+          "new_recall@10_delta": [
+            -0.0037037723416522526,
+            0.0007380073800738007,
+            0.005279234050115514
+          ],
+          "new_recall@25_delta": [
+            -0.008197487646676558,
+            -0.0015009382976374724,
+            0.005124921602946759
+          ],
+          "new_recall@50_delta": [
+            -0.006875740488864392,
+            -0.0007369196757553427,
+            0.005980198822194602
+          ],
+          "new_recall@100_delta": [
+            -0.0038314910796135673,
+            0.0007393716352440554,
+            0.005564553985412579
+          ]
+        }
+      }
+    }
+  },
+  "source_sha256": {
+    "recommender/experiments/description_cleaning/__init__.py": "737ba555ecd6568f58aa078b05465c1c85d545279d3a617466aa8da6b80f9154",
+    "recommender/experiments/description_cleaning/cleaner.py": "b2886748453fd558fea98d5b2e281d4e2d76092ae45bff4ad4d5d4b0b8905174",
+    "recommender/experiments/description_cleaning/config.py": "c954f4a1d0f16ebd2dfe8ffc7d676ed5998732c9c8155531a53db510fccd76e1",
+    "recommender/experiments/description_cleaning/data.py": "75d9a235af0aca94e738d1e23bd09905972e62487c3ecbf559840406779dab82",
+    "recommender/experiments/description_cleaning/evaluate.py": "dc353f6d48d6a3250c17b60d36d2c1d97727842ce9f33aabe7360a9c7fcd3ac9",
+    "recommender/experiments/description_cleaning/text_cache.py": "2aaad490d17657c6e56bb4793a80037b17944ef3fed47f8d9ff2a89406f89a91",
+    "recommender/experiments/description_cleaning/train.py": "aa14d7be83ec81c7d7cc45554257e2f9828c6e321af21f711dafbfd9d8a3e335"
+  },
+  "reproduction_commands": [
+    "PYTHONPATH=. ./venv/bin/pytest tests/",
+    "PYTHONPATH=. ./venv/bin/pytest tests/ --synthetic-only",
+    "PYTHONPATH=. ./venv/bin/python experiments/description_cleaning_v1/run.py --prepare-only",
+    "PYTHONPATH=. ./venv/bin/python experiments/description_cleaning_v1/run.py --verify-baseline-only",
+    "PYTHONPATH=. ./venv/bin/python experiments/description_cleaning_v1/run.py --variants D_html",
+    "PYTHONPATH=. ./venv/bin/python experiments/description_cleaning_v1/run.py --variants D_clean",
+    "PYTHONPATH=. ./venv/bin/python experiments/description_cleaning_v1/summarize.py"
+  ]
+}

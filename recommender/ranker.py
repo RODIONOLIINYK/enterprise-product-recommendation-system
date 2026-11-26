@@ -301,6 +301,21 @@ class UPSCANRRanker(nn.Module):
 
         self.configure_cached_training(cached_only)
 
+    def build_profile_tokens(self, z_text: torch.Tensor, z_tab: torch.Tensor) -> torch.Tensor:
+        """Checkpoint-compatible default; experimental layouts may keep profile views separate."""
+        z_prof = self.profile_fusion(torch.cat([z_text, z_tab], dim=-1))
+        return (z_prof + self.type_embedding.weight[0]).unsqueeze(1)
+
+    def build_memory_statistics(self, tabular_features, purchase_statistics):
+        """Align the statistics-bias keys to the default profile/history memory layout."""
+        return torch.cat((
+            F.pad(tabular_features[:, None, :], (self.seq_feature_dim, 0)),
+            F.pad(purchase_statistics, (0, self.num_tabular_features)),
+        ), dim=1)
+
+    def summarize_memory_attention(self, attn_weights):
+        return attn_weights[..., 0], attn_weights[..., 1:].sum(dim=-1)
+
     def build_key_padding_mask(self, attention_mask: torch.Tensor) -> torch.Tensor:
         """Construct a (B, history_length + 1) mask; True indicates padding.
 
@@ -341,8 +356,7 @@ class UPSCANRRanker(nn.Module):
         tab_concat = torch.cat([c_city, c_reg, c_ind, tabular_features], dim=-1)
         z_tab = self.tabular_proj(tab_concat)  # (B, 128)
 
-        z_prof = self.profile_fusion(torch.cat([z_text, z_tab], dim=-1))  # (B, 128)
-        t_0 = (z_prof + self.type_embedding.weight[0]).unsqueeze(1)  # (B, 1, 128)
+        t_0 = self.build_profile_tokens(z_text, z_tab)
 
         # 2. History Tokens 1..32
         if seq_product_ids is None:
@@ -549,10 +563,7 @@ class UPSCANRRanker(nn.Module):
             age = age_days / (age_days + 90.0)
             purchase_statistics = sequence.clone()
             purchase_statistics[..., HISTORY_AGE_INDEX] = age
-            key_statistics = torch.cat((
-                F.pad(tabular_features[:, None, :], (self.seq_feature_dim, 0)),
-                F.pad(purchase_statistics, (0, self.num_tabular_features)),
-            ), dim=1)
+            key_statistics = self.build_memory_statistics(tabular_features, purchase_statistics)
             # A constant term lets a key statistic matter on its own. Each
             # candidate's features also change the weights for that key.
             candidate_statistics = F.pad(pairwise_features, (1, 0), value=1)
@@ -581,8 +592,7 @@ class UPSCANRRanker(nn.Module):
                 attn_w = attn_w.masked_fill(mask_exp, 0.0)
                 w_sum = attn_w.sum(dim=-1, keepdim=True).clamp(min=1e-9)
                 attn_w = attn_w / w_sum
-            token_0_weight = attn_w[..., 0]
-            history_weights = attn_w[..., 1:].sum(dim=-1)
+            token_0_weight, history_weights = self.summarize_memory_attention(attn_w)
 
         # 4. Feature Fusion
         interaction = z_cand * h_att

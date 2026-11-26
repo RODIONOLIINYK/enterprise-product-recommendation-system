@@ -1,0 +1,371 @@
+{
+  "features": [
+    {
+      "feature": "is_repeat_sku",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "user_sku_order_count_norm",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "user_sku_qty_share",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "days_since_last_sku_buy_norm",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "sku_urgency",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "user_cat_order_share",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "user_subcat_order_share",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "user_brand_order_share",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "global_sku_popularity_norm",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "industry_sku_affinity",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "is_repeat_category",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "is_repeat_brand",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "is_repeat_business_line",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "customer_age",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "customer_overdue_ratio",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "customer_30d_activity",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "customer_90d_activity",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "category_age",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "category_overdue_ratio",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "category_never_seen",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "family_age",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "family_overdue_ratio",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "family_never_seen",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "family_history_share",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "sku_orders_7d",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "sku_orders_30d",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "sku_orders_90d",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "sku_buyers_30d",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "sku_growth_30d",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "category_relative_share",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "global_sale_age",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "month_sin",
+      "catboost": "direct scalar",
+      "stage1_mlp": "deliberately omitted in repeat-no-month-v1",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "month_cos",
+      "catboost": "direct scalar",
+      "stage1_mlp": "deliberately omitted in repeat-no-month-v1",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "sku_last_lift",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "sku_recent3_lift",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "category_last_lift",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "family_last_lift",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "line_last_lift",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "sku_support_confidence",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "hierarchical_backoff",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "same_basket_lift",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar",
+      "stage2_before": "direct scoring scalar; first 13 also attention bias",
+      "stage2_treatment": "unchanged direct scalar"
+    },
+    {
+      "feature": "total_purchases",
+      "catboost": "direct scalar",
+      "stage1_mlp": "not a separate direct input",
+      "stage2_before": "profile attention-bias key; zeroed in token value under bias-only mode",
+      "stage2_treatment": "also directly concatenated to scoring MLP in profile8 variants"
+    },
+    {
+      "feature": "total_quantity",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar from sealed upstream cache",
+      "stage2_before": "profile attention-bias key; zeroed in token value under bias-only mode",
+      "stage2_treatment": "also directly concatenated to scoring MLP in profile8 variants"
+    },
+    {
+      "feature": "distinct_products",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar from sealed upstream cache",
+      "stage2_before": "profile attention-bias key; zeroed in token value under bias-only mode",
+      "stage2_treatment": "also directly concatenated to scoring MLP in profile8 variants"
+    },
+    {
+      "feature": "distinct_orders",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar from sealed upstream cache",
+      "stage2_before": "profile attention-bias key; zeroed in token value under bias-only mode",
+      "stage2_treatment": "also directly concatenated to scoring MLP in profile8 variants"
+    },
+    {
+      "feature": "distinct_categories",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar from sealed upstream cache",
+      "stage2_before": "profile attention-bias key; zeroed in token value under bias-only mode",
+      "stage2_treatment": "also directly concatenated to scoring MLP in profile8 variants"
+    },
+    {
+      "feature": "days_since_first_order",
+      "catboost": "direct scalar",
+      "stage1_mlp": "not a separate direct input",
+      "stage2_before": "profile attention-bias key; zeroed in token value under bias-only mode",
+      "stage2_treatment": "also directly concatenated to scoring MLP in profile8 variants"
+    },
+    {
+      "feature": "days_since_last_order",
+      "catboost": "direct scalar",
+      "stage1_mlp": "not a separate direct input",
+      "stage2_before": "profile attention-bias key; zeroed in token value under bias-only mode",
+      "stage2_treatment": "also directly concatenated to scoring MLP in profile8 variants"
+    },
+    {
+      "feature": "median_order_gap",
+      "catboost": "direct scalar",
+      "stage1_mlp": "direct scalar from sealed upstream cache",
+      "stage2_before": "profile attention-bias key; zeroed in token value under bias-only mode",
+      "stage2_treatment": "also directly concatenated to scoring MLP in profile8 variants"
+    },
+    {
+      "feature": "product_id",
+      "catboost": "categorical input",
+      "stage1_mlp": "indirect through frozen candidate product vector; no separate scoring category input",
+      "stage2_before": "indirect through frozen candidate vector; history IDs are separate inputs",
+      "stage2_treatment": "also independent learned candidate embedding in categorical variants"
+    },
+    {
+      "feature": "product_category",
+      "catboost": "categorical input",
+      "stage1_mlp": "indirect through frozen candidate product vector; no separate scoring category input",
+      "stage2_before": "indirect through frozen candidate vector; history IDs are separate inputs",
+      "stage2_treatment": "also independent learned candidate embedding in categorical variants"
+    },
+    {
+      "feature": "business_line",
+      "catboost": "categorical input",
+      "stage1_mlp": "indirect through frozen candidate product vector; no separate scoring category input",
+      "stage2_before": "indirect through frozen candidate vector; history IDs are separate inputs",
+      "stage2_treatment": "also independent learned candidate embedding in categorical variants"
+    }
+  ],
+  "source_policy": "rolling_observed_v2",
+  "heldout_access": false,
+  "profile_and_context_tensor_parity_verified": true
+}

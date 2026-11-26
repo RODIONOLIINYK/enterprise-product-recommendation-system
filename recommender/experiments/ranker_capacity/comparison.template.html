@@ -1,0 +1,36 @@
+<section id="capacity-comparison" data-viz-composition>
+  <p>6,191 validation queries · seed 42 · changes from saved Arm A</p>
+  <p class="text-muted">Neural models rank the same 100 candidates. Standalone CatBoost ranks all eligible SKUs.</p>
+  <div class="viz-controls">
+    <label class="form-label" for="capacity-selection">Checkpoint selection
+      <select id="capacity-selection" class="form-select" disabled>
+        <option value="ndcg">NDCG-selected</option>
+        <option value="discovery">Discovery-selected</option>
+      </select>
+    </label>
+    <label class="form-label" for="capacity-metric">Metric
+      <select id="capacity-metric" class="form-select" disabled>
+        <option value="ndcg">NDCG@10 change</option>
+        <option value="recall">Recall@10 change (percentage points)</option>
+        <option value="hits">New-product hits@10 change</option>
+      </select>
+    </label>
+  </div>
+  <div data-viz-container></div>
+  <p class="text-muted">Positive means improvement. Point estimates from one training seed; no model promoted.</p>
+  __CONFIG_BLOCKS__
+</section>
+<script type="module">
+  import { mountChart } from "https://persistent.oaistatic.com/plugins/visualize/charts/1.2.3/element.js";
+  const root = document.getElementById("capacity-comparison");
+  const selection = document.getElementById("capacity-selection");
+  const metric = document.getElementById("capacity-metric");
+  function configuration() {
+    return JSON.parse(document.getElementById("capacity-" + selection.value + "-" + metric.value).textContent);
+  }
+  const chart = mountChart(root.querySelector("[data-viz-container]"), configuration());
+  selection.addEventListener("change", () => { chart.config = configuration(); });
+  metric.addEventListener("change", () => { chart.config = configuration(); });
+  selection.disabled = false;
+  metric.disabled = false;
+</script>

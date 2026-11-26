@@ -80,9 +80,9 @@ Trained for 10 epochs (`seed=42`, `heuristic_fraction=0.5`, `statistics_attentio
 
 ---
 
-## 4. Archive of Tested & Rejected Experimental Hypotheses (Code Removed)
+## 4. Archive of Tested & Rejected Experimental Hypotheses
 
-To keep the codebase clean, all experimental code paths that failed to beat the reference models above have been deleted. Their empirical results and post-mortem lessons are recorded here so agents never re-implement them:
+The older experiments in the first table had their implementation paths removed. Later versioned campaigns retain isolated reproduction code and evidence, without enabling new production paths. Their results are recorded here so agents do not repeat completed tests:
 
 | Experiment (Removed from Codebase) | New-to-Customer Hits@10 (`/ 1,857`) | Overall Recall@10 | Peak Val NDCG@10 | Why It Failed / Post-Mortem |
 | :--- | :---: | :---: | :---: | :--- |
@@ -94,6 +94,50 @@ To keep the codebase clean, all experimental code paths that failed to beat the 
 | Aligned 11-D Statistics (Full $11 \times 11$ Interactions) | `184` (`9.91%`) | `75.84%` | `0.5930` | Compressed the $14 \times 17$ statistics representation into $11 \times 11$ without adding new information. |
 | Combined Precompiled Vectors + Aligned 11-D + Shared Favorite Attributes | `181` (`9.75%`) | `75.81%` | `0.5928` | Compounded the representational restrictions of frozen history vectors and compressed attention statistics (`-13.4%` relative drop in new-product discovery). |
 | Stage 1 Price / Turnover / Co-Purchase Complementarity | Below reference | Below reference | — | Inferred invoice prices, turnover weights, and monthly co-purchase complementarity lowered Stage 1 unseen discovery recall below the 4-flag reference. |
+
+### Rolling ranker capacity and standalone CatBoost (2026-11-13)
+
+Seed 42; all numbers in each row come from the same NDCG-selected checkpoint. Neural arms use identical 100-candidate rolling slates, 32 events and a ten-epoch budget. Standalone CatBoost uses 52 categorical/statistical inputs and directly ranks the full eligible pool, with no neural representations or selection. Its training samples uniform negatives with inverse-probability weights; validation scores all 4,700,328 eligible query/product pairs. This is a complete-pipeline comparison for CatBoost, rather than a matched architecture-only ablation.
+
+| Configuration | Recall@10 | NDCG@10 | New hits@10 / 1,857 |
+| --- | ---: | ---: | ---: |
+| Saved original rolling pointwise A | 0.77104 | 0.60223 | 255 |
+| Fresh original control | 0.76941 | 0.60214 | 253 |
+| Wider head: 425 → 512 → 256 → 128 → 1 | 0.76632 | 0.60052 | 239 |
+| Wider Transformer FFN: 256 → 512 | 0.76682 | 0.59975 | 245 |
+| Two history self-attention layers | 0.76899 | 0.59955 | 245 |
+| Standalone CatBoost, 318 trees | 0.75815 | 0.59373 | 202 |
+
+Discovery-selected wider-head / wider-FFN / deeper-history checkpoints produce 250 / 249 / 247 new hits respectively; none exceeds saved A or its fresh control. No model was promoted or held-out data evaluated. Single-seed results, paired intervals, learning curves, replay checks and latency are in [the authoritative report](experiments/ranker_capacity_v1/REPORT.md).
+
+### Direct statistical/categorical access and underfitting audit (2026-11-14)
+
+All 41 rolling candidate statistics were already direct Stage 2 scoring inputs. Profile8 previously entered through attention bias; candidate identity/category/line were indirect through frozen candidate vectors. Four matched fresh seed42/10-epoch fits isolated additional direct scoring paths, preserving original head widths, 32-event memory, loss, schedule and 100-candidate slates. Added input weights were zero-initialized with exact initial logit parity.
+
+| NDCG-selected model | Recall@10 | NDCG@10 | New hits@10 |
+| --- | ---: | ---: | ---: |
+| Saved pointwise A | 0.77104 | 0.60223 | 255 |
+| Fresh control | 0.76954 | 0.60105 | 251 |
+| Direct profile8 | 0.76910 | 0.59877 | 238 |
+| Direct candidate SKU/category/line embeddings | 0.76604 | 0.59693 | 238 |
+| Both direct input paths | 0.76633 | 0.59774 | 242 |
+
+No treatment improved the control and no reference was promoted. A separate train-only 128-query probe reached 100% conditional top-10 target recovery after 300 updates with dropout disabled; this verifies optimization/capacity on a tiny cohort, not full-data generalization. Training support is only 2,319 distinct customers, median 8 target instances/SKU; 448/841 SKUs have at most 10 training target instances. Same-mode training/validation diagnostics, feature-by-feature mapping, paired intervals and limitations are in [the authoritative report](experiments/direct_feature_access_v1/REPORT.md). Held-out purchases were not accessed.
+
+### Fixed-input regularization and rotating negatives (2026-11-14)
+
+Seed42, ten epochs per fit; the standalone CatBoost52 schema, numeric inputs, trained model and results were frozen. The new small MLP receives exactly those 49 numeric and three categorical fields (model-specific learned categorical encodings), with no pretrained towers or Transformer. Fixed-pair arms use the identical 2,670,525 sampled pairs/importance weights and binary objective as CatBoost. The augmentation arm changes only negative draws relative to the unregularized MLP, preserving all 45,225 eligible positive instances per epoch. Validation ranks the complete eligible pool.
+
+| NDCG-selected model | Recall@10 | NDCG@10 | New hits@10 |
+| --- | ---: | ---: | ---: |
+| Frozen standalone CatBoost52 | 0.75815 | 0.59373 | 202 |
+| MLP52, fixed pairs, dropout .2/.1 and WD1e-4 | 0.76130 | 0.58915 | 221 |
+| MLP52, fixed pairs, zero dropout/WD | 0.76293 | 0.59143 | 223 |
+| MLP52, rotating negatives, zero dropout/WD | 0.76263 | 0.59372 | 224 |
+
+The MLP has32,953 parameters. Rotating negatives exposes13,240,017 distinct training pairs instead of2,670,525 fixed pairs, without synthetic positive purchases. The CatBoost comparison's paired intervals include zero for NDCG/Recall@10/new recall; no superiority is claimed.
+
+Seven matched Stage2 fits separately halve scoring-head, profile-projection or attention dropout; remove weight decay; remove all active dropout/weight decay; or combine direct52 input access with zero regularization. None of the NDCG-selected treatments beats saved A overall. Best treatment NDCG is0.60138 (zero regularization,235 new hits); direct52+zero regularization gives0.59705/232, versus saved A0.60223/255. The discovery-selected zero-regularization checkpoint gives258 hits but lower R@10=0.76785/NDCG@10=0.60077. No reference was promoted or held-out purchases accessed. Full protocols, all selections, exact transition-input column mapping, uncertainty and replay evidence are in [the authoritative report](experiments/regularization_signal_v1/REPORT.md).
 
 ## 5. Shared Stage 1 representations (2026-11-11)
 

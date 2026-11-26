@@ -1,0 +1,35 @@
+{
+  "heldout_access": false,
+  "promoted": false,
+  "training_fits": 10,
+  "full_suite": {
+    "passed": 598,
+    "skipped": 6,
+    "subtests_passed": 70,
+    "seconds": 16.13
+  },
+  "synthetic_suite": {
+    "passed": 588,
+    "skipped": 16,
+    "subtests_passed": 70,
+    "seconds": 11.05
+  },
+  "ruff_selected": [
+    "F821",
+    "F822",
+    "F823",
+    "F401"
+  ],
+  "ruff_passed": true,
+  "git_diff_check_passed": true,
+  "frozen_reference_cache_hashes_unchanged": 31,
+  "frozen_catboost_input_artifact_hashes_unchanged": 6,
+  "independent_ranker_records": 14,
+  "independent_tabular_records": 9,
+  "max_cpu32_ranker_logit_diff": 2.6226043701171875e-06,
+  "max_cpu4096_tabular_logit_diff": 0.0,
+  "all_augmentation_draw_digests_verified": true,
+  "all_training_positive_instances_preserved_each_epoch": 45225,
+  "unique_rotating_training_pairs": 13240017,
+  "feature_value_parity_sample_rows": 4096
+}

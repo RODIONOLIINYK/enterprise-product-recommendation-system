@@ -1,0 +1,282 @@
+{
+  "heldout_access": false,
+  "support": {
+    "train": {
+      "queries": 26253,
+      "distinct_customers": 2319,
+      "target_instances": 45721,
+      "new_target_instances": 11530,
+      "reachable_target_instances": 44227,
+      "target_count_per_sku_median": 8.0,
+      "skus_with_at_most_10_target_instances": 448,
+      "max_sku_target_instances": 1082
+    },
+    "val": {
+      "queries": 6191,
+      "distinct_customers": 1676,
+      "target_instances": 10276,
+      "new_target_instances": 1857,
+      "reachable_target_instances": 9703,
+      "target_count_per_sku_median": 2.0,
+      "skus_with_at_most_10_target_instances": 627,
+      "max_sku_target_instances": 231
+    },
+    "validation_new_targets_by_training_support": {
+      "at_most_0_training_target_instances": 97,
+      "at_most_5_training_target_instances": 210,
+      "at_most_10_training_target_instances": 335,
+      "at_most_20_training_target_instances": 465,
+      "at_most_50_training_target_instances": 734
+    },
+    "validation_customers_unseen_in_training": 252
+  },
+  "eval_mode_fit_metrics": {
+    "control": {
+      "train": {
+        "loss": 2.8639927580952644,
+        "bce_loss": 0.24402013095095754,
+        "list_loss": 2.619972623884678,
+        "rows": 4096,
+        "slate_conditional_recall@10": 0.7503944914646392,
+        "slate_conditional_new_recall@10": 0.22767295597484277,
+        "reachable_positive_instances": 6971,
+        "reachable_new_instances": 1590
+      },
+      "val": {
+        "loss": 2.7148896250873804,
+        "bce_loss": 0.2157146343961358,
+        "list_loss": 2.4991749990731478,
+        "rows": 4096,
+        "slate_conditional_recall@10": 0.7908775252525253,
+        "slate_conditional_new_recall@10": 0.1857304643261608,
+        "reachable_positive_instances": 6336,
+        "reachable_new_instances": 883
+      }
+    },
+    "profile8": {
+      "train": {
+        "loss": 2.925885371863842,
+        "bce_loss": 0.24822170403786004,
+        "list_loss": 2.677663665264845,
+        "rows": 4096,
+        "slate_conditional_recall@10": 0.7482427198393344,
+        "slate_conditional_new_recall@10": 0.21572327044025158,
+        "reachable_positive_instances": 6971,
+        "reachable_new_instances": 1590
+      },
+      "val": {
+        "loss": 2.7115056104958057,
+        "bce_loss": 0.21382332185748965,
+        "list_loss": 2.49768228456378,
+        "rows": 4096,
+        "slate_conditional_recall@10": 0.7908775252525253,
+        "slate_conditional_new_recall@10": 0.17780294450736125,
+        "reachable_positive_instances": 6336,
+        "reachable_new_instances": 883
+      }
+    },
+    "candidate_categories": {
+      "train": {
+        "loss": 2.853886976838112,
+        "bce_loss": 0.24302126467227936,
+        "list_loss": 2.6108657028526068,
+        "rows": 4096,
+        "slate_conditional_recall@10": 0.7561325491321188,
+        "slate_conditional_new_recall@10": 0.24465408805031447,
+        "reachable_positive_instances": 6971,
+        "reachable_new_instances": 1590
+      },
+      "val": {
+        "loss": 2.749847026541829,
+        "bce_loss": 0.21997784776613116,
+        "list_loss": 2.5298691857606173,
+        "rows": 4096,
+        "slate_conditional_recall@10": 0.7888257575757576,
+        "slate_conditional_new_recall@10": 0.17893544733861835,
+        "reachable_positive_instances": 6336,
+        "reachable_new_instances": 883
+      }
+    },
+    "profile8_and_categories": {
+      "train": {
+        "loss": 2.8557626083493233,
+        "bce_loss": 0.24250410543754697,
+        "list_loss": 2.6132584996521473,
+        "rows": 4096,
+        "slate_conditional_recall@10": 0.754124228948501,
+        "slate_conditional_new_recall@10": 0.2389937106918239,
+        "reachable_positive_instances": 6971,
+        "reachable_new_instances": 1590
+      },
+      "val": {
+        "loss": 2.739941105246544,
+        "bce_loss": 0.21786703448742628,
+        "list_loss": 2.5220740512013435,
+        "rows": 4096,
+        "slate_conditional_recall@10": 0.787405303030303,
+        "slate_conditional_new_recall@10": 0.17667044167610418,
+        "reachable_positive_instances": 6336,
+        "reachable_new_instances": 883
+      }
+    },
+    "saved_A": {
+      "train": {
+        "loss": 2.8652180917561054,
+        "bce_loss": 0.24407041328959167,
+        "list_loss": 2.621147681027651,
+        "rows": 4096,
+        "slate_conditional_recall@10": 0.7498206856978913,
+        "slate_conditional_new_recall@10": 0.22515723270440252,
+        "reachable_positive_instances": 6971,
+        "reachable_new_instances": 1590
+      },
+      "val": {
+        "loss": 2.7112097963690758,
+        "bce_loss": 0.21502335160039365,
+        "list_loss": 2.4961864482611418,
+        "rows": 4096,
+        "slate_conditional_recall@10": 0.7916666666666666,
+        "slate_conditional_new_recall@10": 0.19252548131370328,
+        "reachable_positive_instances": 6336,
+        "reachable_new_instances": 883
+      }
+    }
+  },
+  "sample_seed": 42,
+  "sample_rows_per_split": 4096,
+  "profile_and_context_parity": true,
+  "cpu_replay": [
+    {
+      "arm": "control",
+      "cpu32_max_abs_diff": 1.9073486328125e-06
+    },
+    {
+      "arm": "profile8",
+      "cpu32_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "candidate_categories",
+      "cpu32_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "profile8_and_categories",
+      "cpu32_max_abs_diff": 1.9073486328125e-06
+    }
+  ],
+  "tiny_train_memorization_probe": {
+    "rows": 128,
+    "lr": 0.001,
+    "dropout_disabled": true,
+    "weight_decay": 0,
+    "initial": {
+      "loss": 5.372076511383057,
+      "bce_loss": 0.8691545724868774,
+      "list_loss": 4.502922058105469,
+      "rows": 128,
+      "slate_conditional_recall@10": 0.43171806167400884,
+      "slate_conditional_new_recall@10": 0.078125,
+      "reachable_positive_instances": 227,
+      "reachable_new_instances": 64
+    },
+    "curve": [
+      {
+        "optimizer_steps": 100,
+        "loss": 0.7870535552501678,
+        "bce_loss": 0.07310216128826141,
+        "list_loss": 0.7139514088630676,
+        "rows": 128,
+        "slate_conditional_recall@10": 0.9691629955947136,
+        "slate_conditional_new_recall@10": 0.90625,
+        "reachable_positive_instances": 227,
+        "reachable_new_instances": 64
+      },
+      {
+        "optimizer_steps": 300,
+        "loss": 0.40544266998767853,
+        "bce_loss": 0.0025419435696676373,
+        "list_loss": 0.40290074050426483,
+        "rows": 128,
+        "slate_conditional_recall@10": 1.0,
+        "slate_conditional_new_recall@10": 1.0,
+        "reachable_positive_instances": 227,
+        "reachable_new_instances": 64
+      },
+      {
+        "optimizer_steps": 600,
+        "loss": 0.4031952917575836,
+        "bce_loss": 0.0009846773755270988,
+        "list_loss": 0.40221062302589417,
+        "rows": 128,
+        "slate_conditional_recall@10": 1.0,
+        "slate_conditional_new_recall@10": 1.0,
+        "reachable_positive_instances": 227,
+        "reachable_new_instances": 64
+      }
+    ],
+    "listwise_entropy_lower_bound": 0.39238232374191284,
+    "limitation": "Capacity/optimizer sanity check only; not a full-data or generalization claim."
+  },
+  "catboost_prediction_values_change": {
+    "all_features": {
+      "product_id": 0.0039455075692252815,
+      "product_category": 0.42692943099845365,
+      "business_line": 1.047256545019191,
+      "is_repeat_sku": 0.31854270237283305,
+      "user_sku_order_count_norm": 0.5243318785861502,
+      "user_sku_qty_share": 1.7777690365918184,
+      "days_since_last_sku_buy_norm": 1.6859685465288636,
+      "sku_urgency": 0.8968297148523525,
+      "user_cat_order_share": 0.5222002092083913,
+      "user_subcat_order_share": 5.907838098661459,
+      "user_brand_order_share": 1.4984879484177664,
+      "global_sku_popularity_norm": 0.6322533238718895,
+      "industry_sku_affinity": 22.373255622931808,
+      "is_repeat_category": 0.0,
+      "is_repeat_brand": 0.0,
+      "is_repeat_business_line": 0.0,
+      "customer_age": 0.30573857372570307,
+      "customer_overdue_ratio": 0.22756347800959395,
+      "customer_30d_activity": 0.42982242150726335,
+      "customer_90d_activity": 1.2442732137728982,
+      "category_age": 1.6422951907560566,
+      "category_overdue_ratio": 0.3958789960922389,
+      "category_never_seen": 0.0,
+      "family_age": 0.6127173704955412,
+      "family_overdue_ratio": 3.1154564564147496,
+      "family_never_seen": 0.0,
+      "family_history_share": 2.133901214558095,
+      "sku_orders_7d": 1.031423122780761,
+      "sku_orders_30d": 1.0478686065899054,
+      "sku_orders_90d": 0.2104085461700071,
+      "sku_buyers_30d": 1.4278150854375997,
+      "sku_growth_30d": 0.7431934831713944,
+      "category_relative_share": 2.635178556921826,
+      "global_sale_age": 1.934743059511284,
+      "month_sin": 0.26003886544513116,
+      "month_cos": 0.24857928554413897,
+      "sku_last_lift": 0.059231872153702465,
+      "sku_recent3_lift": 2.28844127689081,
+      "category_last_lift": 0.40084968516198377,
+      "family_last_lift": 0.42730913291287576,
+      "line_last_lift": 1.1005316381947419,
+      "sku_support_confidence": 0.29705931449353973,
+      "hierarchical_backoff": 23.187376182220085,
+      "same_basket_lift": 1.3645651844492228,
+      "profile_total_purchases": 0.6574440377692518,
+      "profile_total_quantity": 1.2081463145407876,
+      "profile_distinct_products": 0.7233347756224567,
+      "profile_distinct_orders": 8.291193755816067,
+      "profile_distinct_categories": 0.20380576838871367,
+      "profile_days_since_first_order": 1.4029913961075493,
+      "profile_days_since_last_order": 0.3356061622626532,
+      "profile_median_order_gap": 0.7896094105011386
+    },
+    "groups": {
+      "categorical3": 1.47813148358687,
+      "context41": 84.90973689540448,
+      "profile8": 13.612131621008619
+    },
+    "caveat": "Not causal, not percentage of predictive accuracy; correlated features can share credit."
+  },
+  "all_preserved_hashes_match": true
+}

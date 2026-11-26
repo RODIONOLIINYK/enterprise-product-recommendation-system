@@ -1,0 +1,20 @@
+{
+  "safe_suite": {
+    "command": "PYTHONPATH=. ./venv/bin/pytest tests/ -q",
+    "passed": 579,
+    "skipped": 6,
+    "subtests_passed": 70,
+    "exit_code": 0
+  },
+  "synthetic_suite": {
+    "command": "PYTHONPATH=. ./venv/bin/pytest tests/ --synthetic-only -q",
+    "passed": 569,
+    "skipped": 16,
+    "subtests_passed": 70,
+    "exit_code": 0
+  },
+  "ruff_undefined_unused_checks": "passed",
+  "git_diff_check": "passed",
+  "chart_configurations_checked": 6,
+  "heldout_access": false
+}

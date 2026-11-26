@@ -301,7 +301,7 @@ def fit_single_stage2_run(
             optimizer.zero_grad(set_to_none=True)
             inputs = stage2_mlp_score_batch_inputs(batch, vectors_dev, dev)
             logits = model(**inputs).logits
-            loss = loss_fn(logits, batch["labels"].to(dev))["loss"]
+            loss = loss_fn(logits, batch["labels"].to(dev), candidate_mask=inputs.get("candidate_mask"))["loss"]
             loss.backward()
             torch.nn.utils.clip_grad_norm_(trainable_params, float(grad_clip_norm))
             optimizer.step()

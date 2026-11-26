@@ -252,7 +252,7 @@ def predict_stage2_ranker(
         if force_zero_score:
             inputs["mlp_score"] = torch.zeros_like(inputs["mlp_score"])
         out = model(**inputs)
-        loss = loss_fn(out.logits, batch["labels"].to(device))["loss"]
+        loss = loss_fn(out.logits, batch["labels"].to(device), candidate_mask=inputs.get("candidate_mask"))["loss"]
         losses.append(float(loss.detach().cpu()))
         logits_list.append(out.logits.detach().cpu())
         if out.token_0_weight is not None:

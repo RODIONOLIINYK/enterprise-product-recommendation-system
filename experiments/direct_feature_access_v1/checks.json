@@ -1,0 +1,92 @@
+{
+  "heldout_access": false,
+  "promoted": false,
+  "tests_full": {
+    "passed": 587,
+    "skipped": 6,
+    "subtests_passed": 70,
+    "seconds": 11.08
+  },
+  "tests_synthetic": {
+    "passed": 577,
+    "skipped": 16,
+    "subtests_passed": 70,
+    "seconds": 8.69
+  },
+  "ruff_select": [
+    "F821",
+    "F822",
+    "F823",
+    "F401"
+  ],
+  "ruff_passed": true,
+  "git_diff_check_passed": true,
+  "protected_hashes_unchanged": 31,
+  "selected_records_reloaded_and_replayed": 8,
+  "independent_cpu32_max_abs_diff": 1.9073486328125e-06,
+  "initial_logit_parity_max_abs_diff": {
+    "control": 0.0,
+    "profile8": 0.0,
+    "candidate_categories": 0.0,
+    "profile8_and_categories": 0.0
+  },
+  "profile_and_context_tensor_parity": true,
+  "fitted_permutation_and_padding": {
+    "control": {
+      "ndcg": {
+        "rows_checked": 32,
+        "max_abs_logit_diff_reversed_slate": 0.0,
+        "max_abs_logit_diff_with_nan_cand_and_hist_padding": 0.0,
+        "masked_pad_logit_neginf": true
+      },
+      "discovery": {
+        "rows_checked": 32,
+        "max_abs_logit_diff_reversed_slate": 0.0,
+        "max_abs_logit_diff_with_nan_cand_and_hist_padding": 0.0,
+        "masked_pad_logit_neginf": true
+      }
+    },
+    "profile8": {
+      "ndcg": {
+        "rows_checked": 32,
+        "max_abs_logit_diff_reversed_slate": 0.0,
+        "max_abs_logit_diff_with_nan_cand_and_hist_padding": 0.0,
+        "masked_pad_logit_neginf": true
+      },
+      "discovery": {
+        "rows_checked": 32,
+        "max_abs_logit_diff_reversed_slate": 0.0,
+        "max_abs_logit_diff_with_nan_cand_and_hist_padding": 0.0,
+        "masked_pad_logit_neginf": true
+      }
+    },
+    "candidate_categories": {
+      "ndcg": {
+        "rows_checked": 32,
+        "max_abs_logit_diff_reversed_slate": 0.0,
+        "max_abs_logit_diff_with_nan_cand_and_hist_padding": 0.0,
+        "masked_pad_logit_neginf": true
+      },
+      "discovery": {
+        "rows_checked": 32,
+        "max_abs_logit_diff_reversed_slate": 0.0,
+        "max_abs_logit_diff_with_nan_cand_and_hist_padding": 0.0,
+        "masked_pad_logit_neginf": true
+      }
+    },
+    "profile8_and_categories": {
+      "ndcg": {
+        "rows_checked": 32,
+        "max_abs_logit_diff_reversed_slate": 0.0,
+        "max_abs_logit_diff_with_nan_cand_and_hist_padding": 0.0,
+        "masked_pad_logit_neginf": true
+      },
+      "discovery": {
+        "rows_checked": 32,
+        "max_abs_logit_diff_reversed_slate": 0.0,
+        "max_abs_logit_diff_with_nan_cand_and_hist_padding": 0.0,
+        "masked_pad_logit_neginf": true
+      }
+    }
+  }
+}

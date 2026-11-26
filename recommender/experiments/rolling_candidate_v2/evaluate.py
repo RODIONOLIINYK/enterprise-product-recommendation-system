@@ -206,7 +206,7 @@ def predict_rolling_ranker(
     for batch in make_rolling_slate_loader(slate, shuffle=False):
         inputs = rolling_ranker_batch_inputs(batch, product_vectors, device)
         out = model(**inputs, disable_candidate_attention=disable_candidate_attention)
-        loss = loss_fn(out.logits, batch["labels"].to(device))["loss"]
+        loss = loss_fn(out.logits, batch["labels"].to(device), candidate_mask=inputs.get("candidate_mask"))["loss"]
         losses.append(float(loss.detach().cpu()))
         logits_list.append(out.logits.detach().cpu())
         if out.token_0_weight is not None:

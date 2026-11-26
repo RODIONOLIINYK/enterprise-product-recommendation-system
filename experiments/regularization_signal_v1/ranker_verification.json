@@ -1,0 +1,90 @@
+{
+  "heldout_access": false,
+  "selected_records": [
+    {
+      "arm": "control",
+      "selection": "ndcg",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "control",
+      "selection": "discovery",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "head_half",
+      "selection": "ndcg",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.9073486328125e-06
+    },
+    {
+      "arm": "head_half",
+      "selection": "discovery",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "profile_half",
+      "selection": "ndcg",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "profile_half",
+      "selection": "discovery",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "attention_half",
+      "selection": "ndcg",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "attention_half",
+      "selection": "discovery",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "weight_decay_zero",
+      "selection": "ndcg",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.6689300537109375e-06
+    },
+    {
+      "arm": "weight_decay_zero",
+      "selection": "discovery",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.6689300537109375e-06
+    },
+    {
+      "arm": "all_zero",
+      "selection": "ndcg",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.9073486328125e-06
+    },
+    {
+      "arm": "all_zero",
+      "selection": "discovery",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 2.6226043701171875e-06
+    },
+    {
+      "arm": "direct52_all_zero",
+      "selection": "ndcg",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "direct52_all_zero",
+      "selection": "discovery",
+      "full_metrics_replayed": true,
+      "cpu32_max_abs_diff": 1.6689300537109375e-06
+    }
+  ],
+  "all_frozen_inputs_unchanged": true
+}

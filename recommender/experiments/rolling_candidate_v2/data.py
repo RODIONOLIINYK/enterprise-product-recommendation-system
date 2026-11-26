@@ -1429,6 +1429,7 @@ def rolling_ranker_batch_inputs(
         "seq_purchase_dates",
         "prediction_day",
         "candidate_mask",
+        "candidate_indices",
     )
     inputs: Dict[str, Any] = {
         name: batch[name].to(device) if batch.get(name) is not None else None

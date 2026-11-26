@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Stage 2 Candidate Self-Attention &amp; Pre-Attention Token Enrichment (Seed 42)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 24px auto; max-width: 1180px; color: #111827; background: #f9fafb; padding: 0 16px; }
+  h1, h2, h3 { color: #111827; }
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #e0f2fe; color: #0369a1; margin-right: 6px; }
+  .card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px 20px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 7px 8px; text-align: right; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+  th { background: #f3f4f6; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 14px; }
+  .note { font-size: 12px; color: #4b5563; }
+</style>
+</head>
+<body>
+  <h1>Stage 2 Candidate Self-Attention &amp; Token Statistics Enrichment</h1>
+  <div>
+    <span class="badge">Seed: 42</span>
+    <span class="badge">Epochs: 10</span>
+    <span class="badge">Batch: 64</span>
+    <span class="badge">Policy: rolling_observed_v2</span>
+    <span class="badge">Slate: quota100_50 (26,253 train / 6,191 val)</span>
+    <span class="badge">Teacher Score: False</span>
+    <span class="badge">Heldout Access: False</span>
+  </div>
+
+  <div class="card">
+    <h2>1. NDCG-Selected Validation Metrics (best_ndcg.pt)</h2>
+    <table>
+      <thead><tr><th>Arm</th><th>Ep</th><th>Qual</th><th>R@5</th><th>R@10</th><th>R@25</th><th>R@50</th><th>R@100</th><th>NDCG@10</th><th>MRR</th><th>Rep Micro</th><th>Rep Macro</th><th>New Hits@10</th></tr></thead>
+      <tbody><tr><td><strong>Arm A: Pointwise 425D</strong></td><td>8</td><td>Yes</td><td>0.66012</td><td>0.77104</td><td>0.85816</td><td>0.90476</td><td>0.94010</td><td>0.60223</td><td>0.58329</td><td>0.89298</td><td>0.92067</td><td>255 (0.13732)</td></tr>
+<tr><td><strong>Arm B: Cand-Attn 425D</strong></td><td>9</td><td>Yes</td><td>0.65307</td><td>0.76744</td><td>0.85725</td><td>0.90077</td><td>0.94010</td><td>0.59890</td><td>0.57919</td><td>0.88775</td><td>0.91588</td><td>252 (0.13570)</td></tr>
+<tr><td><strong>Arm C: Cand-Attn + Enriched 128D</strong></td><td>9</td><td>Yes</td><td>0.66033</td><td>0.76647</td><td>0.85867</td><td>0.90248</td><td>0.94010</td><td>0.60012</td><td>0.58102</td><td>0.88811</td><td>0.91735</td><td>239 (0.12870)</td></tr></tbody>
+    </table>
+    <p class="note">Identical slates across all 3 arms: mixed coverage micro = 0.94424, new slate coverage = 0.69736 (1,295/1,857).</p>
+  </div>
+
+  <div class="card">
+    <h2>2. Discovery-Selected Validation Metrics (best.pt / best_unqualified.pt)</h2>
+    <table>
+      <thead><tr><th>Arm</th><th>Ep</th><th>Qual</th><th>R@5</th><th>R@10</th><th>R@25</th><th>R@50</th><th>R@100</th><th>NDCG@10</th><th>MRR</th><th>Rep Micro</th><th>Rep Macro</th><th>New Hits@10</th></tr></thead>
+      <tbody><tr><td><strong>Arm A: Pointwise 425D</strong></td><td>8</td><td>Yes</td><td>0.66012</td><td>0.77104</td><td>0.85816</td><td>0.90476</td><td>0.94010</td><td>0.60223</td><td>0.58329</td><td>0.89298</td><td>0.92067</td><td>255 (0.13732)</td></tr>
+<tr><td><strong>Arm B: Cand-Attn 425D</strong></td><td>9</td><td>Yes</td><td>0.65307</td><td>0.76744</td><td>0.85725</td><td>0.90077</td><td>0.94010</td><td>0.59890</td><td>0.57919</td><td>0.88775</td><td>0.91588</td><td>252 (0.13570)</td></tr>
+<tr><td><strong>Arm C: Cand-Attn + Enriched 128D</strong></td><td>6</td><td>Yes</td><td>0.65956</td><td>0.77100</td><td>0.85906</td><td>0.90267</td><td>0.94010</td><td>0.59963</td><td>0.57879</td><td>0.89191</td><td>0.92023</td><td>255 (0.13732)</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>3. Customer-Clustered Paired 95% Bootstrap CIs (2,000 draws, seed=123)</h2>
+    <div class="grid">
+      <div><svg viewBox="0 0 440 145" width="440" height="145" xmlns="http://www.w3.org/2000/svg">
+<text x="75" y="18" font-size="13" font-weight="600" fill="#1f2937">NDCG-Selected: Recall@10 Delta (pp)</text>
+<line x1="247.5" y1="30" x2="247.5" y2="120" stroke="#9ca3af" stroke-dasharray="3,3" stroke-width="1"/>
+<text x="247.5" y="136" font-size="10" text-anchor="middle" fill="#6b7280">0 pp</text>
+<text x="8" y="52" font-size="11" fill="#374151">A -&gt; B</text>
+<line x1="122.2" y1="48" x2="248.7" y2="48" stroke="#2563eb" stroke-width="3"/>
+<circle cx="186.7" cy="48" r="4.5" fill="#2563eb"/>
+<text x="254.7" y="52" font-size="10" fill="#374151">-0.360pp</text>
+<text x="8" y="80" font-size="11" fill="#374151">B -&gt; C</text>
+<line x1="161.5" y1="76" x2="301.1" y2="76" stroke="#2563eb" stroke-width="3"/>
+<circle cx="231.1" cy="76" r="4.5" fill="#2563eb"/>
+<text x="307.1" y="80" font-size="10" fill="#374151">-0.097pp</text>
+<text x="8" y="108" font-size="11" fill="#374151">A -&gt; C</text>
+<line x1="109.5" y1="104" x2="233.1" y2="104" stroke="#dc2626" stroke-width="3"/>
+<circle cx="170.3" cy="104" r="4.5" fill="#dc2626"/>
+<text x="239.1" y="108" font-size="10" fill="#374151">-0.457pp</text>
+</svg></div>
+      <div><svg viewBox="0 0 440 145" width="440" height="145" xmlns="http://www.w3.org/2000/svg">
+<text x="75" y="18" font-size="13" font-weight="600" fill="#1f2937">NDCG-Selected: NDCG@10 Delta (x100)</text>
+<line x1="247.5" y1="30" x2="247.5" y2="120" stroke="#9ca3af" stroke-dasharray="3,3" stroke-width="1"/>
+<text x="247.5" y="136" font-size="10" text-anchor="middle" fill="#6b7280">0 </text>
+<text x="8" y="52" font-size="11" fill="#374151">A -&gt; B</text>
+<line x1="109.5" y1="48" x2="236.5" y2="48" stroke="#dc2626" stroke-width="3"/>
+<circle cx="174.2" cy="48" r="4.5" fill="#dc2626"/>
+<text x="242.5" y="52" font-size="10" fill="#374151">-0.333</text>
+<text x="8" y="80" font-size="11" fill="#374151">B -&gt; C</text>
+<line x1="197.6" y1="76" x2="345.2" y2="76" stroke="#2563eb" stroke-width="3"/>
+<circle cx="274.4" cy="76" r="4.5" fill="#2563eb"/>
+<text x="351.2" y="80" font-size="10" fill="#374151">+0.122</text>
+<text x="8" y="108" font-size="11" fill="#374151">A -&gt; C</text>
+<line x1="137.7" y1="104" x2="260.6" y2="104" stroke="#2563eb" stroke-width="3"/>
+<circle cx="201.1" cy="104" r="4.5" fill="#2563eb"/>
+<text x="266.6" y="108" font-size="10" fill="#374151">-0.211</text>
+</svg></div>
+      <div><svg viewBox="0 0 440 145" width="440" height="145" xmlns="http://www.w3.org/2000/svg">
+<text x="75" y="18" font-size="13" font-weight="600" fill="#1f2937">NDCG-Selected: New Recall@10 Delta (pp)</text>
+<line x1="247.5" y1="30" x2="247.5" y2="120" stroke="#9ca3af" stroke-dasharray="3,3" stroke-width="1"/>
+<text x="247.5" y="136" font-size="10" text-anchor="middle" fill="#6b7280">0 pp</text>
+<text x="8" y="52" font-size="11" fill="#374151">A -&gt; B</text>
+<line x1="151.7" y1="48" x2="313.0" y2="48" stroke="#2563eb" stroke-width="3"/>
+<circle cx="235.2" cy="48" r="4.5" fill="#2563eb"/>
+<text x="319.0" y="52" font-size="10" fill="#374151">-0.162pp</text>
+<text x="8" y="80" font-size="11" fill="#374151">B -&gt; C</text>
+<line x1="114.3" y1="76" x2="280.3" y2="76" stroke="#2563eb" stroke-width="3"/>
+<circle cx="194.0" cy="76" r="4.5" fill="#2563eb"/>
+<text x="286.3" y="80" font-size="10" fill="#374151">-0.700pp</text>
+<text x="8" y="108" font-size="11" fill="#374151">A -&gt; C</text>
+<line x1="109.5" y1="104" x2="258.9" y2="104" stroke="#2563eb" stroke-width="3"/>
+<circle cx="181.7" cy="104" r="4.5" fill="#2563eb"/>
+<text x="264.9" y="108" font-size="10" fill="#374151">-0.862pp</text>
+</svg></div>
+      <div><svg viewBox="0 0 440 145" width="440" height="145" xmlns="http://www.w3.org/2000/svg">
+<text x="75" y="18" font-size="13" font-weight="600" fill="#1f2937">Discovery-Selected: New Recall@10 Delta (pp)</text>
+<line x1="247.5" y1="30" x2="247.5" y2="120" stroke="#9ca3af" stroke-dasharray="3,3" stroke-width="1"/>
+<text x="247.5" y="136" font-size="10" text-anchor="middle" fill="#6b7280">0 pp</text>
+<text x="8" y="52" font-size="11" fill="#374151">A -&gt; B</text>
+<line x1="109.5" y1="48" x2="341.8" y2="48" stroke="#2563eb" stroke-width="3"/>
+<circle cx="229.7" cy="48" r="4.5" fill="#2563eb"/>
+<text x="347.8" y="52" font-size="10" fill="#374151">-0.162pp</text>
+<text x="8" y="80" font-size="11" fill="#374151">B -&gt; C</text>
+<line x1="144.8" y1="76" x2="378.9" y2="76" stroke="#2563eb" stroke-width="3"/>
+<circle cx="265.3" cy="76" r="4.5" fill="#2563eb"/>
+<text x="384.9" y="80" font-size="10" fill="#374151">+0.162pp</text>
+<text x="8" y="108" font-size="11" fill="#374151">A -&gt; C</text>
+<line x1="146.6" y1="104" x2="342.0" y2="104" stroke="#2563eb" stroke-width="3"/>
+<circle cx="247.5" cy="104" r="4.5" fill="#2563eb"/>
+<text x="348.0" y="108" font-size="10" fill="#374151">+0.000pp</text>
+</svg></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>4. Real-Input Stage 2 Request Latency (CPU &amp; MPS, Slate=100)</h2>
+    <table>
+      <thead><tr><th>Device</th><th>Arm</th><th>Params</th><th>Batch 1 Prepared (ms)</th><th>Batch 1 H2D+Fwd (ms)</th><th>Batch 64 Prepared (ms)</th><th>Batch 64 H2D+Fwd (ms)</th></tr></thead>
+      <tbody><tr><td><code>cpu</code></td><td><code>arm_a_control_pointwise_425d</code></td><td>1,237,515</td><td>0.643 / 0.697</td><td>0.673 / 0.692</td><td>10.631 / 10.681</td><td>10.906 / 11.019</td></tr>
+<tr><td><code>cpu</code></td><td><code>arm_b_cand_attn_425d</code></td><td>1,237,515</td><td>0.995 / 1.013</td><td>1.014 / 1.031</td><td>18.802 / 19.066</td><td>18.862 / 18.967</td></tr>
+<tr><td><code>cpu</code></td><td><code>arm_c_cand_attn_enriched_128d</code></td><td>1,344,779</td><td>1.309 / 1.322</td><td>1.312 / 1.332</td><td>22.247 / 22.471</td><td>22.435 / 22.666</td></tr>
+<tr><td><code>mps</code></td><td><code>arm_a_control_pointwise_425d</code></td><td>1,237,515</td><td>2.999 / 3.145</td><td>6.112 / 6.253</td><td>6.639 / 6.752</td><td>9.844 / 9.936</td></tr>
+<tr><td><code>mps</code></td><td><code>arm_b_cand_attn_425d</code></td><td>1,237,515</td><td>3.228 / 3.293</td><td>6.344 / 6.490</td><td>8.969 / 9.320</td><td>12.220 / 12.307</td></tr>
+<tr><td><code>mps</code></td><td><code>arm_c_cand_attn_enriched_128d</code></td><td>1,344,779</td><td>9.844 / 10.129</td><td>13.052 / 13.260</td><td>16.832 / 16.937</td><td>19.860 / 20.107</td></tr></tbody>
+    </table>
+    <p class="note">Prepared measures pre-materialized tensors on target device; H2D+Fwd includes host-to-device batch transfer.</p>
+  </div>
+</body>
+</html>

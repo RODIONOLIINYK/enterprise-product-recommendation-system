@@ -1,0 +1,56 @@
+{
+  "heldout_access": false,
+  "preserved_reference_cache_files": 31,
+  "all_preserved_hashes_match": true,
+  "selected_neural_records": [
+    {
+      "arm": "control32",
+      "selection": "ndcg",
+      "metrics_reproduced": true,
+      "cpu32_max_abs_logit_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "control32",
+      "selection": "discovery",
+      "metrics_reproduced": true,
+      "cpu32_max_abs_logit_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "wider_head",
+      "selection": "ndcg",
+      "metrics_reproduced": true,
+      "cpu32_max_abs_logit_diff": 1.9073486328125e-06
+    },
+    {
+      "arm": "wider_head",
+      "selection": "discovery",
+      "metrics_reproduced": true,
+      "cpu32_max_abs_logit_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "wider_ffn",
+      "selection": "ndcg",
+      "metrics_reproduced": true,
+      "cpu32_max_abs_logit_diff": 1.9073486328125e-06
+    },
+    {
+      "arm": "wider_ffn",
+      "selection": "discovery",
+      "metrics_reproduced": true,
+      "cpu32_max_abs_logit_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "deeper_memory",
+      "selection": "ndcg",
+      "metrics_reproduced": true,
+      "cpu32_max_abs_logit_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "deeper_memory",
+      "selection": "discovery",
+      "metrics_reproduced": true,
+      "cpu32_max_abs_logit_diff": 1.430511474609375e-06
+    }
+  ],
+  "standalone_tree_replay": "Complete eligible-pool replay after reload is enforced by standalone.py"
+}

@@ -1,0 +1,41 @@
+<section id="capacity-comparison" data-viz-composition>
+  <p>6,191 validation queries · seed 42 · changes from saved Arm A</p>
+  <p class="text-muted">Neural models rank the same 100 candidates. Standalone CatBoost ranks all eligible SKUs.</p>
+  <div class="viz-controls">
+    <label class="form-label" for="capacity-selection">Checkpoint selection
+      <select id="capacity-selection" class="form-select" disabled>
+        <option value="ndcg">NDCG-selected</option>
+        <option value="discovery">Discovery-selected</option>
+      </select>
+    </label>
+    <label class="form-label" for="capacity-metric">Metric
+      <select id="capacity-metric" class="form-select" disabled>
+        <option value="ndcg">NDCG@10 change</option>
+        <option value="recall">Recall@10 change (percentage points)</option>
+        <option value="hits">New-product hits@10 change</option>
+      </select>
+    </label>
+  </div>
+  <div data-viz-container></div>
+  <p class="text-muted">Positive means improvement. Point estimates from one training seed; no model promoted.</p>
+  <script type="application/json" data-viz-chart id="capacity-ndcg-ndcg">{"id": "capacity-results", "title": "NDCG@10 change", "description": "Treatment minus saved original 32-event pointwise control.", "height": 320, "columns": ["model", "delta"], "rows": [["Fresh original control", -9.294714324969977e-05], ["Wider scoring MLP", -0.0017108430141082875], ["Wider Transformer FFN", -0.0024757348743122964], ["Two history attention layers", -0.0026805791931426848], ["Standalone CatBoost", -0.008500227917387582]], "spec": {"type": "horizontalBar", "y": "model", "x": "delta", "xLabel": "NDCG@10 change", "xDomain": [-0.009775262104995719, 0.0012750341876081371], "showValues": true, "sortOrder": "original", "valueFormat": {"style": "decimal", "minimumFractionDigits": 5, "maximumFractionDigits": 5}}}</script>
+<script type="application/json" data-viz-chart id="capacity-discovery-ndcg">{"id": "capacity-results", "title": "NDCG@10 change", "description": "Treatment minus saved original 32-event pointwise control.", "height": 320, "columns": ["model", "delta"], "rows": [["Fresh original control", -9.294714324969977e-05], ["Wider scoring MLP", -0.0034157738831023243], ["Wider Transformer FFN", -0.0028763983315410746], ["Two history attention layers", -0.004743123669586624], ["Standalone CatBoost", -0.008500227917387582]], "spec": {"type": "horizontalBar", "y": "model", "x": "delta", "xLabel": "NDCG@10 change", "xDomain": [-0.009775262104995719, 0.0012750341876081371], "showValues": true, "sortOrder": "original", "valueFormat": {"style": "decimal", "minimumFractionDigits": 5, "maximumFractionDigits": 5}}}</script>
+<script type="application/json" data-viz-chart id="capacity-ndcg-recall">{"id": "capacity-results", "title": "Recall@10 change (percentage points)", "description": "Treatment minus saved original 32-event pointwise control.", "height": 320, "columns": ["model", "delta"], "rows": [["Fresh original control", -0.16360597890235917], ["Wider scoring MLP", -0.47249388652230717], ["Wider Transformer FFN", -0.4223739343267585], ["Two history attention layers", -0.20537620279178492], ["Standalone CatBoost", -1.2895195319491015]], "spec": {"type": "horizontalBar", "y": "model", "x": "delta", "xLabel": "Recall@10 change (percentage points)", "xDomain": [-1.4829474617414666, 0.19342792979236523], "showValues": true, "sortOrder": "original", "valueFormat": {"style": "decimal", "minimumFractionDigits": 3, "maximumFractionDigits": 3}}}</script>
+<script type="application/json" data-viz-chart id="capacity-discovery-recall">{"id": "capacity-results", "title": "Recall@10 change (percentage points)", "description": "Treatment minus saved original 32-event pointwise control.", "height": 320, "columns": ["model", "delta"], "rows": [["Fresh original control", -0.16360597890235917], ["Wider scoring MLP", -0.1383125973256738], ["Wider Transformer FFN", -0.3805130779771182], ["Two history attention layers", -0.39247378368683083], ["Standalone CatBoost", -1.2895195319491015]], "spec": {"type": "horizontalBar", "y": "model", "x": "delta", "xLabel": "Recall@10 change (percentage points)", "xDomain": [-1.4829474617414666, 0.19342792979236523], "showValues": true, "sortOrder": "original", "valueFormat": {"style": "decimal", "minimumFractionDigits": 3, "maximumFractionDigits": 3}}}</script>
+<script type="application/json" data-viz-chart id="capacity-ndcg-hits">{"id": "capacity-results", "title": "New-product hits@10 change", "description": "Treatment minus saved original 32-event pointwise control.", "height": 320, "columns": ["model", "delta"], "rows": [["Fresh original control", -2], ["Wider scoring MLP", -16], ["Wider Transformer FFN", -10], ["Two history attention layers", -10], ["Standalone CatBoost", -53]], "spec": {"type": "horizontalBar", "y": "model", "x": "delta", "xLabel": "New-product hits@10 change", "xDomain": [-60.95, 7.949999999999999], "showValues": true, "sortOrder": "original", "valueFormat": {"style": "decimal", "minimumFractionDigits": 0, "maximumFractionDigits": 0}}}</script>
+<script type="application/json" data-viz-chart id="capacity-discovery-hits">{"id": "capacity-results", "title": "New-product hits@10 change", "description": "Treatment minus saved original 32-event pointwise control.", "height": 320, "columns": ["model", "delta"], "rows": [["Fresh original control", -2], ["Wider scoring MLP", -5], ["Wider Transformer FFN", -6], ["Two history attention layers", -8], ["Standalone CatBoost", -53]], "spec": {"type": "horizontalBar", "y": "model", "x": "delta", "xLabel": "New-product hits@10 change", "xDomain": [-60.95, 7.949999999999999], "showValues": true, "sortOrder": "original", "valueFormat": {"style": "decimal", "minimumFractionDigits": 0, "maximumFractionDigits": 0}}}</script>
+</section>
+<script type="module">
+  import { mountChart } from "https://persistent.oaistatic.com/plugins/visualize/charts/1.2.3/element.js";
+  const root = document.getElementById("capacity-comparison");
+  const selection = document.getElementById("capacity-selection");
+  const metric = document.getElementById("capacity-metric");
+  function configuration() {
+    return JSON.parse(document.getElementById("capacity-" + selection.value + "-" + metric.value).textContent);
+  }
+  const chart = mountChart(root.querySelector("[data-viz-container]"), configuration());
+  selection.addEventListener("change", () => { chart.config = configuration(); });
+  metric.addEventListener("change", () => { chart.config = configuration(); });
+  selection.disabled = false;
+  metric.disabled = false;
+</script>

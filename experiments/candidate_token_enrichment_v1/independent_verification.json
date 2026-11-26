@@ -1,0 +1,68 @@
+{
+  "heldout_access": false,
+  "additional_training_executed": false,
+  "preserved_hashes_matched": 31,
+  "selected_checkpoint_checks": [
+    {
+      "arm": "arm_a_control_pointwise_425d",
+      "selection": "ndcg",
+      "epoch": 8,
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "cpu_vs_saved_max_abs_diff": 1.9073486328125e-06
+    },
+    {
+      "arm": "arm_a_control_pointwise_425d",
+      "selection": "discovery",
+      "epoch": 8,
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "cpu_vs_saved_max_abs_diff": 1.9073486328125e-06
+    },
+    {
+      "arm": "arm_b_cand_attn_425d",
+      "selection": "ndcg",
+      "epoch": 9,
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "cpu_vs_saved_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "arm_b_cand_attn_425d",
+      "selection": "discovery",
+      "epoch": 9,
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "cpu_vs_saved_max_abs_diff": 1.430511474609375e-06
+    },
+    {
+      "arm": "arm_c_cand_attn_enriched_128d",
+      "selection": "ndcg",
+      "epoch": 9,
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "cpu_vs_saved_max_abs_diff": 1.9073486328125e-06
+    },
+    {
+      "arm": "arm_c_cand_attn_enriched_128d",
+      "selection": "discovery",
+      "epoch": 6,
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "cpu_vs_saved_max_abs_diff": 1.430511474609375e-06
+    }
+  ],
+  "full_tests": {
+    "passed": 549,
+    "skipped": 6
+  },
+  "synthetic_tests": {
+    "passed": 539,
+    "skipped": 16
+  },
+  "interpretation_limits": [
+    "Single training seed; intervals are conditional on fitted weights.",
+    "Removing an entire enrichment block measures block dependence, not isolated statistical feature value.",
+    "Enrichment without candidate attention was not independently trained."
+  ]
+}

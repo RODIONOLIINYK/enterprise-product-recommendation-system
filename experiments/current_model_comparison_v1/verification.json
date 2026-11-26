@@ -1,0 +1,97 @@
+{
+  "heldout_access": false,
+  "additional_training_executed": false,
+  "preserved_hashes_matched": 31,
+  "selected_checkpoint_checks": [
+    {
+      "model": "fused_two_profile_32",
+      "selection": "ndcg",
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "max_abs_cpu_vs_saved_mps_diff": 1.430511474609375e-06
+    },
+    {
+      "model": "fused_two_profile_32",
+      "selection": "discovery",
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "max_abs_cpu_vs_saved_mps_diff": 1.430511474609375e-06
+    },
+    {
+      "model": "split_text_attributes_32",
+      "selection": "ndcg",
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "max_abs_cpu_vs_saved_mps_diff": 1.6689300537109375e-06
+    },
+    {
+      "model": "split_text_attributes_32",
+      "selection": "discovery",
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "max_abs_cpu_vs_saved_mps_diff": 1.430511474609375e-06
+    },
+    {
+      "model": "split_text_attributes_64",
+      "selection": "ndcg",
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "max_abs_cpu_vs_saved_mps_diff": 2.6226043701171875e-06
+    },
+    {
+      "model": "split_text_attributes_64",
+      "selection": "discovery",
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "max_abs_cpu_vs_saved_mps_diff": 2.6226043701171875e-06
+    },
+    {
+      "model": "historical17",
+      "selection": "ndcg",
+      "metrics_match": true,
+      "full_validation_rows_replayed": 6191
+    },
+    {
+      "model": "historical17",
+      "selection": "discovery",
+      "metrics_match": true,
+      "full_validation_rows_replayed": 6191
+    },
+    {
+      "model": "current53",
+      "selection": "ndcg",
+      "metrics_match": true,
+      "full_validation_rows_replayed": 6191
+    },
+    {
+      "model": "current53",
+      "selection": "discovery",
+      "metrics_match": true,
+      "full_validation_rows_replayed": 6191
+    },
+    {
+      "model": "fused_one_profile_64",
+      "selection": "ndcg",
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "max_abs_cpu_vs_saved_mps_diff": 1.6689300537109375e-06
+    },
+    {
+      "model": "fused_one_profile_64",
+      "selection": "discovery",
+      "metrics_match": true,
+      "cpu_replay_rows": 32,
+      "max_abs_cpu_vs_saved_mps_diff": 1.430511474609375e-06
+    }
+  ],
+  "full_tests": {
+    "passed": 569,
+    "skipped": 6
+  },
+  "synthetic_tests": {
+    "passed": 559,
+    "skipped": 16
+  },
+  "default_A_replay_cpu_maxdiff": 1.9073486328125e-06,
+  "all64_memory_models_share_identical_history_cache": true
+}
