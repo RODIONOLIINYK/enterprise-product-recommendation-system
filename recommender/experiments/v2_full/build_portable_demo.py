@@ -852,24 +852,81 @@ rebuildFilter();
 
 
 README_START_TXT = """====================================================================
-  Система AI-рекомендацій B2B — Демо, Презентація, Документація і Модель
+  Система AI-рекомендацій B2B — Live Python Демо, Презентація,
+  Документація (3D) та Навчена Модель
 ====================================================================
 
-ЯК ВІДКРИТИ (БЕЗ ІНТЕРНЕТУ ТА БЕЗ ВСТАНОВЛЕННЯ ПРОГРАМ):
+ВАРІАНТ 1 — ЖИВИЙ ЗАПУСК НЕЙРОМЕРЕЖІ У PYTHON (РЕКОМЕНДОВАНО):
+  Показує реальну швидкість моделі (~2–3 мс на CPU без GPU), живий
+  розрахунок PyTorch на кожному кліку та бенчмарк на 100 замовлень
+  (1 000 реальних тестових замовлень: 700 навчених + 300 ненавчених).
+
+  macOS:   Подвійний клік на START_LIVE_DEMO.command
+           (або в терміналі: python3 live_demo_server.py)
+  Windows: Подвійний клік на START_LIVE_DEMO.bat
+           (або в cmd: python live_demo_server.py)
+
+  Вимоги для Live Python: Python 3.9+ та бібліотеки з requirements.txt
+  (встановити один раз: pip install -r requirements.txt).
+
+ВАРІАНТ 2 — ШВИДКИЙ ПЕРЕГЛЯД БЕЗ ВСТАНОВЛЕННЯ ПРОГРАМ (HTML):
   1. Розпакуйте цей ZIP-архів у будь-яку папку.
   2. Відкрийте потрібний файл подвійним кліком у браузері (Chrome / Safari / Edge):
-     - OPEN_DEMO.html       — інтерактивний перегляд прогнозів моделі на реальних
-                              замовленнях із фінальної тестової вибірки (2026-07..2026-11)
+     - OPEN_DEMO.html       — офлайн-демо на 220 реальних тестових замовленнях
      - PRESENTATION.html    — презентація (9 слайдів, 3D-схема, перемикання ← / →)
-     - DOCUMENTATION.html   — зрозуміла документація та інтерактивна 3D-модель архітектури
+     - DOCUMENTATION.html   — зрозуміла документація та інтерактивна 3D-архітектура
      - PRESENTATION.pdf     — PDF-версія презентації з Google Slides
 
 ВМІСТ ПАПКИ model/:
-  - best_discovery.pt      — фінальна навчена нейромережа PyTorch
-                             (w2_2mem_recency_hl365, Епоха 10)
-  - v2_full_reference.json — повна специфікація та контрольні суми SHA-256
+  - best_discovery.pt       — фінальна навчена нейромережа PyTorch
+                              (w2_2mem_recency_hl365, Епоха 10, 5.26 МБ)
+  - test_live_bundle.pt.gz  — 1 000 реальних тестових замовлень (тензори для Live PyTorch)
+  - v2_full_reference.json  — повна специфікація та контрольні суми SHA-256
 ====================================================================
 """
+
+START_MAC_SH = """#!/bin/bash
+cd "$(dirname "$0")"
+echo "=== Запуск Live Python AI-демо (Wave2BE2ERanker · PyTorch CPU) ==="
+PY=""
+for cand in "./venv/bin/python" "../../venv/bin/python" "python3" "python"; do
+  if command -v "$cand" >/dev/null 2>&1; then
+    if "$cand" -c "import torch, numpy" >/dev/null 2>&1; then
+      PY="$cand"
+      break
+    fi
+  fi
+done
+if [ -z "$PY" ]; then
+  echo "Не знайдено Python із PyTorch (torch) та NumPy."
+  echo "Встановіть залежності командою: pip3 install -r requirements.txt"
+  read -p "Натисніть Enter для виходу..."
+  exit 1
+fi
+echo "Використовується: $PY"
+"$PY" live_demo_server.py --port 8799
+"""
+
+START_WIN_BAT = """@echo off
+cd /d "%~dp0"
+echo === Запуск Live Python AI-демо (Wave2BE2ERanker · PyTorch CPU) ===
+python -c "import torch, numpy" >nul 2>&1
+if errorlevel 1 (
+  echo Не знайдено Python із PyTorch (torch) та NumPy.
+  echo Встановіть залежності командою: pip install -r requirements.txt
+  pause
+  exit /b 1
+)
+python live_demo_server.py --port 8799
+pause
+"""
+
+REQUIREMENTS_TXT = """torch>=2.0.0
+numpy>=1.24.0
+"""
+
+DEFAULT_LIVE_BUNDLE_PATH = Path("data/v2_full/interim/test_live_bundle_1000.pt.gz")
+LIVE_SERVER_SCRIPT_PATH = Path(__file__).resolve().parent / "live_demo_server.py"
 
 
 def build_portable_demo_zip(
@@ -879,6 +936,7 @@ def build_portable_demo_zip(
     split: str = "test",
     test_cases_json: Path = DEFAULT_TEST_CASES_JSON,
     presentation_pdf: Optional[Path] = None,
+    live_bundle_path: Optional[Path] = DEFAULT_LIVE_BUNDLE_PATH,
 ) -> Path:
     t0 = time.perf_counter()
     ref = json.loads(V2_FULL_REFERENCE_PATH.read_text(encoding="utf-8"))
@@ -944,21 +1002,41 @@ def build_portable_demo_zip(
     output_zip = Path(output_zip)
     output_zip.parent.mkdir(parents=True, exist_ok=True)
     root_folder = "B2B_Recommender_Demo"
-    with zipfile.ZipFile(output_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+    with zipfile.ZipFile(output_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         zf.writestr(f"{root_folder}/OPEN_DEMO.html", html_out.encode("utf-8"))
         zf.writestr(f"{root_folder}/PRESENTATION.html", pres_html.encode("utf-8"))
         zf.writestr(f"{root_folder}/DOCUMENTATION.html", doc_html.encode("utf-8"))
         zf.writestr(f"{root_folder}/README_START.txt", README_START_TXT.encode("utf-8"))
+        zf.writestr(f"{root_folder}/requirements.txt", REQUIREMENTS_TXT.encode("utf-8"))
+        zf.writestr(f"{root_folder}/START_LIVE_DEMO.bat", START_WIN_BAT.replace("\n", "\r\n").encode("utf-8"))
+
+        # Preserve executable permissions on macOS launcher and live_demo_server.py
+        zi_sh = zipfile.ZipInfo(f"{root_folder}/START_LIVE_DEMO.command")
+        zi_sh.external_attr = 0o755 << 16
+        zf.writestr(zi_sh, START_MAC_SH.encode("utf-8"))
+
+        if LIVE_SERVER_SCRIPT_PATH.is_file():
+            zi_py = zipfile.ZipInfo(f"{root_folder}/live_demo_server.py")
+            zi_py.external_attr = 0o755 << 16
+            zf.writestr(zi_py, LIVE_SERVER_SCRIPT_PATH.read_bytes())
+
         if presentation_pdf is not None and Path(presentation_pdf).exists():
             zf.write(presentation_pdf, arcname=f"{root_folder}/PRESENTATION.pdf")
         zf.write(ckpt_path, arcname=f"{root_folder}/model/best_discovery.pt")
         zf.write(V2_FULL_REFERENCE_PATH, arcname=f"{root_folder}/model/v2_full_reference.json")
+        if live_bundle_path is not None and Path(live_bundle_path).is_file():
+            # Already gzip-compressed; store without re-compressing for fast zip/unzip
+            zf.write(
+                live_bundle_path,
+                arcname=f"{root_folder}/model/test_live_bundle.pt.gz",
+                compress_type=zipfile.ZIP_STORED,
+            )
 
     elapsed = time.perf_counter() - t0
     size_mb = output_zip.stat().st_size / (1024 * 1024)
     print(
-        f"[portable-demo] Built {output_zip} ({size_mb:.2f} MB, split={split}, {len(cases)} real cases, "
-        f"{showcase_count} showcase highlights) in {elapsed:.1f}s",
+        f"[portable-demo] Built {output_zip} ({size_mb:.2f} MB, split={split}, {len(cases)} offline HTML cases + "
+        f"Live Python server, {showcase_count} showcase highlights) in {elapsed:.1f}s",
         flush=True,
     )
     return output_zip
@@ -971,6 +1049,7 @@ def main() -> None:
     parser.add_argument("--split", choices=("test", "val"), default="test")
     parser.add_argument("--test-cases-json", type=Path, default=DEFAULT_TEST_CASES_JSON)
     parser.add_argument("--presentation-pdf", type=Path, default=None)
+    parser.add_argument("--live-bundle", type=Path, default=DEFAULT_LIVE_BUNDLE_PATH)
     args = parser.parse_args()
     build_portable_demo_zip(
         output_zip=args.output,
@@ -978,6 +1057,7 @@ def main() -> None:
         split=args.split,
         test_cases_json=args.test_cases_json,
         presentation_pdf=args.presentation_pdf,
+        live_bundle_path=args.live_bundle,
     )
 
 

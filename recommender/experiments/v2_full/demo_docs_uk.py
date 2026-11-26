@@ -506,11 +506,12 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
         </tbody>
       </table>
       <p style="font-size:12px;color:var(--muted);margin-top:8px;">
-        *Чисті новинки — режим Option A. **У продакшені <code>ProductTower</code> здатен одразу кодувати нові товари через їхній опис і характеристики (BGE-M3 + 65D спец.) без перенавчання; в офлайн-тесті таблиця була заморожена на 1 141 продукті, тому 76.63% — сувора нижня оцінка.
+        *Чисті новинки — режим Option A. **У продакшені <code>ProductTower</code> здатен одразу кодувати нові товари через їхній опис і характеристики (BGE-M3 + 65D спец.) без перенавчання; в офлайн-тесті таблиця була заморожена на 1 141 продукті, тому 76.63% — сувора нижня оцінка.<br />
+        <strong>Доказ відсутності перенавчання:</strong> середній тестовий ордер (<code>2026-09-12</code>) віддалений від останнього навчального продажу (<code>2026-01-30</code>) на <strong>7.4 місяця (225 днів; медіана 7.5 міс., макс. 9.7 міс. / 294 дні)</strong> — і точність на навчених C&amp;P тримається стабільно на <strong>83.03%</strong>.
       </p>
     </div>
     <div class="slide-foot">
-      <span>Стабільність тесту (навчені C&amp;P): Лип 82.33% → Сер 83.07% → Вер 83.72% → Жов 83.20% → Лис 82.88%</span>
+      <span>Стабільність через 5–9.7 міс. (навчені C&amp;P): Лип 82.33% → Сер 83.07% → Вер 83.72% → Жов 83.20% → Лис 82.88%</span>
       <span>Слайд 8 із 9</span>
     </div>
   </section>
@@ -519,25 +520,26 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
   <section class="slide">
     <div>
       <div class="slide-kicker">Що входить у пакет</div>
-      <h2>Готово до перегляду та інтеграції</h2>
+      <h2>Готово до перегляду, живого запуску Python та інтеграції</h2>
       <p class="lead">
-        У цьому ZIP-архіві зібрано все необхідне: інтерактивне демо на реальних кейсах валідації,
-        презентація, зрозуміла документація архітектури та сама навчена модель PyTorch.
+        У цьому ZIP-архіві зібрано і живий Python-сервер із реальним PyTorch-бенчмарком швидкості (~3 мс на CPU),
+        і офлайн-файли для перегляду без встановлення програм.
       </p>
     </div>
     <div class="grid-2">
       <div class="card accent">
-        <h3>Файли для перегляду (відкриваються у браузері)</h3>
+        <h3>Запуск демо, презентації та 3D-документації</h3>
         <ul>
-          <li><strong>OPEN_DEMO.html</strong> — інтерактивний перегляд прогнозів моделі на 220 реальних замовленнях із фінального тесту (2026-07..11).</li>
-          <li><strong>PRESENTATION.html</strong> та <strong>PRESENTATION.pdf</strong> — ця презентація (слайд 5 має живу 3D-архітектуру).</li>
-          <li><strong>DOCUMENTATION.html</strong> — зрозумілий посібник із інтерактивною 3D-моделлю архітектури та розбором усіх блоків.</li>
+          <li><strong>START_LIVE_DEMO.command / .bat</strong> (<code>live_demo_server.py</code>) — живий Python-сервер із реальним PyTorch CPU-інференсом на <strong>1 000 тестових замовленнях</strong> (700 навчених + 300 ненавчених) і живим бенчмарком швидкості!</li>
+          <li><strong>OPEN_DEMO.html</strong> — офлайн-версія без Python (220 кейсів: 117 навчених + 103 ненавчених із <code>⚠️</code>).</li>
+          <li><strong>PRESENTATION.html / .pdf</strong> та <strong>DOCUMENTATION.html</strong> — презентація й інтерактивна 3D-архітектура.</li>
         </ul>
       </div>
       <div class="card">
-        <h3>Навчена модель для розробників (model/)</h3>
+        <h3>Навчена модель та тензори у папці model/</h3>
         <ul>
           <li><strong>model/best_discovery.pt</strong> — фінальні ваги PyTorch (<code>__CKPT_MB__ МБ</code>, Епоха 10).</li>
+          <li><strong>model/test_live_bundle.pt.gz</strong> — реальні тензори для живого PyTorch-демо.</li>
           <li><strong>model/v2_full_reference.json</strong> — технічна специфікація та контрольна сума SHA-256.</li>
           <li class="mono" style="font-size:11.5px;word-break:break-all;color:var(--muted);">SHA-256: __CKPT_SHA__</li>
         </ul>
@@ -806,6 +808,13 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
             </tr>
           </tbody>
         </table>
+        <div class="callout green">
+          <strong>Доказ відсутності перенавчання (часовий розрив 7.4 місяця):</strong>
+          останній продаж у навчальній вибірці датований <code>2026-01-30</code>, тоді як <strong>середня дата замовлення у фінальному тесті — <code>2026-09-12</code></strong>
+          (розрив <strong>225 днів = 7.4 місяця</strong>; медіана — <strong>7.5 місяця</strong>, а фінальні замовлення <code>2026-11-20</code> віддалені на <strong>9.7 місяця / 294 дні</strong>).
+          Попри майже 7.5–10 місяців без жодного перенавчання, точність на навчених клієнтах і товарах тримається стабільно на рівні
+          <strong>83.03% Recall@10</strong> (проти 84.27% на валідації) і не просідає помісячно (Лип 82.33% → Сер 83.07% → Вер 83.72% → Жов 83.20% → Лис 82.88%).
+        </div>
         <div class="callout">
           <strong>Принцип нульового витоку (Zero Future Leakage):</strong> для кожного замовлення на дату <em>D</em>
           історія клієнта, популярність товарів, статистика менеджера й фінансові показники перераховуються
@@ -1200,13 +1209,13 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
       id: 'cust_tower', label: '2. CustomerTower',
       x: -5.65, y: 1.95, z: 0.1, dx: 1.7, dy: 1.5, dz: 1.35,
       top: '#60a5fa', front: '#2563eb', side: '#1e3a8a',
-      summary: '<strong>2. Вежа клієнта (CustomerTower):</strong> перетворює текстовий опис, регіон, галузь та 7 фінансово-поведінкових ознак у єдиний щільний 128-вимірний вектор клієнта.',
+      summary: '<strong>2. Вежа клієнта (CustomerTower / Token-0 Encoder):</strong> перетворює текстовий опис, регіон, галузь та 7 фінансово-поведінкових ознак у єдиний 128-вимірний вектор Токена 0 напряму (без окремого Stage 1 residual MLP).',
       features: [
-        'Текстова гілка: cust_text_proj (Linear 1024 → 128 + LayerNorm + GELU)',
-        'Таблична гілка: ембедінги city (16D) + region (16D) + industry (16D) + CUST_7 (7D) → 128D',
-        'Злиття: token0_fusion([text_128, tab_128]) → 128D',
+        'Текстова гілка (cust_text_proj): Linear 1024 → 128 + LayerNorm + GELU + Dropout(0.12)',
+        'Таблична гілка (cust_tab_proj): concat[city(16D), region(16D), industry(16D), CUST_7(7D)] = 55D → 128D → 128D (CUST_7 входить сюди напряму!)',
+        'Злиття (token0_fusion): concat[z_text(128D), z_tab(128D)] = 256D → Linear(128) + LayerNorm + GELU',
       ],
-      dims: 'Вхід: [1024D текст, 3 ID, 7D CUST_7] → Вихід: вектор клієнта 128D → передається у Токен 0.',
+      dims: 'Вхід: [1024D текст, 3 ID (48D), 7D CUST_7] → Вихід: 128D → + type_emb[0] = Токен 0 (CUST_7 також передається у Cross-Attention key_statistics).',
       training: 'Навчається наскрізно (End-to-End) разом з усією моделлю; dropout = 0.12, weight_decay = 1e-2.',
     },
     {
