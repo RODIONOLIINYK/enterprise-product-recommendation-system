@@ -1203,12 +1203,14 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
   ];
 
   const byId = Object.fromEntries(BLOCKS.map(b => [b.id, b]));
-  let yaw = -0.46, pitch = 0.44, zoom = 1.0, autoSpin = true, selectedId = 'xatt';
+  // Camera angles: yaw orbits horizontally around Z, elev tilts down from above (0.12..1.35 rad)
+  let yaw = -0.34, elev = 0.46, zoom = 1.0, autoSpin = false, selectedId = 'xatt';
   let dragging = false, lx = 0, ly = 0, draggedDist = 0;
   let hitZones = [];
   let tAnim = 0;
 
   if (infoEl && byId[selectedId]) infoEl.innerHTML = byId[selectedId].desc;
+  if (autoBtn) autoBtn.textContent = 'Авто-обертання: Вимк.';
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -1221,22 +1223,37 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
   resize();
   window.addEventListener('resize', resize);
 
+  // True right-handed camera projection:
+  //   - Rotate world (x, y, z) around vertical Z axis by yaw
+  //   - Tilt camera down by elevation angle `elev`
+  //   - +depth = FARTHER from camera, -depth = CLOSER to camera
+  //   - Perspective scale = camDist / (camDist + depth) so closer objects appear larger
   function proj(x, y, z, W, H) {
     const cy = Math.cos(yaw), sy = Math.sin(yaw);
-    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const ce = Math.cos(elev), se = Math.sin(elev);
     const x1 = x * cy - y * sy;
     const y1 = x * sy + y * cy;
-    const y2 = y1 * cp - z * sp;
-    const z2 = y1 * sp + z * cp;
-    const dist = 23.0;
-    const persp = dist / (dist - y2);
-    const scale = Math.min(W / 18.2, H / 7.8) * zoom * persp;
-    return { sx: W * 0.5 + x1 * scale, sy: H * 0.55 - z2 * scale, depth: y2, scale };
+    const depth = y1 * ce - z * se;
+    const up = y1 * se + z * ce;
+    const camDist = 26.0;
+    const persp = camDist / Math.max(4.0, camDist + depth);
+    const scale = Math.min(W / 18.8, H / 8.2) * zoom * persp;
+    return { sx: W * 0.5 + x1 * scale, sy: H * 0.57 - up * scale, depth, scale };
   }
 
   function centerOf(b) {
     return [b.x + b.dx * 0.5, b.y + b.dy * 0.5, b.z + b.dz * 0.5];
   }
+
+  // Face normals in world space + CCW vertex order viewed from OUTSIDE the box
+  const BOX_FACES = [
+    { idx: [4, 5, 6, 7], n: [0, 0, 1], kind: 'top' },    // +Z top
+    { idx: [0, 3, 2, 1], n: [0, 0, -1], kind: 'side' },  // -Z bottom
+    { idx: [0, 1, 5, 4], n: [0, -1, 0], kind: 'front' }, // -Y front
+    { idx: [2, 3, 7, 6], n: [0, 1, 0], kind: 'front' },  // +Y back
+    { idx: [1, 2, 6, 5], n: [1, 0, 0], kind: 'side' },   // +X right
+    { idx: [3, 0, 4, 7], n: [-1, 0, 0], kind: 'side' },  // -X left
+  ];
 
   function drawPrism(x, y, z, dx, dy, dz, topC, frontC, sideC, isSel, W, H) {
     const pts = [
@@ -1244,29 +1261,32 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
       [x, y, z+dz], [x+dx, y, z+dz], [x+dx, y+dy, z+dz], [x, y+dy, z+dz]
     ].map(p => proj(p[0], p[1], p[2], W, H));
 
-    const faces = [
-      { idx: [4,5,6,7], col: topC },
-      { idx: [0,1,5,4], col: frontC },
-      { idx: [1,2,6,5], col: sideC },
-      { idx: [2,3,7,6], col: frontC },
-      { idx: [3,0,4,7], col: sideC },
-    ];
-    faces.sort((a, b) => {
-      const da = a.idx.reduce((s, i) => s + pts[i].depth, 0) / 4;
-      const db = b.idx.reduce((s, i) => s + pts[i].depth, 0) / 4;
-      return da - db;
-    });
-    faces.forEach(f => {
+    // Only draw front-facing faces (true 2D signed screen area check = exact back-face culling)
+    const visible = [];
+    for (const f of BOX_FACES) {
+      const p0 = pts[f.idx[0]], p1 = pts[f.idx[1]], p2 = pts[f.idx[2]];
+      const cross = (p1.sx - p0.sx) * (p2.sy - p0.sy) - (p1.sy - p0.sy) * (p2.sx - p0.sx);
+      // In screen coords (Y down), CCW outside-facing vertices have negative cross product
+      if (cross < 0) {
+        const avgDepth = f.idx.reduce((s, i) => s + pts[i].depth, 0) / 4;
+        const col = f.kind === 'top' ? topC : (f.kind === 'front' ? frontC : sideC);
+        visible.push({ idx: f.idx, col, avgDepth });
+      }
+    }
+    // Painter's order: draw FARTHER faces first (larger depth -> smaller depth)
+    visible.sort((a, b) => b.avgDepth - a.avgDepth);
+
+    for (const f of visible) {
       ctx.beginPath();
       f.idx.forEach((vi, k) => k === 0 ? ctx.moveTo(pts[vi].sx, pts[vi].sy) : ctx.lineTo(pts[vi].sx, pts[vi].sy));
       ctx.closePath();
       ctx.fillStyle = f.col;
-      ctx.globalAlpha = isSel ? 1.0 : 0.92;
+      ctx.globalAlpha = isSel ? 1.0 : 0.94;
       ctx.fill();
       ctx.strokeStyle = isSel ? '#0f172a' : 'rgba(255,255,255,0.85)';
-      ctx.lineWidth = isSel ? 1.6 : 0.9;
+      ctx.lineWidth = isSel ? 1.7 : 0.9;
       ctx.stroke();
-    });
+    }
     ctx.globalAlpha = 1.0;
     const xs = pts.map(p => p.sx), ys = pts.map(p => p.sy);
     return {
@@ -1286,12 +1306,12 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
       ctx.fillStyle = '#f8fbff';
       ctx.fillRect(0, 0, W, H);
 
-      if (autoSpin && !dragging) yaw = -0.46 + Math.sin(tAnim * 0.45) * 0.24;
+      if (autoSpin && !dragging) yaw = -0.34 + Math.sin(tAnim * 0.42) * 0.22;
       tAnim += 0.016;
 
-      // Subtle 3D floor grid
+      // Subtle 3D floor grid at z = 0
       ctx.strokeStyle = '#e2e8f0';
-      ctx.lineWidth = 0.8;
+      ctx.lineWidth = 0.85;
       for (let gx = -8; gx <= 9; gx += 1.5) {
         const a = proj(gx, -3.2, 0, W, H), b = proj(gx, 3.8, 0, W, H);
         ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
@@ -1300,6 +1320,19 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
         const a = proj(-8, gy, 0, W, H), b = proj(9, gy, 0, W, H);
         ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
       }
+
+      // Soft ground shadows under each block
+      BLOCKS.forEach(b => {
+        const sPts = [
+          [b.x + 0.12, b.y - 0.12, 0.01], [b.x + b.dx + 0.12, b.y - 0.12, 0.01],
+          [b.x + b.dx + 0.12, b.y + b.dy - 0.12, 0.01], [b.x + 0.12, b.y + b.dy - 0.12, 0.01],
+        ].map(p => proj(p[0], p[1], p[2], W, H));
+        ctx.beginPath();
+        sPts.forEach((p, k) => k === 0 ? ctx.moveTo(p.sx, p.sy) : ctx.lineTo(p.sx, p.sy));
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.07)';
+        ctx.fill();
+      });
 
       // Draw 3D flow lines & animated data pulses
       EDGES.forEach(([u, v, col], ei) => {
@@ -1310,7 +1343,7 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
         ctx.moveTo(s1.sx, s1.sy);
         ctx.lineTo(s2.sx, s2.sy);
         ctx.strokeStyle = col;
-        ctx.globalAlpha = 0.35;
+        ctx.globalAlpha = 0.38;
         ctx.lineWidth = 2.0;
         ctx.stroke();
         ctx.globalAlpha = 1.0;
@@ -1325,11 +1358,11 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
         ctx.fill();
       });
 
-      // Depth-sort blocks back to front
+      // True painter's order: draw FARTHER blocks first (larger depth -> smaller depth)
       const sorted = BLOCKS.map(b => {
         const c = centerOf(b);
         return { b, depth: proj(c[0], c[1], c[2], W, H).depth };
-      }).sort((a, b) => a.depth - b.depth);
+      }).sort((a, b) => b.depth - a.depth);
 
       hitZones = [];
       const labels = [];
@@ -1337,37 +1370,64 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
         const isSel = b.id === selectedId;
         let bbox;
         if (b.stacks && b.stacks > 1) {
-          const gap = 0.06;
+          const gap = 0.055;
           const sh = (b.dz - gap * (b.stacks - 1)) / b.stacks;
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, topCx = 0, topCy = 0;
           for (let s = 0; s < b.stacks; s++) {
             const z0 = b.z + s * (sh + gap);
-            bbox = drawPrism(b.x, b.y, z0, b.dx, b.dy, sh, b.top, b.front, b.side, isSel, W, H);
+            const sb = drawPrism(b.x, b.y, z0, b.dx, b.dy, sh, b.top, b.front, b.side, isSel, W, H);
+            minX = Math.min(minX, sb.minX); maxX = Math.max(maxX, sb.maxX);
+            minY = Math.min(minY, sb.minY); maxY = Math.max(maxY, sb.maxY);
+            topCx = sb.topCx; topCy = sb.topCy;
           }
+          bbox = { minX, maxX, minY, maxY, topCx, topCy };
         } else {
           bbox = drawPrism(b.x, b.y, b.z, b.dx, b.dy, b.dz, b.top, b.front, b.side, isSel, W, H);
         }
         hitZones.push({ id: b.id, ...bbox });
-        labels.push({ b, isSel, x: bbox.topCx, y: bbox.minY - 8 });
+        labels.push({ b, isSel, ax: bbox.topCx, ay: bbox.minY, x: bbox.topCx, y: bbox.minY - 14 });
       });
 
-      // Crisp floating Ukrainian pill labels
+      // Repel overlapping label pills vertically so labels stay crisp and legible
+      const placed = [];
+      labels.sort((a, b) => a.y - b.y);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      labels.forEach(({ b, isSel, x, y }) => {
-        ctx.font = isSel ? '700 11.5px -apple-system, sans-serif' : '600 10.5px -apple-system, sans-serif';
-        const tw = ctx.measureText(b.label).width + 14;
-        const th = 20;
-        const lx0 = Math.max(8, Math.min(W - tw - 8, x - tw / 2));
-        const ly0 = Math.max(6, Math.min(H - th - 6, y - th / 2));
-        ctx.fillStyle = isSel ? '#0f172a' : 'rgba(255,255,255,0.92)';
-        ctx.strokeStyle = isSel ? '#0f172a' : '#cbd5e1';
+      labels.forEach(item => {
+        ctx.font = item.isSel ? '700 11px -apple-system, sans-serif' : '600 10px -apple-system, sans-serif';
+        const tw = ctx.measureText(item.b.label).width + 12;
+        const th = 19;
+        let lx0 = Math.max(6, Math.min(W - tw - 6, item.x - tw / 2));
+        let ly0 = Math.max(6, Math.min(H - th - 6, item.y - th / 2));
+        for (let iter = 0; iter < 6; iter++) {
+          let hit = false;
+          for (const p of placed) {
+            if (lx0 < p.x + p.w + 4 && lx0 + tw + 4 > p.x && ly0 < p.y + p.h + 3 && ly0 + th + 3 > p.y) {
+              ly0 = Math.max(6, p.y - th - 4);
+              hit = true;
+            }
+          }
+          if (!hit) break;
+        }
+        placed.push({ x: lx0, y: ly0, w: tw, h: th });
+
+        // Leader hairline from pill to block top
+        ctx.beginPath();
+        ctx.moveTo(lx0 + tw / 2, ly0 + th);
+        ctx.lineTo(item.ax, item.ay);
+        ctx.strokeStyle = item.isSel ? '#0f172a' : '#94a3b8';
+        ctx.lineWidth = 0.9;
+        ctx.stroke();
+
+        ctx.fillStyle = item.isSel ? '#0f172a' : 'rgba(255,255,255,0.95)';
+        ctx.strokeStyle = item.isSel ? '#0f172a' : '#cbd5e1';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.roundRect(lx0, ly0, tw, th, 6);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = isSel ? '#ffffff' : '#0f172a';
-        ctx.fillText(b.label, lx0 + tw / 2, ly0 + th / 2 + 0.5);
+        ctx.fillStyle = item.isSel ? '#ffffff' : '#0f172a';
+        ctx.fillText(item.b.label, lx0 + tw / 2, ly0 + th / 2 + 0.5);
       });
     }
     requestAnimationFrame(frame);
@@ -1388,8 +1448,8 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
       autoSpin = false;
       if (autoBtn) autoBtn.textContent = 'Авто-обертання: Вимк.';
     }
-    yaw += dx * 0.008;
-    pitch = Math.max(0.08, Math.min(1.28, pitch + dy * 0.008));
+    yaw -= dx * 0.008;
+    elev = Math.max(0.10, Math.min(1.38, elev + dy * 0.008));
   });
   canvas.addEventListener('pointerup', e => {
     dragging = false;
@@ -1397,6 +1457,7 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
     if (draggedDist < 6) {
       const rect = canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      // Hit test front-most block first (reverse of painter's order)
       for (let i = hitZones.length - 1; i >= 0; i--) {
         const z = hitZones[i];
         if (mx >= z.minX - 6 && mx <= z.maxX + 6 && my >= z.minY - 24 && my <= z.maxY + 6) {
@@ -1417,11 +1478,11 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
     autoBtn.textContent = autoSpin ? 'Авто-обертання: Увімк.' : 'Авто-обертання: Вимк.';
   });
   if (resetBtn) resetBtn.addEventListener('click', () => {
-    yaw = -0.46; pitch = 0.44; zoom = 1.0; autoSpin = true;
-    if (autoBtn) autoBtn.textContent = 'Авто-обертання: Увімк.';
+    yaw = -0.34; elev = 0.46; zoom = 1.0; autoSpin = false;
+    if (autoBtn) autoBtn.textContent = 'Авто-обертання: Вимк.';
   });
   if (topBtn) topBtn.addEventListener('click', () => {
-    yaw = 0.0; pitch = 1.24; zoom = 1.02; autoSpin = false;
+    yaw = 0.0; elev = 1.32; zoom = 1.02; autoSpin = false;
     if (autoBtn) autoBtn.textContent = 'Авто-обертання: Вимк.';
   });
 }

@@ -1,0 +1,197 @@
+{
+  "val_slices": [
+    {
+      "name": "Val \u00b7 All (16,623)",
+      "baskets": 16623,
+      "recall@10": 0.8225902840653363,
+      "ndcg@10": 0.6547630971436896,
+      "new_hits@10": 1255,
+      "new_targets": 4496,
+      "new_recall@10": 0.2791370106761566
+    },
+    {
+      "name": "Val \u00b7 Trained Customers only",
+      "baskets": 15851,
+      "recall@10": 0.8314289526361793,
+      "ndcg@10": 0.6627795271969025,
+      "new_hits@10": 648,
+      "new_targets": 3368,
+      "new_recall@10": 0.19239904988123516
+    },
+    {
+      "name": "Val \u00b7 Trained Products only",
+      "baskets": 16087,
+      "recall@10": 0.8336325052569539,
+      "ndcg@10": 0.6636920201552732,
+      "new_hits@10": 1174,
+      "new_targets": 3916,
+      "new_recall@10": 0.2997957099080695
+    },
+    {
+      "name": "Val \u00b7 Trained Customers AND Trained Products",
+      "baskets": 15343,
+      "recall@10": 0.8426546963064243,
+      "ndcg@10": 0.6718016983173579,
+      "new_hits@10": 582,
+      "new_targets": 2836,
+      "new_recall@10": 0.20521861777150915
+    },
+    {
+      "name": "Val \u00b7 Unlearned Customer OR Unlearned Product",
+      "baskets": 1280,
+      "recall@10": 0.5820838176473556,
+      "ndcg@10": 0.4505261769815097,
+      "new_hits@10": 673,
+      "new_targets": 1660,
+      "new_recall@10": 0.405421686746988
+    }
+  ],
+  "test_slices": [
+    {
+      "name": "Test \u00b7 All Full Catalogue",
+      "baskets": 13184,
+      "recall@5": 0.6264603024214455,
+      "recall@10": 0.7662904216715355,
+      "recall@25": 0.8779001033677456,
+      "ndcg@10": 0.5840936739589281,
+      "new_hits@10": 853,
+      "new_targets": 3929,
+      "new_recall@10": 0.2171035886994146,
+      "pure_unseen_hits@10": 1681,
+      "pure_unseen_recall@10": 0.4278442351743446
+    },
+    {
+      "name": "Test \u00b7 Zero Unmodeled Products (1,141)",
+      "baskets": 12422,
+      "recall@5": 0.6503206633764473,
+      "recall@10": 0.7926660897678363,
+      "recall@25": 0.9064979217881963,
+      "ndcg@10": 0.6021730180843563,
+      "new_hits@10": 815,
+      "new_targets": 3199,
+      "new_recall@10": 0.25476711472335106,
+      "pure_unseen_hits@10": 1604,
+      "pure_unseen_recall@10": 0.5014066895904971
+    },
+    {
+      "name": "Test \u00b7 Trained Products only (1,056)",
+      "baskets": 10631,
+      "recall@5": 0.6848315925966194,
+      "recall@10": 0.8145211932790712,
+      "recall@25": 0.9162536514478948,
+      "ndcg@10": 0.6215660577410652,
+      "new_hits@10": 510,
+      "new_targets": 2246,
+      "new_recall@10": 0.22707034728406056,
+      "pure_unseen_hits@10": 988,
+      "pure_unseen_recall@10": 0.43989314336598395
+    },
+    {
+      "name": "Test \u00b7 Trained Customers only",
+      "baskets": 12217,
+      "recall@5": 0.6371785117628377,
+      "recall@10": 0.7784953432980448,
+      "recall@25": 0.8866029569447261,
+      "ndcg@10": 0.5940991745906827,
+      "new_hits@10": 510,
+      "new_targets": 3058,
+      "new_recall@10": 0.16677567037279267,
+      "pure_unseen_hits@10": 1272,
+      "pure_unseen_recall@10": 0.4159581425768476
+    },
+    {
+      "name": "Test \u00b7 Trained Customers AND Trained Products",
+      "baskets": 9839,
+      "recall@5": 0.6997697526130294,
+      "recall@10": 0.8302921502840195,
+      "recall@25": 0.9268734782963871,
+      "ndcg@10": 0.6348743322566457,
+      "new_hits@10": 248,
+      "new_targets": 1581,
+      "new_recall@10": 0.1568627450980392,
+      "pure_unseen_hits@10": 682,
+      "pure_unseen_recall@10": 0.43137254901960786
+    },
+    {
+      "name": "Test \u00b7 Unlearned Customer OR Unlearned Product",
+      "baskets": 3345,
+      "recall@5": 0.41082751305373444,
+      "recall@10": 0.578035411860406,
+      "recall@25": 0.7338495694595529,
+      "ndcg@10": 0.43472718756393774,
+      "new_hits@10": 605,
+      "new_targets": 2348,
+      "new_recall@10": 0.25766609880749575,
+      "pure_unseen_hits@10": 999,
+      "pure_unseen_recall@10": 0.42546848381601365
+    }
+  ],
+  "test_monthly_trained_cp": [
+    {
+      "name": "Test 2026-07 (Trained C & P)",
+      "baskets": 2340,
+      "recall@5": 0.6831281598268778,
+      "recall@10": 0.8232575223921378,
+      "recall@25": 0.924657271740605,
+      "ndcg@10": 0.6244755348007678,
+      "new_hits@10": 70,
+      "new_targets": 399,
+      "new_recall@10": 0.17543859649122806,
+      "pure_unseen_hits@10": 179,
+      "pure_unseen_recall@10": 0.44862155388471175
+    },
+    {
+      "name": "Test 2026-08 (Trained C & P)",
+      "baskets": 1939,
+      "recall@5": 0.684907472620211,
+      "recall@10": 0.8306555586983643,
+      "recall@25": 0.9264764903883007,
+      "ndcg@10": 0.6381586147623836,
+      "new_hits@10": 59,
+      "new_targets": 336,
+      "new_recall@10": 0.17559523809523808,
+      "pure_unseen_hits@10": 143,
+      "pure_unseen_recall@10": 0.4255952380952381
+    },
+    {
+      "name": "Test 2026-09 (Trained C & P)",
+      "baskets": 2067,
+      "recall@5": 0.7136674122523179,
+      "recall@10": 0.8371551928155703,
+      "recall@25": 0.9284871487701677,
+      "ndcg@10": 0.6410779349218785,
+      "new_hits@10": 54,
+      "new_targets": 326,
+      "new_recall@10": 0.1656441717791411,
+      "pure_unseen_hits@10": 139,
+      "pure_unseen_recall@10": 0.4263803680981595
+    },
+    {
+      "name": "Test 2026-10 (Trained C & P)",
+      "baskets": 2119,
+      "recall@5": 0.7084825876236919,
+      "recall@10": 0.831971130437388,
+      "recall@25": 0.9271601609024922,
+      "ndcg@10": 0.6368395936521863,
+      "new_hits@10": 45,
+      "new_targets": 325,
+      "new_recall@10": 0.13846153846153847,
+      "pure_unseen_hits@10": 143,
+      "pure_unseen_recall@10": 0.44
+    },
+    {
+      "name": "Test 2026-11 (Trained C & P)",
+      "baskets": 1374,
+      "recall@5": 0.7147408793697002,
+      "recall@10": 0.828845798387283,
+      "recall@25": 0.9283383586331184,
+      "ndcg@10": 0.6355859237136632,
+      "new_hits@10": 20,
+      "new_targets": 195,
+      "new_recall@10": 0.10256410256410256,
+      "pure_unseen_hits@10": 78,
+      "pure_unseen_recall@10": 0.4
+    }
+  ],
+  "elapsed_s": 199.16588979098015
+}
