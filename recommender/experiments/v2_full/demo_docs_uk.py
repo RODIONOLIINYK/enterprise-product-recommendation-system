@@ -427,22 +427,22 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
     </div>
     <div class="card">
       <div class="evo-list">
-        <div class="evo-row"><div>1. Початковий SKU-бейзлайн (v1)</div><div class="evo-track"><div class="evo-fill" style="width:24%"></div></div><div class="mono" style="text-align:right;">76.15%</div><div class="mono" style="text-align:right;color:var(--amber);">11.25%</div></div>
-        <div class="evo-row"><div>2. Уніфікація Shared-UV (v1)</div><div class="evo-track"><div class="evo-fill" style="width:76%"></div></div><div class="mono" style="text-align:right;">80.89%</div><div class="mono" style="text-align:right;color:var(--amber);">21.62%</div></div>
-        <div class="evo-row"><div>3. CatBoost · 42 ознаки (v2_full)</div><div class="evo-track"><div class="evo-fill" style="width:84%"></div></div><div class="mono" style="text-align:right;">81.61%</div><div class="mono" style="text-align:right;color:var(--amber);">25.33%</div></div>
-        <div class="evo-row"><div>4. Wave 1 E2E нейромережа (arm4)</div><div class="evo-track"><div class="evo-fill" style="width:87%"></div></div><div class="mono" style="text-align:right;">81.84%</div><div class="mono" style="text-align:right;color:var(--amber);">25.98%</div></div>
-        <div class="evo-row"><div>5. Wave 2C · голова новинок (Option A)</div><div class="evo-track"><div class="evo-fill" style="width:90%"></div></div><div class="mono" style="text-align:right;">82.12%</div><div class="mono" style="text-align:right;color:var(--amber);">27.11%</div></div>
-        <div class="evo-row"><div>6. 2× блоки пам'яті Transformer</div><div class="evo-track"><div class="evo-fill" style="width:91%"></div></div><div class="mono" style="text-align:right;">82.18%</div><div class="mono" style="text-align:right;color:var(--amber);">27.31%</div></div>
-        <div class="evo-row best"><div>7. Фінал: 2× пам'ять + свіжість 365д ⭐</div><div class="evo-track"><div class="evo-fill" style="width:93%"></div></div><div class="mono" style="text-align:right;color:var(--green);">82.26%</div><div class="mono" style="text-align:right;color:var(--amber);">27.91%</div></div>
+        <div class="evo-row"><div>1. Базова популярність (старт, <code>a0f5407</code>)</div><div class="evo-track"><div class="evo-fill" style="width:21%"></div></div><div class="mono" style="text-align:right;">17.88%</div><div class="mono" style="text-align:right;color:var(--muted);">—</div></div>
+        <div class="evo-row"><div>2. Перша Two-Tower (Stage 1 v1, <code>a0f5407</code>)</div><div class="evo-track"><div class="evo-fill" style="width:55%"></div></div><div class="mono" style="text-align:right;">47.60%</div><div class="mono" style="text-align:right;color:var(--muted);">—</div></div>
+        <div class="evo-row"><div>3. Перший ранкер UPS-CANR (Stage 2 v1)</div><div class="evo-track"><div class="evo-fill" style="width:76%"></div></div><div class="mono" style="text-align:right;">66.69%</div><div class="mono" style="text-align:right;color:var(--muted);">—</div></div>
+        <div class="evo-row"><div>4. 4 прапорці знайомості + Stat-Attention (<code>4f3d326</code>)</div><div class="evo-track"><div class="evo-fill" style="width:85%"></div></div><div class="mono" style="text-align:right;">76.15%</div><div class="mono" style="text-align:right;color:var(--amber);">11.25%</div></div>
+        <div class="evo-row"><div>5. Канонічні продукти (base_name) + Full-Pool (<code>e0681bd</code>)</div><div class="evo-track"><div class="evo-fill" style="width:91%"></div></div><div class="mono" style="text-align:right;">80.89%</div><div class="mono" style="text-align:right;color:var(--amber);">21.62%</div></div>
+        <div class="evo-row"><div>6. E2E Wave2BE2ERanker + Option A (<code>w2_2mem_blocks</code>)</div><div class="evo-track"><div class="evo-fill" style="width:93%"></div></div><div class="mono" style="text-align:right;">82.18%</div><div class="mono" style="text-align:right;color:var(--amber);">27.31%</div></div>
+        <div class="evo-row best"><div>7. Фінал: 2× пам'ять + свіжість 365д ⭐</div><div class="evo-track"><div class="evo-fill" style="width:96%"></div></div><div class="mono" style="text-align:right;color:var(--green);">82.26% / 84.27%*</div><div class="mono" style="text-align:right;color:var(--amber);">27.91%</div></div>
       </div>
     </div>
     <div class="grid-3">
-      <div class="card green"><strong>+6.11 п.п. Recall@10</strong><p>Від 76.15% до 82.26% загальної точності Топ-10.</p></div>
-      <div class="card amber"><strong>×2.5 краще відкриття новинок</strong><p>New@10 виріс із 11.25% до 27.91% (а в режимі чистих новинок — 52.27%).</p></div>
-      <div class="card accent"><strong>Сильніша за CatBoost</strong><p>Нейромережа обійшла градієнтний бустинг за всіма основними метриками.</p></div>
+      <div class="card green"><strong>+64.4 п.п. від старту</strong><p>Від 17.88% (популярність) та 47.60% (перша Two-Tower) до 82.26% усіх / 84.27%* навчених C&amp;P.</p></div>
+      <div class="card amber"><strong>×2.5 краще відкриття новинок</strong><p>New@10 виріс із 11.25% до 27.91% (у режимі чистих новинок — 51.78%), а свіжість 365д дала +5.98 п.п. на нових товарах тесту.</p></div>
+      <div class="card accent"><strong>Сильніша за CatBoost</strong><p>Нейромережа обійшла градієнтний бустинг (81.61% R@10 / 0.6438 NDCG) за всіма метриками.</p></div>
     </div>
     <div class="slide-foot">
-      <span>Кожен етап перевірявся на тій самій валідаційній вибірці (16 623 замовлення)</span>
+      <span>*84.27% — валідація на навчених C&amp;P (83.03% у тесті через 7.4 міс.). Повний лог: PROJECT_HISTORY.md</span>
       <span>Слайд 7 із 9</span>
     </div>
   </section>
