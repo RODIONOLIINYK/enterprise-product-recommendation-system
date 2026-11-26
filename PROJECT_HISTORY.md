@@ -1,6 +1,6 @@
 # Project History & Model Evolution (`PROJECT_HISTORY.md`)
 
-Chronological engineering log of the **Enterprise B2B Product Recommendation System** across all full-catalogue chronological milestones (`2026-10-07` → `2026-11-26`), grounded directly in git commits and saved evaluation reports.
+Chronological engineering log of the **Enterprise B2B Product Recommendation System** from initial prototype (`2026-07-16`) to the final promoted `Wave2BE2ERanker` (`w2_2mem_recency_hl365`, `2026-11-26`), grounded directly in git commits and saved evaluation reports.
 
 ---
 
@@ -8,6 +8,7 @@ Chronological engineering log of the **Enterprise B2B Product Recommendation Sys
 
 | Phase | Period & Key Commits | What Was Introduced | Dataset / Evaluation Scope | Overall Recall@10 | NDCG@10 | New-to-Customer @10 |
 | :--- | :--- | :--- | :--- | :---: | :---: | :---: |
+| **0. Early CatBoost Prototypes** | `2026-07-16 .. 08-18`<br>(`afc66ef`, `0bd5a91`, `2a5eff1`, `0fdb00b`, `2cb7f75`) | Initial replenishment CatBoost Ranker → calibrated CatBoost Classifier prototypes before pivoting to full-catalogue Two-Tower neural retrieval. | Small sampled candidate subset *(not full-catalogue)* | — | — | — |
 | **1. Global Popularity Baseline** | `2026-10-07 .. 11-07`<br>(`c9e8786`, `a0f5407`) | Strict chronological split (`zero future leakage`), paid-sale filtering (`ПРОДАЖА` + `ТОВАР`), full-catalogue evaluation (`6,191` val baskets). | v1 Val (`6,191` baskets, SKU) | **17.88%** | `0.0925` | — |
 | **2. First Modular Two-Tower (Stage 1)** | `2026-11-07`<br>(`a0f5407`) | 128D `CustomerTower` (BGE-M3 + history Transformer) & `ProductTower` (BGE-M3 + catalogue attributes), 10 epochs. | v1 Val (`6,191` baskets, SKU) | **47.60%** | `0.3007` | — |
 | **3. First `UPS-CANR` Neural Ranker (Stage 2)** | `2026-11-07`<br>(`a0f5407`) | 33-token Customer Memory (Token 0 profile + Tokens 1..32 history), 4-head cross-attention, 50-item rerank, BCE + listwise loss. | v1 Val (`6,191` baskets, SKU) | **66.69%** | `0.5347` | — |
@@ -22,6 +23,11 @@ Chronological engineering log of the **Enterprise B2B Product Recommendation Sys
 ---
 
 ## Detailed Chronological Log by Phase
+
+### Phase 0: Early Tabular CatBoost Prototypes (`2026-07-16 .. 2026-08-18`)
+- **Key Commits:** `afc66ef`, `36f2c16`, `6b9a3bb`, `0bd5a91`, `2a5eff1`, `60594f6`, `97cfd30`, `29ab48b`, `0fdb00b`, `7ba1756`, `2cb7f75`, `d20ce22`.
+- **What Was Built:** Initial replenishment feature notebooks, `CatBoostRanker` → `CatBoostClassifier` prototypes, and early package-variant unification (`97cfd30`, `7ba1756`).
+- **Why Replaced:** Evaluated only over small sampled candidate groups rather than live full-catalogue chronological retrieval, motivating the pivot (`2cb7f75`) to a neural Two-Tower retriever + deep reranker.
 
 ### Phase 1: Clean Temporal Two-Stage Neural Foundation (`2026-10-07 .. 2026-11-07`)
 - **Key Commits:** `c9e8786`, `753c53b`, `a0f5407`.
