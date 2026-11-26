@@ -401,10 +401,10 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
           таким же важливим, як замовлення 2026 року, під час навчання застосовується плавне згасання ваги:
         </p>
         <ul>
-          <li><strong>Свіжі продажі (останні місяці):</strong> вага <strong>1.00</strong> (максимальний вплив)</li>
-          <li><strong>1 рік тому:</strong> вага <strong>0.50</strong></li>
-          <li><strong>2 роки тому:</strong> вага <strong>0.25</strong></li>
-          <li><strong>Давніші роки:</strong> мінімальна базова вага <strong>0.10</strong> (база знань зберігається)</li>
+          <li><strong>Свіжі продажі (січень 2026):</strong> ефективна вага <strong>2.31×</strong> (понад 2× від середнього!)</li>
+          <li><strong>1 рік тому (лютий 2025):</strong> ефективна вага <strong>1.16×</strong> (січень 2025: <strong>1.09×</strong>)</li>
+          <li><strong>2 роки тому (лютий 2024):</strong> ефективна вага <strong>0.58×</strong></li>
+          <li><strong>3 роки тому (січень 2023):</strong> ефективна вага <strong>0.28×</strong> (середня по вибірці = 1.00×)</li>
         </ul>
         <p style="margin-top:12px;"><strong>Результат:</strong> найвища точність відкриття новинок (<strong>+0.89 п.п.*</strong> статистично значущий приріст) без втрати загального Recall@10.</p>
       </div>
@@ -450,67 +450,67 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
   <!-- SLIDE 8 -->
   <section class="slide">
     <div>
-      <div class="slide-kicker">Підсумкові результати · Навчені клієнти та продукти</div>
-      <h2>Порівняння валідації (84.27%) та фінального тесту (83.03%)</h2>
+      <div class="slide-kicker">Підсумкові результати · Обидві оцінки (Навчені C&amp;P + Повна вибірка)</div>
+      <h2>Порівняння валідації та фінального тесту (2026-07..11)</h2>
       <p class="lead">
-        Чесне порівняння на всіх замовленнях, де клієнти та продукти вже були присутні в навчанні (без перенавчання через 5–10 місяців).
+        Показано обидва зрізи: <strong>навчені клієнти й товари</strong> (чиста перевірка без перенавчання) та <strong>повна вибірка</strong> (включно з новими пост-навчальними клієнтами й товарами).
       </p>
     </div>
     <div class="card">
       <table>
         <thead>
           <tr>
-            <th>Вибірка / Період (навчені клієнти й товари)</th>
+            <th>Вибірка / Зріз оцінки</th>
             <th>Замовлень</th>
             <th>Recall@10</th>
             <th>NDCG@10</th>
-            <th>Нові для клієнта@10</th>
+            <th>Нові@10 (Чисті*)</th>
           </tr>
         </thead>
         <tbody>
           <tr style="background:var(--green-bg);font-weight:700;">
-            <td>Валідація · 2026-02..06</td>
+            <td>Валідація · навчені клієнти й товари</td>
             <td class="mono">15 343</td>
             <td class="mono">84.27%</td>
             <td class="mono">67.18%</td>
-            <td class="mono">20.52% (582 / 2 836)</td>
+            <td class="mono">20.52% (582)</td>
           </tr>
           <tr style="background:var(--primary-soft);font-weight:700;">
-            <td>Фінальний тест · 2026-07..11 (усі 5 міс.)</td>
+            <td>Фінальний тест · навчені клієнти й товари</td>
             <td class="mono">9 839</td>
             <td class="mono">83.03%</td>
             <td class="mono">63.49%</td>
-            <td class="mono">15.69% (43.14% чисті*)</td>
+            <td class="mono">15.69% (43.1% чист.)</td>
           </tr>
           <tr>
-            <td>Тест · Липень–Серпень 2026</td>
-            <td class="mono">4 279</td>
-            <td class="mono">82.33% → 83.07%</td>
-            <td class="mono">62.45% → 63.82%</td>
-            <td class="mono">17.55% (43.7% чисті)</td>
+            <td>Валідація · усі замовлення (повний каталог)</td>
+            <td class="mono">16 623</td>
+            <td class="mono">82.26%</td>
+            <td class="mono">65.48%</td>
+            <td class="mono">27.91% (51.8% чист.)</td>
           </tr>
           <tr>
-            <td>Тест · Вересень–Жовтень 2026</td>
-            <td class="mono">4 186</td>
-            <td class="mono">83.72% → 83.20%</td>
-            <td class="mono">64.11% → 63.68%</td>
-            <td class="mono">15.2% (43.3% чисті)</td>
+            <td>Фінальний тест · модельований каталог (1 141)</td>
+            <td class="mono">12 928</td>
+            <td class="mono">79.21%</td>
+            <td class="mono">60.10%</td>
+            <td class="mono">25.61% (50.5% чист.)</td>
           </tr>
-          <tr>
-            <td>Тест · Листопад 2026 (10-й міс. без донавч.)</td>
-            <td class="mono">1 374</td>
-            <td class="mono">82.88%</td>
-            <td class="mono">63.56%</td>
-            <td class="mono">10.26% (40.0% чисті)</td>
+          <tr style="background:var(--amber-bg);">
+            <td>Фінальний тест · усі замовлення (повний каталог)**</td>
+            <td class="mono">13 184</td>
+            <td class="mono">76.63%</td>
+            <td class="mono">58.41%</td>
+            <td class="mono">21.71% (42.8% чист.)</td>
           </tr>
         </tbody>
       </table>
-      <p style="font-size:12.5px;color:var(--muted);margin-top:8px;">
-        *«Чисті новинки» — режим Option A (лише ще не куплені клієнтом товари). Для довідки: включно з новими пост-навчальними товарами й холодними клієнтами повна вибірка дає 82.26% (Val) / 76.63% (Test).
+      <p style="font-size:12px;color:var(--muted);margin-top:8px;">
+        *Чисті новинки — режим Option A. **У продакшені <code>ProductTower</code> здатен одразу кодувати нові товари через їхній опис і характеристики (BGE-M3 + 65D спец.) без перенавчання; в офлайн-тесті таблиця була заморожена на 1 141 продукті, тому 76.63% — сувора нижня оцінка.
       </p>
     </div>
     <div class="slide-foot">
-      <span>Підтверджено в experiments/v2_full/v2_full_heldout_test_slice_analysis.json</span>
+      <span>Стабільність тесту (навчені C&amp;P): Лип 82.33% → Сер 83.07% → Вер 83.72% → Жов 83.20% → Лис 82.88%</span>
       <span>Слайд 8 із 9</span>
     </div>
   </section>
@@ -1068,13 +1068,14 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
           сучасному асортименту 2025–2026 років.
         </p>
         <div class="callout amber">
-          <strong>Як модель працює, якщо навчання завершилося раніше за «сьогодні»?</strong>
-          Вага свіжості <code>HL = 365 днів</code> рахується плавною кривою відносно кінця навчання (<code>2026-02-01</code>):
-          наприклад, <code>2025-02-01</code> (365д) отримує вагу <code>0.50</code>, <code>2025-01-01</code> (396д) — <code>0.47</code>,
-          а <code>2026-01-31</code> — <code>1.00</code>. Під час роботи всі <strong>42 сигнали та історія оновлюються наживо</strong>
-          до поточної дати — тому на фінальному тесті через <strong>5–10 місяців без перенавчання</strong> на навчених клієнтах
-          і продуктах модель стабільно тримає <strong>83.03% Recall@10</strong> (від 82.33% у липні до 82.88% у листопаді, без жодного спаду!).
-          У продакшені регулярне квартальне перенавчання автоматично підхоплює новододані товари й клієнтів.
+          <strong>Ефективна вага свіжості та робота з новими товарами:</strong>
+          Після нормалізації середньої ваги до <code>1.00×</code> найсвіжіші продажі (<code>2026-01</code>) отримують
+          <strong>2.31× важливість</strong> (у понад 2 рази більше за середнє і у 8× більше за 2023 рік), рік тому
+          (<code>2025-02</code>) — <strong>1.16×</strong> (січень 2025: <strong>1.09×</strong>), 2 роки тому — <strong>0.58×</strong>,
+          3 роки тому — <strong>0.28×</strong>. Під час щоденної роботи всі 42 сигнали оновлюються наживо, а
+          <code>ProductTower</code> кодує будь-який новий товар через його опис і 65 специфікацій навіть без перенавчання
+          (у фінальному тесті: <strong>83.03% Recall@10</strong> на навчених клієнтах і товарах та <strong>79.21% / 76.63%</strong>
+          на модельованому / замороженому повному каталозі).
         </div>
       </section>
 
@@ -1100,8 +1101,8 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
             <tr><td><strong>Архітектура</strong></td><td class="mono">Wave2BE2ERanker (2× Memory Transformer + OptionAUnseenHead)</td></tr>
             <tr><td><strong>Кількість параметрів</strong></td><td class="mono">__TRAIN_PARAMS__ (навчання) / __REQ_PARAMS__ (на 1 запит)</td></tr>
             <tr><td><strong>Каталог продуктів</strong></td><td class="mono">1 141 канонічний продукт (1 660 SKU)</td></tr>
-            <tr><td><strong>Валідація (навчені клієнти й товари)</strong></td><td class="mono">15 343 зам. · Recall@10: 84.27% · NDCG@10: 67.18%</td></tr>
-            <tr><td><strong>Фінальний тест (навчені клієнти й товари)</strong></td><td class="mono">9 839 зам. (2026-07..11) · Recall@10: 83.03% · NDCG@10: 63.49% · Чисті новинки@10: 43.14%</td></tr>
+            <tr><td><strong>Валідація (навчені C&amp;P / повна)</strong></td><td class="mono">84.27% (15 343 зам., NDCG 67.18%) · Повна: 82.26% (16 623 зам., PureU 51.78%)</td></tr>
+            <tr><td><strong>Фінальний тест (навчені C&amp;P / повна)</strong></td><td class="mono">83.03% (9 839 зам., NDCG 63.49%) · Модельов.: 79.21% · Повна: 76.63% (13 184 зам.)</td></tr>
             <tr><td><strong>Швидкість прогнозу (CPU)</strong></td><td class="mono">~2.9 мс на 1 клієнта (по всіх 1 141 продуктах)</td></tr>
             <tr><td><strong>Файл моделі у ZIP</strong></td><td class="mono">model/best_discovery.pt (__CKPT_MB__ МБ)</td></tr>
             <tr><td><strong>Контрольна сума SHA-256</strong></td><td class="mono" style="word-break:break-all;">__CKPT_SHA__</td></tr>
