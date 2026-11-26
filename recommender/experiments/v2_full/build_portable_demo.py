@@ -350,9 +350,10 @@ PORTABLE_HTML_TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>B2B Product Recommender — Interactive Demo (w2_2mem_recency_hl365)</title>
+<title>Система AI-рекомендацій B2B — Інтерактивне демо (w2_2mem_recency_hl365)</title>
 <style>
   :root {
+    color-scheme: light;
     --bg: #f4f7fb;
     --surface: #ffffff;
     --surface-2: #f8fafc;
@@ -373,23 +374,6 @@ PORTABLE_HTML_TEMPLATE = r"""<!DOCTYPE html>
     --radius: 14px;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  }
-  body.dark {
-    --bg: #0b1120;
-    --surface: #111827;
-    --surface-2: #172033;
-    --border: #24324a;
-    --text: #e6edf7;
-    --muted: #94a3b8;
-    --primary: #3b82f6;
-    --primary-soft: rgba(59, 130, 246, 0.16);
-    --green: #34d399;
-    --green-bg: rgba(16, 185, 129, 0.15);
-    --amber: #fbbf24;
-    --amber-bg: rgba(245, 158, 11, 0.16);
-    --purple: #c4b5fd;
-    --purple-bg: rgba(139, 92, 246, 0.18);
-    --shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -567,8 +551,6 @@ PORTABLE_HTML_TEMPLATE = r"""<!DOCTYPE html>
         <button class="tab-btn" data-tab="overview" data-i18n="tabOverview">Огляд і результати</button>
         <button class="tab-btn" data-tab="package" data-i18n="tabPackage">Модель у пакеті</button>
       </div>
-      <button class="icon-btn" id="btn-lang">UA / EN</button>
-      <button class="icon-btn" id="btn-theme">🌙</button>
     </div>
   </div>
 
@@ -714,7 +696,7 @@ PORTABLE_HTML_TEMPLATE = r"""<!DOCTYPE html>
       </div>
       <div class="kpi">
         <div class="lbl" data-i18n="kpiSpeedLbl">Швидкість (1 запит)</div>
-        <div class="num">2.9 ms</div>
+        <div class="num">2.9 мс</div>
         <div class="sub" data-i18n="kpiSpeedSub">По всіх 1 141 формуляціях на CPU</div>
       </div>
     </div>
@@ -784,10 +766,10 @@ PORTABLE_HTML_TEMPLATE = r"""<!DOCTYPE html>
       <p style="color:var(--muted);" data-i18n="pkgDesc">Разом із цим демо у папці <code>model/</code> знаходиться сама навчена нейромережа PyTorch та повна специфікація з контрольними сумами SHA-256.</p>
       <div class="mini-stats" id="pkg-grid" style="grid-template-columns:repeat(3,1fr);"></div>
       <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:12.5px;">
-        <div><strong>Reference ID:</strong> <span class="mono" id="pkg-refid"></span></div>
-        <div style="margin-top:4px;"><strong>Model Checkpoint:</strong> <span class="mono">model/best_discovery.pt</span> (<span id="pkg-size"></span>)</div>
-        <div style="margin-top:4px;"><strong>SHA-256:</strong> <span class="mono" id="pkg-sha" style="word-break:break-all;"></span></div>
-        <div style="margin-top:4px;"><strong>Train / Val Split:</strong> <span class="mono">Train &lt; 2026-02-01 (137,765 baskets) · Val 2026-02-01..2026-06-30 (16,623 baskets) · Held-out Test &gt;= 2026-07-01 untouched</span></div>
+        <div><strong>Ідентифікатор релізу:</strong> <span class="mono" id="pkg-refid"></span></div>
+        <div style="margin-top:4px;"><strong>Файл моделі:</strong> <span class="mono">model/best_discovery.pt</span> (<span id="pkg-size"></span>)</div>
+        <div style="margin-top:4px;"><strong>Контрольна сума SHA-256:</strong> <span class="mono" id="pkg-sha" style="word-break:break-all;"></span></div>
+        <div style="margin-top:4px;"><strong>Розбиття даних:</strong> <span class="mono">Навчання &lt; 2026-02-01 (137 765 замовлень) · Валідація 2026-02-01..2026-06-30 (16 623 замовлення) · Тест &gt;= 2026-07-01 недоторканий</span></div>
       </div>
     </div>
   </div>
@@ -866,8 +848,8 @@ const I18N = {
     footerRight: "Усі прогнози згенеровано реальною нейромережею w2_2mem_recency_hl365 без доступу до майбутніх даних.",
     searchPh: "Пошук компанії, міста, галузі або товару...",
     cohorts: {
-      showcase: "Найкращі приклади (Showcase)",
-      all: "Усі приклади демо",
+      showcase: "Найкращі приклади (валідація)",
+      all: "Усі кейси валідації в демо",
       has_new: "Постійні клієнти з новинками",
       first_observed: "Нові клієнти (1-ше замовлення)",
       multi_item: "Великі кошики (≥2 товари)",
@@ -875,7 +857,7 @@ const I18N = {
     },
     modes: {
       blended: "Змішаний (Повтори + Новинки)",
-      pure_unseen: "Лише нові товари (Cross-Sell)",
+      pure_unseen: "Лише нові товари (Крос-продажі)",
       main_only: "Лише регулярні повтори",
     },
     hitRep: "✓ Вгадано · Повтор",
@@ -911,127 +893,18 @@ const I18N = {
       visc: x => `В'язкість ${x.v}%`,
     },
   },
-  en: {
-    appTitle: "B2B AI Product Recommender",
-    finalModelBadge: "Final Model · v2_full",
-    tabExplorer: "Interactive Predictions",
-    tabOverview: "Overview & Metrics",
-    tabPackage: "Bundled Model",
-    btnRandom: "Random Case",
-    whatIfTitle: "Repeat ↔ New Product (Cross-Sell) Balance",
-    sliderLeft: "More Repeats",
-    sliderRight: "More New",
-    btnReset: "Optimal",
-    ndcgHint: "Position-weighted Top-10 quality",
-    lblNewHits: "New Discoveries in Top-10",
-    newHint: "Never purchased by customer before",
-    lblSpeed: "Inference Latency (CPU)",
-    top10Title: "Top-10 Neural Network Predictions",
-    legendHit: "✓ Repeat Hit",
-    legendNewHit: "★ New Discovery Hit",
-    thProduct: "Recommended Formulation & Drivers",
-    thSku: "Resolved Pack SKU",
-    thConf: "Score",
-    thStatus: "Outcome",
-    gtTitle: "Actual Ground-Truth Basket on",
-    custTitle: "Customer Profile (Strictly Prior)",
-    stOrders: "Prior Orders",
-    stBns: "Distinct Products",
-    stGap: "Median Cadence",
-    stLast: "Days Since Last",
-    stPrep: "Prepaid / Cash",
-    stDef: "Deferral / Overdue",
-    histTitle: "Recent Prior Purchases (< Date)",
-    thDate: "Date",
-    thHistProd: "Product",
-    thQty: "Qty",
-    kpiR10Sub: "Formulations caught in Top-10 (16,623 baskets)",
-    kpiNdcgSub: "Top-10 ranking order quality",
-    kpiNewLbl: "New Products@10",
-    kpiNewSub: "1,255 / 4,496 truly new adoptions",
-    kpiPureLbl: "Pure Cross-Sell@10",
-    kpiPureSub: "2,350 / 4,496 when ranking unseen only",
-    kpiSpeedLbl: "Latency (1 Request)",
-    kpiSpeedSub: "All 1,141 formulations scored on CPU",
-    howTitle: "How the Pipeline Works (Zero Future Leakage)",
-    p1t: "Catalogue Unification",
-    p1d: "1,660 SKUs unified into 1,141 canonical formulations so pack variants (4L / 20L / 209L) never crowd Top-10.",
-    p2t: "42 Strictly Causal Signals",
-    p2d: "Repeat cadence, collaborative filtering, manager & region shares, industry, viscosity, financials — all < order date.",
-    p3t: "2-Layer Transformer + Dual Heads",
-    p3d: "Dedicated Repeat Head (Main) + Cross-Sell Head (Option A), trained with 365-day recency weighting for the 2025–2026 regime.",
-    p4t: "Pack-Size SKU Resolver",
-    p4d: "Automatically resolves each Top-10 formulation to the customer's most likely pack size (drum, pail, jug).",
-    evoTitle: "Model Quality Progression (Validation)",
-    cohortTitle: "Performance by Segment (16,623 Baskets)",
-    thSeg: "Segment",
-    segAll: "All Validation Baskets (16,623)",
-    segRet: "Returning Customers (16,215)",
-    segCold: "First-Observed / Cold-Start (408)",
-    segPure: "Pure Unseen Cross-Sell (Option A, Ep 9)",
-    segSku: "Resolved Exact Pack SKU",
-    pkgTitle: "Final Model Bundled in This ZIP Packet",
-    pkgDesc: "The model/ folder inside this ZIP contains the trained PyTorch checkpoint and full SHA-256 verified reference metadata.",
-    footerRight: "All predictions were generated by the real w2_2mem_recency_hl365 neural network with zero future leakage.",
-    searchPh: "Search company, city, industry, or product...",
-    cohorts: {
-      showcase: "Curated Highlights (Showcase)",
-      all: "All Demo Cases",
-      has_new: "Returning w/ True New Product",
-      first_observed: "Cold-Start (First Order)",
-      multi_item: "Multi-Product Baskets (≥2)",
-      returning: "Returning Customers",
-    },
-    modes: {
-      blended: "Blended (Repeats + Cross-Sell)",
-      pure_unseen: "Pure New Products (Cross-Sell)",
-      main_only: "Repeat Replenishment Only",
-    },
-    hitRep: "✓ HIT · Repeat",
-    hitNew: "★ HIT · NEW!",
-    tagRep: "Repeat",
-    tagNew: "New Candidate",
-    tagCold: "Cold-Start (0 prior)",
-    tagReturning: "Returning Customer",
-    r10Lbl: "Case Recall@10",
-    r10PureLbl: "Pure Unseen Recall@10",
-    ndcgLbl: "Case NDCG@10",
-    ndcgPureLbl: "Pure Unseen NDCG@10",
-    ofBought: (h, t) => `${h} of ${t} bought formulations in Top-10`,
-    ofNewBought: (h, t) => `${h} of ${t} new formulations in Top-10`,
-    rankHit: r => `Rank #${r} ✓`,
-    rankMiss: r => `Rank #${r}`,
-    maskedRep: "Masked (Repeat)",
-    noHist: "First observed order — zero prior history. Predictions use company profile, industry, region & rolling demand.",
-    whatIfOpt: (a, b) => `Optimal OOF calibration: a=${a}, b=${b}`,
-    whatIfAdj: (a, b, d) => `Adjusted by ${d > 0 ? '+' : ''}${d.toFixed(1)} (a=${a}, b=${b})`,
-    drv: {
-      repeat: x => `Repeat ${x.n}× · ${x.d}d ago`,
-      due: x => `Due ${x.v}×`,
-      cf_rec: x => `CF rec ${x.v}`,
-      cf_cos: x => `CF cos ${x.v}`,
-      seq_lift: x => `Seq lift +${x.v}`,
-      mgr30: x => `Mgr 30d ${x.v}%`,
-      mgr_ind: x => `Mgr×Ind ${x.v}%`,
-      mgr90: x => `Mgr 90d ${x.v}%`,
-      reg90: x => `Reg 90d ${x.v}%`,
-      ind: x => `Industry ${x.v}%`,
-      equip: () => `Equipment match`,
-      visc: x => `Viscosity ${x.v}%`,
-    },
-  }
 };
 
-let lang = 'uk';
+const T = I18N.uk;
 let filteredCases = [];
 let curPos = 0;
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const sigmoid = x => 1 / (1 + Math.exp(-Math.max(-20, Math.min(20, x))));
 
-function applyLang() {
-  const t = I18N[lang];
-  document.documentElement.lang = lang;
+function initUI() {
+  const t = T;
+  document.documentElement.lang = 'uk';
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const k = el.getAttribute('data-i18n');
     if (t[k]) el.textContent = t[k];
@@ -1039,10 +912,10 @@ function applyLang() {
   document.getElementById('inp-search').placeholder = t.searchPh;
   const meta = DEMO_PAYLOAD.meta;
   document.getElementById('top-subtitle').textContent =
-    `${meta.arm} (Ep ${meta.epoch} · 2× Transformer · HL=365d · ${(meta.per_request_params/1e6).toFixed(2)}M per-req) · ` +
-    `${meta.num_formulations.toLocaleString()} formulations · ${DEMO_PAYLOAD.cases.length} real validation cases`;
+    `${meta.arm} (Епоха ${meta.epoch} · 2× Transformer · HL=365д · ${(meta.per_request_params/1e6).toFixed(2)}M параметрів) · ` +
+    `${meta.num_formulations.toLocaleString('uk-UA')} продуктів · ${DEMO_PAYLOAD.cases.length} реальних кейсів`;
   document.getElementById('footer-left').textContent =
-    `Ref: ${meta.reference_id} · Validation ${meta.date_range[0]} → ${meta.date_range[1]} (${meta.validation_baskets.toLocaleString()} baskets)`;
+    `Реліз: ${meta.reference_id} · Валідація ${meta.date_range[0]} → ${meta.date_range[1]} (${meta.validation_baskets.toLocaleString('uk-UA')} замовлень)`;
 
   const prevCohort = document.getElementById('sel-cohort').value || 'showcase';
   const prevMode = document.getElementById('sel-mode').value || 'blended';
@@ -1069,13 +942,13 @@ function applyLang() {
 
 function renderEvolution() {
   const rows = [
-    { name: "1. Initial SKU Baseline (v1)", r10: 76.15, new10: "11.25%" },
-    { name: "2. v1 Shared-UV Formulations", r10: 80.89, new10: "21.62%" },
-    { name: "3. CatBoost 42-feat (v2_full)", r10: 81.61, new10: "25.33%" },
-    { name: "4. v2_full Wave 1 E2E (arm4)", r10: 81.84, new10: "25.98%" },
-    { name: "5. v2_full Wave 2C (Option A)", r10: 82.12, new10: "27.11%" },
-    { name: "6. v2_full 2× Memory Blocks", r10: 82.18, new10: "27.31%" },
-    { name: "7. Final: 2× Mem + HL=365d ⭐", r10: 82.26, new10: "27.91%", best: true },
+    { name: "1. Початковий SKU-бейзлайн (v1)", r10: 76.15, new10: "11.25%" },
+    { name: "2. Уніфікація Shared-UV (v1)", r10: 80.89, new10: "21.62%" },
+    { name: "3. CatBoost · 42 ознаки (v2_full)", r10: 81.61, new10: "25.33%" },
+    { name: "4. Wave 1 E2E нейромережа (arm4)", r10: 81.84, new10: "25.98%" },
+    { name: "5. Wave 2C · голова новинок (Option A)", r10: 82.12, new10: "27.11%" },
+    { name: "6. 2× блоки пам'яті Transformer", r10: 82.18, new10: "27.31%" },
+    { name: "7. Фінал: 2× пам'ять + свіжість 365д ⭐", r10: 82.26, new10: "27.91%", best: true },
   ];
   document.getElementById('evo-bars').innerHTML = rows.map(r => {
     const pct = Math.max(8, Math.min(100, ((r.r10 - 74) / (83 - 74)) * 100));
@@ -1091,15 +964,15 @@ function renderEvolution() {
 function renderPackageInfo() {
   const m = DEMO_PAYLOAD.meta;
   document.getElementById('pkg-refid').textContent = m.reference_id;
-  document.getElementById('pkg-size').textContent = `${(m.checkpoint_bytes / (1024*1024)).toFixed(2)} MB`;
+  document.getElementById('pkg-size').textContent = `${(m.checkpoint_bytes / (1024*1024)).toFixed(2)} МБ`;
   document.getElementById('pkg-sha').textContent = m.checkpoint_sha256;
   const items = [
-    ["Architecture", "Wave2BE2ERanker (2× mem)"],
-    ["Train / Per-Req Params", `${(m.train_params/1e6).toFixed(2)}M / ${(m.per_request_params/1e6).toFixed(2)}M`],
-    ["Features", "cand_42 + CUST_7 + SEQ_5"],
-    ["Recency Weighting", "HL=365d (min=0.1)"],
-    ["Validation R@10 / NDCG", "82.26% / 65.48%"],
-    ["New@10 / PureU@10", "27.91% / 52.27%"],
+    ["Архітектура", "Wave2BE2ERanker (2× блоки пам'яті)"],
+    ["Параметри (навч. / запит)", `${(m.train_params/1e6).toFixed(2)}M / ${(m.per_request_params/1e6).toFixed(2)}M`],
+    ["Вхідні ознаки", "42 кандидатні + 7 клієнтських + 5 історії"],
+    ["Вага свіжості даних", "Період напіврозпаду 365 днів (мін. 0.1)"],
+    ["Валідація Recall@10 / NDCG", "82.26% / 65.48%"],
+    ["Нові@10 / Чисті новинки@10", "27.91% / 52.27%"],
   ];
   document.getElementById('pkg-grid').innerHTML = items.map(([k, v]) =>
     `<div class="mstat"><div class="k">${esc(k)}</div><div class="v" style="font-size:13px;">${esc(v)}</div></div>`
@@ -1140,7 +1013,7 @@ function rankCaseClient(d, mode, boostDelta) {
 }
 
 function renderCurrentCase() {
-  const t = I18N[lang];
+  const t = T;
   const cntEl = document.getElementById('pool-counter');
   if (!filteredCases.length) {
     cntEl.textContent = '0 / 0';
@@ -1149,7 +1022,7 @@ function renderCurrentCase() {
   }
   curPos = ((curPos % filteredCases.length) + filteredCases.length) % filteredCases.length;
   const d = filteredCases[curPos];
-  cntEl.textContent = `${curPos + 1} / ${filteredCases.length} (Case #${d.id})`;
+  cntEl.textContent = `${curPos + 1} / ${filteredCases.length} (Кейс #${d.id})`;
 
   const mode = document.getElementById('sel-mode').value || 'blended';
   const boostDelta = mode === 'blended' ? parseFloat(document.getElementById('rng-boost').value || '0') : 0;
@@ -1173,12 +1046,12 @@ function renderCurrentCase() {
 
   document.getElementById('lbl-c-r10').textContent = isPure ? t.r10PureLbl : t.r10Lbl;
   document.getElementById('lbl-c-ndcg').textContent = isPure ? t.ndcgPureLbl : t.ndcgLbl;
-  document.getElementById('c-r10').textContent = r10 !== null ? `${(100*r10).toFixed(1)}%` : 'N/A';
+  document.getElementById('c-r10').textContent = r10 !== null ? `${(100*r10).toFixed(1)}%` : '—';
   document.getElementById('c-hits').textContent = isPure ? t.ofNewBought(hits, denom) : t.ofBought(hits, denom);
-  document.getElementById('c-ndcg').textContent = ndcg !== null ? `${(100*ndcg).toFixed(1)}%` : 'N/A';
+  document.getElementById('c-ndcg').textContent = ndcg !== null ? `${(100*ndcg).toFixed(1)}%` : '—';
   document.getElementById('c-new').textContent = `${newHits} / ${d.nnew}`;
-  document.getElementById('c-ms').textContent = `${d.ms[1].toFixed(2)} ms`;
-  document.getElementById('c-date-sub').textContent = `${d.dt} · ${d.el.toLocaleString()} eligible`;
+  document.getElementById('c-ms').textContent = `${d.ms[1].toFixed(2)} мс`;
+  document.getElementById('c-date-sub').textContent = `${d.dt} · ${d.el.toLocaleString('uk-UA')} доступних`;
 
   const top10Rank = {};
   top10.forEach((p, idx) => { top10Rank[p.b] = idx + 1; });
@@ -1209,7 +1082,7 @@ function renderCurrentCase() {
   }).join('');
 
   document.getElementById('gt-date').textContent = d.dt;
-  document.getElementById('gt-badge').textContent = `${d.ntgt} (${d.nnew} new)`;
+  document.getElementById('gt-badge').textContent = `${d.ntgt} (${d.nnew} нових)`;
   document.getElementById('gt-list').innerHTML = d.gt.map(g => {
     let rk = top10Rank[g.b] || null;
     if (rk === null && Math.abs(boostDelta) < 1e-6) {
@@ -1233,15 +1106,15 @@ function renderCurrentCase() {
   document.getElementById('cust-desc').textContent = c.desc || '—';
   document.getElementById('st-ord').textContent = c.ord;
   document.getElementById('st-bns').textContent = c.bns;
-  document.getElementById('st-gap').textContent = c.gap !== null ? `${c.gap}d` : '—';
-  document.getElementById('st-last').textContent = c.last !== null ? `${c.last}d` : '—';
+  document.getElementById('st-gap').textContent = c.gap !== null ? `${c.gap}д` : '—';
+  document.getElementById('st-last').textContent = c.last !== null ? `${c.last}д` : '—';
   document.getElementById('st-prep').textContent = `${c.prep}%`;
-  document.getElementById('st-def').textContent = `${c.def}d / ${c.ovd}%`;
+  document.getElementById('st-def').textContent = `${c.def}д / ${c.ovd}%`;
 
   document.getElementById('hist-badge').textContent = d.hist.length ? `${d.hist.length}` : '0';
   document.getElementById('hist-tbody').innerHTML = d.hist.length
     ? d.hist.map(h => `<tr>
-        <td class="mono" style="font-size:11.5px;white-space:nowrap;">${esc(h.dt)}<div style="color:var(--muted);font-size:10.5px;">-${h.ago}d</div></td>
+        <td class="mono" style="font-size:11.5px;white-space:nowrap;">${esc(h.dt)}<div style="color:var(--muted);font-size:10.5px;">-${h.ago}д</div></td>
         <td><div style="font-weight:600;">${esc(h.n)}</div><div style="color:var(--muted);font-size:11px;">${esc(h.br)} · ${esc(h.cat)}</div></td>
         <td class="mono">${h.q}</td>
       </tr>`).join('')
@@ -1255,11 +1128,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('sec-' + btn.dataset.tab).classList.add('active');
   });
-});
-document.getElementById('btn-lang').addEventListener('click', () => { lang = lang === 'uk' ? 'en' : 'uk'; applyLang(); });
-document.getElementById('btn-theme').addEventListener('click', () => {
-  document.body.classList.toggle('dark');
-  document.getElementById('btn-theme').textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
 });
 document.getElementById('sel-cohort').addEventListener('change', rebuildFilter);
 document.getElementById('sel-mode').addEventListener('change', renderCurrentCase);
@@ -1280,7 +1148,7 @@ document.getElementById('btn-reset-boost').addEventListener('click', () => {
   renderCurrentCase();
 });
 
-applyLang();
+initUI();
 rebuildFilter();
 </script>
 </body>
@@ -1289,10 +1157,10 @@ rebuildFilter();
 
 
 README_START_TXT = """====================================================================
-  B2B AI Product Recommender — Interactive Demo + Final Model
+  Система AI-рекомендацій B2B — Інтерактивне демо + Фінальна модель
 ====================================================================
 
-[UA] ЯК ВІДКРИТИ ДЕМО:
+ЯК ВІДКРИТИ ДЕМО:
   1. Розпакуйте цей ZIP-архів у будь-яку папку.
   2. Двічі клікніть на файл OPEN_DEMO.html — він відкриється у браузері
      (Chrome / Safari / Edge) без інтернету та без встановлення програм.
@@ -1300,15 +1168,10 @@ README_START_TXT = """==========================================================
      (Повтори + Новинки / Лише новинки), шукати компанії та рухати
      повзунок балансу повторів і нових товарів у реальному часі.
 
-  У папці model/ лежить сама навчена модель PyTorch (best_discovery.pt)
-  та її повна специфікація (v2_full_reference.json).
-
-[EN] HOW TO OPEN:
-  1. Unzip this archive anywhere.
-  2. Double-click OPEN_DEMO.html to launch the interactive demo directly
-     in any web browser (offline, zero installation required).
-  3. The model/ folder contains the trained PyTorch checkpoint
-     (best_discovery.pt, w2_2mem_recency_hl365 Ep 10) and verified metadata.
+ВМІСТ ПАПКИ model/:
+  - best_discovery.pt — фінальна навчена нейромережа PyTorch
+    (w2_2mem_recency_hl365, Епоха 10)
+  - v2_full_reference.json — повна специфікація та контрольні суми SHA-256
 ====================================================================
 """
 
