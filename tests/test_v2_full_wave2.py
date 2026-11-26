@@ -34,6 +34,8 @@ from recommender.experiments.v2_full.config import TEST_START_V2, TRAIN_CUTOFF_V
 from recommender.experiments.v2_full.e2e_ranker import EndToEndStage2Ranker, TwoStageAdaptiveRanker
 from recommender.experiments.v2_full.run_v2_full_wave2 import (
     ACTIVE_E2E_BASE_CONFIG,
+    FINAL_2MEM_ARM_NAMES,
+    SIZE_SCALING_ARM_NAMES,
     build_wave2_arm_specs,
 )
 from recommender.experiments.v2_full.wave2_utils import (
@@ -455,13 +457,35 @@ def test_wave2_arm_specs_strictly_e2e_cand42():
         "w2_2mem_blocks",
         "w2_wider_mlp",
         "w2_2mem_wider_mlp",
+        "w2_wider_towers",
         "w2_dim192",
+        "w2_dim192_2mem_wider_mlp",
+        "w2_dim256",
+        "w2_dim256_2mem_4mlp",
         "w2_hist_len64",
         "w2_recency_hl365",
         "w2_2mem_wider_mlp_syn7030",
+        "w2_2mem_hist64",
+        "w2_2mem_recency_hl365",
+        "w2_2mem_hist64_recency_hl365",
+    ]
+    assert list(SIZE_SCALING_ARM_NAMES) == [
+        "w2_2mem_blocks",
+        "w2_wider_mlp",
+        "w2_2mem_wider_mlp",
+        "w2_wider_towers",
+        "w2_dim192",
+        "w2_dim192_2mem_wider_mlp",
+        "w2_dim256",
+        "w2_dim256_2mem_4mlp",
+    ]
+    assert list(FINAL_2MEM_ARM_NAMES) == [
+        "w2_2mem_hist64",
+        "w2_2mem_recency_hl365",
+        "w2_2mem_hist64_recency_hl365",
     ]
     by_name = {s["name"]: s for s in e2e_specs}
-    # Isolated capacity arms
+    # Model-size scaling ladder
     assert (by_name["w2_2mem_blocks"]["d_model"], by_name["w2_2mem_blocks"]["memory_layers"],
             by_name["w2_2mem_blocks"]["memory_ffn_dim"], by_name["w2_2mem_blocks"]["mlp_widths"],
             by_name["w2_2mem_blocks"]["synthetic_unseen_aug"]) == (128, 2, 384, (384, 192, 96), False)
@@ -471,17 +495,66 @@ def test_wave2_arm_specs_strictly_e2e_cand42():
     assert (by_name["w2_2mem_wider_mlp"]["d_model"], by_name["w2_2mem_wider_mlp"]["memory_layers"],
             by_name["w2_2mem_wider_mlp"]["memory_ffn_dim"], by_name["w2_2mem_wider_mlp"]["mlp_widths"],
             by_name["w2_2mem_wider_mlp"]["synthetic_unseen_aug"]) == (128, 2, 512, (512, 256, 128), False)
+    assert (
+        by_name["w2_wider_towers"]["d_model"],
+        by_name["w2_wider_towers"]["memory_layers"],
+        by_name["w2_wider_towers"]["product_tower_hidden_dim"],
+        by_name["w2_wider_towers"]["cust_tower_hidden_dim"],
+        by_name["w2_wider_towers"]["attr_emb_dim"],
+        by_name["w2_wider_towers"]["mlp_widths"],
+    ) == (128, 1, 256, 256, 32, (384, 192, 96))
     assert (by_name["w2_dim192"]["d_model"], by_name["w2_dim192"]["num_heads"],
             by_name["w2_dim192"]["memory_layers"], by_name["w2_dim192"]["memory_ffn_dim"],
             by_name["w2_dim192"]["mlp_widths"], by_name["w2_dim192"]["synthetic_unseen_aug"]) == (
         192, 8, 1, 576, (384, 192, 96), False
     )
+    assert (
+        by_name["w2_dim192_2mem_wider_mlp"]["d_model"],
+        by_name["w2_dim192_2mem_wider_mlp"]["num_heads"],
+        by_name["w2_dim192_2mem_wider_mlp"]["memory_layers"],
+        by_name["w2_dim192_2mem_wider_mlp"]["memory_ffn_dim"],
+        by_name["w2_dim192_2mem_wider_mlp"]["mlp_widths"],
+        by_name["w2_dim192_2mem_wider_mlp"]["attr_emb_dim"],
+    ) == (192, 8, 2, 576, (512, 256, 128), 24)
+    assert (
+        by_name["w2_dim256"]["d_model"],
+        by_name["w2_dim256"]["num_heads"],
+        by_name["w2_dim256"]["memory_layers"],
+        by_name["w2_dim256"]["memory_ffn_dim"],
+        by_name["w2_dim256"]["mlp_widths"],
+        by_name["w2_dim256"]["attr_emb_dim"],
+    ) == (256, 8, 1, 768, (512, 256, 128), 32)
+    assert (
+        by_name["w2_dim256_2mem_4mlp"]["d_model"],
+        by_name["w2_dim256_2mem_4mlp"]["num_heads"],
+        by_name["w2_dim256_2mem_4mlp"]["memory_layers"],
+        by_name["w2_dim256_2mem_4mlp"]["memory_ffn_dim"],
+        by_name["w2_dim256_2mem_4mlp"]["mlp_widths"],
+        by_name["w2_dim256_2mem_4mlp"]["product_tower_hidden_dim"],
+        by_name["w2_dim256_2mem_4mlp"]["cust_tower_hidden_dim"],
+        by_name["w2_dim256_2mem_4mlp"]["attr_emb_dim"],
+    ) == (256, 8, 2, 1024, (768, 512, 256, 128), 384, 384, 32)
     assert by_name["w2_hist_len64"]["seq_len"] == 64
     assert by_name["w2_recency_hl365"]["recency_half_life_days"] == 365.0
     # Separate bigger-model synthetic unseen augmentation experiment
     assert (by_name["w2_2mem_wider_mlp_syn7030"]["d_model"], by_name["w2_2mem_wider_mlp_syn7030"]["memory_layers"],
             by_name["w2_2mem_wider_mlp_syn7030"]["memory_ffn_dim"], by_name["w2_2mem_wider_mlp_syn7030"]["mlp_widths"],
             by_name["w2_2mem_wider_mlp_syn7030"]["synthetic_unseen_aug"]) == (128, 2, 512, (512, 256, 128), True)
+    # Final 2-memory-block ablation suite (seq_len=64, half_life=365d, combined)
+    assert (by_name["w2_2mem_hist64"]["memory_layers"], by_name["w2_2mem_hist64"]["seq_len"],
+            by_name["w2_2mem_hist64"]["recency_half_life_days"], by_name["w2_2mem_hist64"]["mlp_widths"]) == (
+        2, 64, None, (384, 192, 96)
+    )
+    assert (by_name["w2_2mem_recency_hl365"]["memory_layers"], by_name["w2_2mem_recency_hl365"]["seq_len"],
+            by_name["w2_2mem_recency_hl365"]["recency_half_life_days"], by_name["w2_2mem_recency_hl365"]["mlp_widths"]) == (
+        2, 32, 365.0, (384, 192, 96)
+    )
+    assert (
+        by_name["w2_2mem_hist64_recency_hl365"]["memory_layers"],
+        by_name["w2_2mem_hist64_recency_hl365"]["seq_len"],
+        by_name["w2_2mem_hist64_recency_hl365"]["recency_half_life_days"],
+        by_name["w2_2mem_hist64_recency_hl365"]["mlp_widths"],
+    ) == (2, 64, 365.0, (384, 192, 96))
 
     assert all(
         s["num_candidate_features"] == 42
@@ -502,10 +575,17 @@ def test_wave2_arm_specs_strictly_e2e_cand42():
         "w2_2mem_blocks",
         "w2_wider_mlp",
         "w2_2mem_wider_mlp",
+        "w2_wider_towers",
         "w2_dim192",
+        "w2_dim192_2mem_wider_mlp",
+        "w2_dim256",
+        "w2_dim256_2mem_4mlp",
         "w2_hist_len64",
         "w2_recency_hl365",
         "w2_2mem_wider_mlp_syn7030",
+        "w2_2mem_hist64",
+        "w2_2mem_recency_hl365",
+        "w2_2mem_hist64_recency_hl365",
         "w2_hist_len96",
     ]
     with pytest.raises(ValueError, match="exclusively on E2E"):
@@ -1047,3 +1127,162 @@ def test_wave2_static_shape_tpu_loss_and_tail_padding_exact_parity():
     )
     assert rb == 3 and len(rows_p) == 8 and cand_p.shape == (8, 4, 42)
     assert rows_p[:3].tolist() == [10, 20, 30]
+
+
+def test_wave2_larger_model_size_arms_tower_scaling_bf16_and_presets():
+    from recommender.experiments.v2_full import run_v2_full_wave2 as runner
+    from recommender.experiments.v2_full.wave2b_models import Wave2BE2ERanker, strip_wave2b_training_aux
+
+    torch.manual_seed(31)
+    attrs, products, batch, _, allowed = _make_synthetic_batch(b=3, c=12, n_tr_c=9, s=16, d_model=128)
+    cand42 = torch.rand(3, 12, 42)
+    cust7 = torch.rand(3, 7)
+    w_batch = {**batch, "candidate_features": cand42, "customer_features": cust7}
+    y = torch.zeros(3, 12)
+    y[:, 0] = 1.0
+    y[:, 5] = 1.0
+
+    # Validation guards for preset & tower dimensions
+    with pytest.raises(ValueError, match="Unsupported Wave 2 preset"):
+        runner.run_v2_full_wave2(preset="invalid", skip_v1_verify=True, device="cpu")
+    with pytest.raises(ValueError, match="not both"):
+        runner.run_v2_full_wave2(preset="size", arms=["w2_dim256"], skip_v1_verify=True, device="cpu")
+    with pytest.raises(ValueError, match="not both"):
+        runner.run_v2_full_wave2(preset="final_2mem", arms=["w2_2mem_hist64"], skip_v1_verify=True, device="cpu")
+    with pytest.raises(ValueError, match="attr_emb_dim"):
+        Wave2BE2ERanker(product_attr_vocab_sizes=attrs, num_cities=5, num_regions=4, num_industries=4, attr_emb_dim=0)
+    with pytest.raises(ValueError, match="product_tower_hidden_dim"):
+        Wave2BE2ERanker(
+            product_attr_vocab_sizes=attrs, num_cities=5, num_regions=4, num_industries=4, product_tower_hidden_dim=0
+        )
+    with pytest.raises(ValueError, match="cust_tower_hidden_dim"):
+        Wave2BE2ERanker(
+            product_attr_vocab_sizes=attrs, num_cities=5, num_regions=4, num_industries=4, cust_tower_hidden_dim=0
+        )
+
+    # Default Wave2BE2ERanker preserves exact backward-compatible tower dimensions
+    base_m = Wave2BE2ERanker(
+        product_attr_vocab_sizes=attrs,
+        num_cities=5,
+        num_regions=4,
+        num_industries=4,
+        num_candidate_features=42,
+        num_customer_features=7,
+        num_pairwise_bias_features=42,
+        pure_v_query=True,
+        option_a_unseen_head=True,
+        unseen_dropout_cold_prob=0.0,
+        unseen_attn_aux_enabled=False,
+        seed=5,
+    )
+    assert base_m.product_tower_hidden_dim == 128
+    assert base_m.cust_tower_hidden_dim == 128
+    assert base_m.attr_emb_dim == 16
+    base_params = sum(p.numel() for p in base_m.parameters())
+
+    specs_by_name = {s["name"]: s for s in build_wave2_arm_specs(ACTIVE_E2E_BASE_CONFIG)}
+    new_size_arms = ("w2_wider_towers", "w2_dim192_2mem_wider_mlp", "w2_dim256", "w2_dim256_2mem_4mlp")
+    param_counts = {}
+    wloss = WeightedRankerLoss()
+
+    for arm_name in new_size_arms:
+        cfg = specs_by_name[arm_name]
+        model = Wave2BE2ERanker(
+            product_attr_vocab_sizes=attrs,
+            num_cities=5,
+            num_regions=4,
+            num_industries=4,
+            num_candidate_features=42,
+            num_customer_features=7,
+            num_pairwise_bias_features=42,
+            pure_v_query=True,
+            option_a_unseen_head=True,
+            unseen_dropout_cold_prob=0.0,
+            unseen_attn_aux_enabled=False,
+            d_model=cfg["d_model"],
+            num_heads=cfg["num_heads"],
+            memory_ffn_dim=cfg["memory_ffn_dim"],
+            memory_layers=cfg["memory_layers"],
+            max_seq_len=cfg["seq_len"],
+            mlp_widths=cfg["mlp_widths"],
+            product_tower_hidden_dim=cfg["product_tower_hidden_dim"],
+            cust_tower_hidden_dim=cfg["cust_tower_hidden_dim"],
+            attr_emb_dim=cfg["attr_emb_dim"],
+            aux_60d_enabled=True,
+            seed=5,
+        )
+        param_counts[arm_name] = sum(p.numel() for p in model.parameters())
+        assert param_counts[arm_name] > base_params
+
+        with torch.amp.autocast("cpu", dtype=torch.bfloat16):
+            res = model(**w_batch, prod_inputs=products, train_bn_limit=9, return_aux=True)
+        loss = (
+            wloss(res["output"].logits.float(), y, candidate_mask=allowed)["loss"]
+            + 0.3 * wloss(res["aux_60d_logits"].float(), y, candidate_mask=allowed)["loss"]
+            + wloss(res["unseen_logits"].float(), y, candidate_mask=allowed)["loss"]
+            + 0.3 * wloss(res["unseen_aux_60d_logits"].float(), y, candidate_mask=allowed)["loss"]
+        )
+        loss.backward()
+
+        last_mem = cfg["memory_layers"] - 1
+        last_mlp = len(cfg["mlp_widths"]) - 1
+        for pname in (
+            "product_tower.text_proj.0.weight",
+            "cust_text_proj.0.weight",
+            "city_embedding.weight",
+            f"memory_encoder.layers.{last_mem}.linear1.weight",
+            f"mlp_blocks.{last_mlp}.0.weight",
+            f"option_a_head.mlp_blocks.{last_mlp}.0.weight",
+            "statistics_attention_weights",
+        ):
+            p = dict(model.named_parameters())[pname]
+            assert p.grad is not None and torch.isfinite(p.grad).all() and p.grad.abs().sum().item() > 0.0
+
+        # Cached v_bn parity + stripped inference load parity
+        model.eval()
+        eval_batch = {**w_batch, "candidate_mask": torch.ones(3, 12, dtype=torch.bool)}
+        with torch.no_grad():
+            out_live = model(**eval_batch, prod_inputs=products, return_aux=False)
+            v_cached = model.precompute_product_vectors(products)
+            assert v_cached.shape == (12, cfg["d_model"])
+            out_cached = model(**eval_batch, precomputed_v_bn=v_cached, return_aux=False)
+            assert torch.allclose(out_live["output"].logits, out_cached["output"].logits, atol=1e-5)
+            assert torch.allclose(out_live["unseen_logits"], out_cached["unseen_logits"], atol=1e-5)
+
+        inf = Wave2BE2ERanker(
+            product_attr_vocab_sizes=attrs,
+            num_cities=5,
+            num_regions=4,
+            num_industries=4,
+            num_candidate_features=42,
+            num_customer_features=7,
+            num_pairwise_bias_features=42,
+            pure_v_query=True,
+            option_a_unseen_head=True,
+            unseen_dropout_cold_prob=0.0,
+            unseen_attn_aux_enabled=False,
+            d_model=cfg["d_model"],
+            num_heads=cfg["num_heads"],
+            memory_ffn_dim=cfg["memory_ffn_dim"],
+            memory_layers=cfg["memory_layers"],
+            max_seq_len=cfg["seq_len"],
+            mlp_widths=cfg["mlp_widths"],
+            product_tower_hidden_dim=cfg["product_tower_hidden_dim"],
+            cust_tower_hidden_dim=cfg["cust_tower_hidden_dim"],
+            attr_emb_dim=cfg["attr_emb_dim"],
+            aux_60d_enabled=False,
+            seed=5,
+        ).eval()
+        inf.load_state_dict(strip_wave2b_training_aux(model.state_dict()), strict=True)
+        with torch.no_grad():
+            out_inf = inf(**eval_batch, precomputed_v_bn=v_cached, return_aux=False)
+            assert torch.allclose(out_live["output"].logits, out_inf["output"].logits, atol=1e-5)
+            assert torch.allclose(out_live["unseen_logits"], out_inf["unseen_logits"], atol=1e-5)
+
+    assert (
+        base_params
+        < param_counts["w2_wider_towers"]
+        < param_counts["w2_dim192_2mem_wider_mlp"]
+        < param_counts["w2_dim256"]
+        < param_counts["w2_dim256_2mem_4mlp"]
+    )

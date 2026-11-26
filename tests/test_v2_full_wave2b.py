@@ -727,7 +727,7 @@ def test_v2_full_cand42_reference_defaults_and_checksum_verification(tmp_path):
         resolve_v2_full_reference_predictions,
     )
     assert ACTIVE_V2_FULL_BASE_MODEL == "arm4_e2e_unseen_attn_aux"
-    assert ACTIVE_V2_FULL_REFERENCE_ID == "v2-full-arm4-w2c-clean-sep-w10-cal-disc-ep6"
+    assert ACTIVE_V2_FULL_REFERENCE_ID == "v2-full-arm4-w2a-2mem-recency-hl365-cal-disc-ep10"
     if pytest.importorskip("catboost"):
         from recommender.experiments.v2_full.run_v2_full_catboost import ALL_CB_MODELS, DEFAULT_CB_MODELS
 
@@ -742,7 +742,9 @@ def test_v2_full_cand42_reference_defaults_and_checksum_verification(tmp_path):
         assert doc["active_feature_schema"]["active_seq_stat_indices"] == [0, 1, 5, 6, 8]
         assert "mgr_base_name_growth_30d_vs_90d" in doc["active_feature_schema"]["dropped_features"]
         arch = doc["active_architecture"]
-        assert arch["arm"] == "w2c_exp1_clean_sep_w10"
+        assert arch["arm"] == "w2_2mem_recency_hl365"
+        assert arch["memory_layers"] == 2
+        assert arch["recency_half_life_days"] == 365.0
         assert arch["pure_v_query"] is True
         assert arch["num_pairwise_bias_features"] == 42
         assert arch["option_a_unseen_head"] is True

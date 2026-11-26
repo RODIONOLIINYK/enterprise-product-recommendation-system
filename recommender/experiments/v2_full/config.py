@@ -22,7 +22,7 @@ ARTIFACT_ROOT = Path("checkpoints/v2_full")
 EVIDENCE_ROOT = Path("experiments/v2_full")
 V2_FULL_REFERENCE_PATH = EVIDENCE_ROOT / "v2_full_reference.json"
 ACTIVE_V2_FULL_BASE_MODEL = "arm4_e2e_unseen_attn_aux"
-ACTIVE_V2_FULL_REFERENCE_ID = "v2-full-arm4-w2c-clean-sep-w10-cal-disc-ep6"
+ACTIVE_V2_FULL_REFERENCE_ID = "v2-full-arm4-w2a-2mem-recency-hl365-cal-disc-ep10"
 
 RAW_WORKBOOK_PATH = RAW_ROOT / "dataset.xlsx"
 RAW_CUSTOMERS_PATH = RAW_ROOT / "customers.csv"

@@ -1,9 +1,9 @@
 """Live interactive demo engine for the canonical `v2_full` E2E Option A model.
 
-Serves the promoted single-stage `Wave2BE2ERanker` (`v2-full-arm4-w2c-clean-sep-w10-cal-disc-ep6`,
-`cand_42 + CUST_7 + SEQ_5`, Pure-Q `Q = v_bn`, Full-42 cross-attention bias, clean separated
-`OptionAUnseenHead`, and 2-parameter customer-grouped OOF affine blend) over the `16,623` strictly
-out-of-time `v2_full` Validation baskets (`2026-02-01 .. 2026-06-30`).
+Serves the promoted single-stage `Wave2BE2ERanker` (`v2-full-arm4-w2a-2mem-recency-hl365-cal-disc-ep10`,
+2× memory blocks + 365d recency weighting, `cand_42 + CUST_7 + SEQ_5`, Pure-Q `Q = v_bn`, Full-42
+cross-attention bias, clean separated `OptionAUnseenHead`, and 2-parameter customer-grouped OOF
+affine blend) over the `16,623` strictly out-of-time `v2_full` Validation baskets (`2026-02-01 .. 2026-06-30`).
 
 Strictly zero held-out Test (`>= 2026-07-01`) access.
 """
@@ -141,7 +141,7 @@ def _resolve_checkpoint_kind(
     checkpoint_kind: str,
 ) -> Tuple[Mapping[str, Any], Mapping[str, Any]]:
     kind = str(checkpoint_kind).strip().lower()
-    if kind in ("discovery", "primary", "unseen"):
+    if kind in ("discovery", "primary"):
         return (
             reference["checkpoints"]["ranker"],
             reference["validation_metrics_primary_cal_discovery"],
@@ -151,7 +151,12 @@ def _resolve_checkpoint_kind(
             reference["checkpoints"]["ndcg_ranker"],
             reference["validation_metrics_companion_cal_ndcg"],
         )
-    raise ValueError(f"Unsupported checkpoint_kind={checkpoint_kind!r}; expected 'discovery' or 'ndcg'.")
+    if kind == "unseen":
+        unseen_entry = reference["checkpoints"].get("unseen_ranker", reference["checkpoints"]["ranker"])
+        if unseen_entry.get("path") == reference["checkpoints"]["ndcg_ranker"].get("path"):
+            return unseen_entry, reference["validation_metrics_companion_cal_ndcg"]
+        return unseen_entry, reference["validation_metrics_primary_cal_discovery"]
+    raise ValueError(f"Unsupported checkpoint_kind={checkpoint_kind!r}; expected 'discovery', 'ndcg', or 'unseen'.")
 
 
 class V2FullLiveDemoEngine:
@@ -289,7 +294,7 @@ class V2FullLiveDemoEngine:
         # Load Wave2BE2ERanker & precompute cached v_bn (1,141 x 128)
         print("[demo-v2] Loading Wave2BE2ERanker + OptionAUnseenHead & caching 1,141 v_bn vectors...", flush=True)
         arch = dict(self.reference["active_architecture"])
-        self.active_variant = str(arch.get("arm", "w2c_exp1_clean_sep_w10"))
+        self.active_variant = str(arch.get("arm", "w2_2mem_recency_hl365"))
         self.active_ckpt_path = str(ckpt_path)
         n_demand = int(self.shared_meta["prod_inputs"]["demand_features"].shape[1])
 

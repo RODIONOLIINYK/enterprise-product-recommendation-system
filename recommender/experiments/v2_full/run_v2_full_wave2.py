@@ -8,7 +8,7 @@ separated Main/Option A targets, `OptionAUnseenHead` on `cand_37` with **0% tabu
 >= 2026-07-01 access, paired 95% customer-clustered bootstrap CIs over 16,623 validation baskets
 vs. `v2_full_reference.json`):
 
-  Isolated Capacity Factors:
+  Model-Size Scaling Ladder (`--preset size` runs these 8 arms):
     1. `w2_2mem_blocks`:
          2x stacked `[Self-Attention -> FFN(384)]` memory blocks (`memory_layers=2`), keeping
          `d_model=128` and `(384, 192, 96)` scoring MLPs fixed.
@@ -18,26 +18,40 @@ vs. `v2_full_reference.json`):
     3. `w2_2mem_wider_mlp`:
          Both 2x `[Self-Attention -> FFN(512)]` memory blocks AND wider `(512, 256, 128)` scoring
          MLPs (`d_model=128`).
-    4. `w2_dim192`:
+    4. `w2_wider_towers`:
+         Wider Product & Customer towers (`product_tower_hidden_dim=256`, `cust_tower_hidden_dim=256`,
+         `attr_emb_dim=32`) while keeping `d_model=128`, `memory_layers=1`, and `(384, 192, 96)` MLPs
+         fixed (adds ~0 ms per-request CPU latency since `ProductTower` is cached offline).
+    5. `w2_dim192`:
          Bigger product & customer representation dimensionality (`d_model=192`, `num_heads=8`
          [24D/head], `memory_ffn_dim=576`), keeping `memory_layers=1` and `(384, 192, 96)` MLPs.
+    6. `w2_dim192_2mem_wider_mlp`:
+         Compound `d_model=192` scaling: `d_model=192`, `num_heads=8` [24D/head], `memory_layers=2`,
+         `memory_ffn_dim=576`, `mlp_widths=(512, 256, 128)`, `attr_emb_dim=24`.
+    7. `w2_dim256`:
+         Isolated `d_model=256` width scaling: `d_model=256`, `num_heads=8` [32D/head],
+         `memory_layers=1`, `memory_ffn_dim=768`, `mlp_widths=(512, 256, 128)`, `attr_emb_dim=32`.
+    8. `w2_dim256_2mem_4mlp`:
+         Large flagship capacity arm: `d_model=256`, `num_heads=8` [32D/head], `memory_layers=2`,
+         `memory_ffn_dim=1024`, 4-block `mlp_widths=(768, 512, 256, 128)`,
+         `product_tower_hidden_dim=384`, `cust_tower_hidden_dim=384`, `attr_emb_dim=32`.
 
   Longer Purchase History & Recency Sample Weighting:
-    5. `w2_hist_len64`:
+    9. `w2_hist_len64`:
          `seq_len=64` (all other architecture/loss settings identical to the promoted `w10` reference).
-    6. `w2_recency_hl365`:
+   10. `w2_recency_hl365`:
          Exponential recency basket weighting (`half_life_days=365.0`, `min_weight=0.1`,
          mean-normalized to 1.0 across train baskets) applied to separated `L_main`, `L_60d`,
          and Option A unseen losses (`L_unseen_next`, `L_unseen_60d`).
 
   Separate Bigger-Model Synthetic Unseen Augmentation Experiment:
-    7. `w2_2mem_wider_mlp_syn7030`:
+   11. `w2_2mem_wider_mlp_syn7030`:
          Exact `w2_2mem_wider_mlp` architecture trained with offline exact 70/30 masked-b* + FO
          synthetic unseen augmentation (`synthetic_unseen.py`, `w_optA=1.0`, `skip_main_head=True`),
          compared directly against both `w10` and `w2_2mem_wider_mlp`.
 
   Conditional Wave 3 (OFF by default):
-    8. `w2_hist_len96` (`--include-hist96`):
+   12. `w2_hist_len96` (`--include-hist96`):
          `seq_len=96` — deferred to Wave 3 and run ONLY if `w2_hist_len64` improves over the
          32-event `w2c_exp1_clean_sep_w10` reference control.
 """
@@ -147,8 +161,23 @@ ACTIVE_E2E_BASE_CONFIG: Dict[str, Any] = {
     "unseen_attn_beta": 0.0,
 }
 
-WAVE2A_SCHEMA_VERSION = "cand42_clean_sep_w10_optionA_pureQ_full42bias_cust7_seq5_v2"
+WAVE2A_SCHEMA_VERSION = "cand42_clean_sep_w10_optionA_pureQ_full42bias_cust7_seq5_v4"
 REQUIRED_WAVE2A_REF_KEYS: Tuple[str, ...] = ("v2_full_ref_primary", "v2_full_ref_cal_ndcg")
+SIZE_SCALING_ARM_NAMES: Tuple[str, ...] = (
+    "w2_2mem_blocks",
+    "w2_wider_mlp",
+    "w2_2mem_wider_mlp",
+    "w2_wider_towers",
+    "w2_dim192",
+    "w2_dim192_2mem_wider_mlp",
+    "w2_dim256",
+    "w2_dim256_2mem_4mlp",
+)
+FINAL_2MEM_ARM_NAMES: Tuple[str, ...] = (
+    "w2_2mem_hist64",
+    "w2_2mem_recency_hl365",
+    "w2_2mem_hist64_recency_hl365",
+)
 
 
 def _wave2a_code_digest() -> str:
@@ -205,6 +234,9 @@ def build_wave2_arm_specs(
         "memory_ffn_dim": 384,
         "memory_layers": 1,
         "mlp_widths": (384, 192, 96),
+        "product_tower_hidden_dim": None,
+        "cust_tower_hidden_dim": None,
+        "attr_emb_dim": 16,
         "dropout": 0.12,
         "seq_len": 32,
         "recency_half_life_days": None,
@@ -236,12 +268,56 @@ def build_wave2_arm_specs(
         },
         {
             **defaults,
+            "name": "w2_wider_towers",
+            "d_model": 128,
+            "num_heads": 8,
+            "memory_layers": 1,
+            "memory_ffn_dim": 384,
+            "mlp_widths": (384, 192, 96),
+            "product_tower_hidden_dim": 256,
+            "cust_tower_hidden_dim": 256,
+            "attr_emb_dim": 32,
+        },
+        {
+            **defaults,
             "name": "w2_dim192",
             "d_model": 192,
             "num_heads": 8,
             "memory_ffn_dim": 576,
             "memory_layers": 1,
             "mlp_widths": (384, 192, 96),
+        },
+        {
+            **defaults,
+            "name": "w2_dim192_2mem_wider_mlp",
+            "d_model": 192,
+            "num_heads": 8,
+            "memory_ffn_dim": 576,
+            "memory_layers": 2,
+            "mlp_widths": (512, 256, 128),
+            "attr_emb_dim": 24,
+        },
+        {
+            **defaults,
+            "name": "w2_dim256",
+            "d_model": 256,
+            "num_heads": 8,
+            "memory_ffn_dim": 768,
+            "memory_layers": 1,
+            "mlp_widths": (512, 256, 128),
+            "attr_emb_dim": 32,
+        },
+        {
+            **defaults,
+            "name": "w2_dim256_2mem_4mlp",
+            "d_model": 256,
+            "num_heads": 8,
+            "memory_ffn_dim": 1024,
+            "memory_layers": 2,
+            "mlp_widths": (768, 512, 256, 128),
+            "product_tower_hidden_dim": 384,
+            "cust_tower_hidden_dim": 384,
+            "attr_emb_dim": 32,
         },
         {
             **defaults,
@@ -261,6 +337,33 @@ def build_wave2_arm_specs(
             "memory_ffn_dim": 512,
             "mlp_widths": (512, 256, 128),
             "synthetic_unseen_aug": True,
+        },
+        {
+            **defaults,
+            "name": "w2_2mem_hist64",
+            "memory_layers": 2,
+            "memory_ffn_dim": 384,
+            "mlp_widths": (384, 192, 96),
+            "seq_len": 64,
+        },
+        {
+            **defaults,
+            "name": "w2_2mem_recency_hl365",
+            "memory_layers": 2,
+            "memory_ffn_dim": 384,
+            "mlp_widths": (384, 192, 96),
+            "recency_half_life_days": 365.0,
+            "recency_min_weight": 0.1,
+        },
+        {
+            **defaults,
+            "name": "w2_2mem_hist64_recency_hl365",
+            "memory_layers": 2,
+            "memory_ffn_dim": 384,
+            "mlp_widths": (384, 192, 96),
+            "seq_len": 64,
+            "recency_half_life_days": 365.0,
+            "recency_min_weight": 0.1,
         },
     ]
     if include_hist96:
@@ -783,6 +886,11 @@ def train_and_eval_wave2_arm(
     memory_ffn_dim = int(arm_cfg["memory_ffn_dim"])
     memory_layers = int(arm_cfg["memory_layers"])
     mlp_widths = tuple(int(w) for w in arm_cfg["mlp_widths"])
+    raw_p_hid = arm_cfg.get("product_tower_hidden_dim")
+    product_tower_hidden_dim = int(raw_p_hid) if raw_p_hid is not None else None
+    raw_c_hid = arm_cfg.get("cust_tower_hidden_dim")
+    cust_tower_hidden_dim = int(raw_c_hid) if raw_c_hid is not None else None
+    attr_emb_dim = int(arm_cfg.get("attr_emb_dim", 16))
     dropout = float(arm_cfg.get("dropout", 0.12))
     seq_len = int(arm_cfg["seq_len"])
     recency_hl = arm_cfg.get("recency_half_life_days")
@@ -850,6 +958,9 @@ def train_and_eval_wave2_arm(
             memory_layers=memory_layers,
             max_seq_len=seq_len,
             mlp_widths=mlp_widths,
+            product_tower_hidden_dim=product_tower_hidden_dim,
+            cust_tower_hidden_dim=cust_tower_hidden_dim,
+            attr_emb_dim=attr_emb_dim,
             dropout=dropout,
             aux_60d_enabled=training_aux,
             seed=seed,
@@ -925,6 +1036,7 @@ def train_and_eval_wave2_arm(
         f"\n[v2-w2] Training {arm_name} (e2e cand={num_cand_feats}, sep_targets={separated_main}, "
         f"optA_drop={unseen_cold_p:.0%}, w_optA={unseen_head_weight}, syn7030={use_syn} [{n_syn_total:,}], "
         f"d={d_model}, h={num_heads}, mem_layers={memory_layers}, ffn={memory_ffn_dim}, mlp={mlp_widths}, "
+        f"p_hid={product_tower_hidden_dim or d_model}, c_hid={cust_tower_hidden_dim or d_model}, emb={attr_emb_dim}, "
         f"seq={seq_len}, recency_hl={recency_hl}, dev={dev}, bf16={use_bf16}, "
         f"train_params={n_train_params:,}, per_req_params={n_req_params:,})...",
         flush=True,
@@ -1350,6 +1462,7 @@ def run_v2_full_wave2(
     seed: int = SEED,
     epochs: int = STAGE2_EPOCHS,
     batch_size: int = STAGE2_BATCH_SIZE,
+    preset: str = "all",
     arms: Optional[Sequence[str]] = None,
     include_hist96: bool = False,
     device: Optional[str] = None,
@@ -1358,6 +1471,10 @@ def run_v2_full_wave2(
     skip_v1_verify: bool = False,
     sync_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
+    if preset not in ("all", "size", "final_2mem"):
+        raise ValueError(f"Unsupported Wave 2 preset {preset!r}. Expected 'all', 'size', or 'final_2mem'.")
+    if preset != "all" and arms is not None:
+        raise ValueError(f"Specify either --preset {preset} or --arms, not both.")
     t_all = time.perf_counter()
     dev = resolve_wave2_device(device)
     on_tpu = is_tpu_device(dev)
@@ -1389,9 +1506,15 @@ def run_v2_full_wave2(
 
     all_specs = build_wave2_arm_specs(ACTIVE_E2E_BASE_CONFIG, include_hist96=include_hist96)
     available = {a["name"] for a in all_specs}
-    if arms is not None and (not arms or set(arms) - available):
-        raise ValueError(f"Unsupported Wave 2 arm selection {arms!r}. Available: {sorted(available)}")
-    selected_specs = [a for a in all_specs if arms is None or a["name"] in arms]
+    if preset == "size":
+        effective_arms: Optional[Sequence[str]] = SIZE_SCALING_ARM_NAMES
+    elif preset == "final_2mem":
+        effective_arms = FINAL_2MEM_ARM_NAMES
+    else:
+        effective_arms = arms
+    if effective_arms is not None and (not effective_arms or set(effective_arms) - available):
+        raise ValueError(f"Unsupported Wave 2 arm selection {effective_arms!r}. Available: {sorted(available)}")
+    selected_specs = [a for a in all_specs if effective_arms is None or a["name"] in effective_arms]
 
     tr_e5_p, va_e5_p, e5_manifest = build_or_load_extra_cand_5()
     shared_meta, tr_meta, va_meta = load_prepared_metadata(PREPARED_ROOT)
@@ -1582,7 +1705,15 @@ def run_v2_full_wave2(
     for base_arm, cand_arm in (
         ("w2_2mem_blocks", "w2_2mem_wider_mlp"),
         ("w2_wider_mlp", "w2_2mem_wider_mlp"),
+        ("w2_dim192", "w2_dim192_2mem_wider_mlp"),
+        ("w2_2mem_wider_mlp", "w2_dim192_2mem_wider_mlp"),
+        ("w2_dim192", "w2_dim256"),
+        ("w2_dim256", "w2_dim256_2mem_4mlp"),
+        ("w2_dim192_2mem_wider_mlp", "w2_dim256_2mem_4mlp"),
         ("w2_2mem_wider_mlp", "w2_2mem_wider_mlp_syn7030"),
+        ("w2_2mem_hist64", "w2_2mem_hist64_recency_hl365"),
+        ("w2_2mem_recency_hl365", "w2_2mem_hist64_recency_hl365"),
+        ("w2_2mem_hist64", "w2_2mem_recency_hl365"),
     ):
         if base_arm in arm_results and cand_arm in arm_results:
             b_res = arm_results[base_arm]
@@ -1606,11 +1737,15 @@ def run_v2_full_wave2(
         _verify_reference_files(ref_v1_3s)
 
     EVIDENCE_ROOT.mkdir(parents=True, exist_ok=True)
-    summary_path = EVIDENCE_ROOT / f"v2_full_wave2a_{base_name}_clean_sep_w10_seed{seed}.json"
-    if len(selected_specs) != len(all_specs):
-        summary_path = summary_path.with_stem(summary_path.stem + "_" + "_".join(a["name"] for a in selected_specs))
+    if preset in ("size", "final_2mem"):
+        summary_path = EVIDENCE_ROOT / f"v2_full_wave2a_{base_name}_clean_sep_w10_{preset}_seed{seed}.json"
+    else:
+        summary_path = EVIDENCE_ROOT / f"v2_full_wave2a_{base_name}_clean_sep_w10_seed{seed}.json"
+        if len(selected_specs) != len(all_specs):
+            summary_path = summary_path.with_stem(summary_path.stem + "_" + "_".join(a["name"] for a in selected_specs))
     summary = {
         "experiment": "v2_full_wave2a_controlled_ablations_clean_sep_w10",
+        "preset": preset,
         "dataset": "v2_full",
         "reference_id": ACTIVE_V2_FULL_REFERENCE_ID,
         "feature_schema": "cand_42+CUST_7+SEQ_5 (OptionA=cand_37, dropout=0%, sep_targets=True, w_optA=1.0)",
@@ -1640,6 +1775,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--epochs", type=int, default=STAGE2_EPOCHS)
     parser.add_argument("--batch-size", type=int, default=STAGE2_BATCH_SIZE)
+    parser.add_argument("--preset", choices=("all", "size", "final_2mem"), default="all")
     parser.add_argument("--arms", nargs="+", default=None)
     parser.add_argument("--include-hist96", action="store_true")
     parser.add_argument("--device", type=str, default=None)
@@ -1652,6 +1788,7 @@ def main() -> None:
         seed=args.seed,
         epochs=args.epochs,
         batch_size=args.batch_size,
+        preset=args.preset,
         arms=args.arms,
         include_hist96=args.include_hist96,
         device=args.device,

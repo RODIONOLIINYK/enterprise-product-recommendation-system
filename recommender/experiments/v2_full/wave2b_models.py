@@ -217,6 +217,9 @@ class Wave2BE2ERanker(_Wave2BCandidateAttention):
         memory_layers: int = 1,
         max_seq_len: int = DEFAULT_SEQUENCE_LENGTH,
         mlp_widths: Sequence[int] = (384, 192, 96),
+        product_tower_hidden_dim: Optional[int] = None,
+        cust_tower_hidden_dim: Optional[int] = None,
+        attr_emb_dim: int = 16,
         dropout: float = 0.12,
         aux_60d_enabled: bool = True,
         seed: int = 42,
@@ -224,6 +227,12 @@ class Wave2BE2ERanker(_Wave2BCandidateAttention):
         super().__init__()
         if int(memory_layers) < 1 or int(max_seq_len) < 1:
             raise ValueError(f"memory_layers and max_seq_len must be >= 1, got {memory_layers}, {max_seq_len}")
+        if int(attr_emb_dim) < 1:
+            raise ValueError(f"attr_emb_dim must be >= 1, got {attr_emb_dim}")
+        if product_tower_hidden_dim is not None and int(product_tower_hidden_dim) < 1:
+            raise ValueError(f"product_tower_hidden_dim must be >= 1, got {product_tower_hidden_dim}")
+        if cust_tower_hidden_dim is not None and int(cust_tower_hidden_dim) < 1:
+            raise ValueError(f"cust_tower_hidden_dim must be >= 1, got {cust_tower_hidden_dim}")
         if not active_seq_stat_indices:
             raise ValueError("active_seq_stat_indices must be non-empty.")
         if int(num_pairwise_bias_features) > int(num_candidate_features):
@@ -237,6 +246,13 @@ class Wave2BE2ERanker(_Wave2BCandidateAttention):
         self.num_heads = int(num_heads)
         self.memory_layers = int(memory_layers)
         self.max_seq_len = int(max_seq_len)
+        self.product_tower_hidden_dim = (
+            int(product_tower_hidden_dim) if product_tower_hidden_dim is not None else self.d_model
+        )
+        self.cust_tower_hidden_dim = (
+            int(cust_tower_hidden_dim) if cust_tower_hidden_dim is not None else self.d_model
+        )
+        self.attr_emb_dim = int(attr_emb_dim)
         self.num_candidate_features = int(num_candidate_features)
         self.num_customer_features = int(num_customer_features)
         self.num_pairwise_bias_features = int(num_pairwise_bias_features)
@@ -252,32 +268,32 @@ class Wave2BE2ERanker(_Wave2BCandidateAttention):
             attribute_vocab_sizes=product_attr_vocab_sizes,
             text_dim=int(text_dim),
             output_dim=self.d_model,
-            hidden_dim=self.d_model,
+            hidden_dim=self.product_tower_hidden_dim,
             num_demand_features=int(num_demand_features),
-            attr_emb_dim=16,
+            attr_emb_dim=self.attr_emb_dim,
             dropout=0.1,
         )
 
         self.cust_text_proj = nn.Sequential(
-            nn.Linear(int(text_dim), self.d_model),
-            nn.LayerNorm(self.d_model),
+            nn.Linear(int(text_dim), self.cust_tower_hidden_dim),
+            nn.LayerNorm(self.cust_tower_hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
         )
-        self.city_embedding = nn.Embedding(int(num_cities), 16, padding_idx=0)
-        self.region_embedding = nn.Embedding(int(num_regions), 16, padding_idx=0)
-        self.industry_embedding = nn.Embedding(int(num_industries), 16, padding_idx=0)
-        tab_in = 16 * 3 + self.num_customer_features
+        self.city_embedding = nn.Embedding(int(num_cities), self.attr_emb_dim, padding_idx=0)
+        self.region_embedding = nn.Embedding(int(num_regions), self.attr_emb_dim, padding_idx=0)
+        self.industry_embedding = nn.Embedding(int(num_industries), self.attr_emb_dim, padding_idx=0)
+        tab_in = self.attr_emb_dim * 3 + self.num_customer_features
         self.cust_tab_proj = nn.Sequential(
-            nn.Linear(tab_in, self.d_model),
-            nn.LayerNorm(self.d_model),
+            nn.Linear(tab_in, self.cust_tower_hidden_dim),
+            nn.LayerNorm(self.cust_tower_hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(self.d_model, self.d_model),
-            nn.LayerNorm(self.d_model),
+            nn.Linear(self.cust_tower_hidden_dim, self.cust_tower_hidden_dim),
+            nn.LayerNorm(self.cust_tower_hidden_dim),
         )
         self.token0_fusion = nn.Sequential(
-            nn.Linear(self.d_model * 2, self.d_model),
+            nn.Linear(self.cust_tower_hidden_dim * 2, self.d_model),
             nn.LayerNorm(self.d_model),
             nn.GELU(),
         )
