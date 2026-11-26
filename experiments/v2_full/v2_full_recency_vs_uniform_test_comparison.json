@@ -1,0 +1,188 @@
+{
+  "test_window": "2026-07-01..2026-11-20",
+  "total_test_orders": 13184,
+  "w2_2mem_recency_hl365_ep10": {
+    "full_catalogue_all": {
+      "orders": 13184,
+      "recall@10": 76.63,
+      "ndcg@10": 58.41,
+      "new_hits@10": 853,
+      "new_targets": 3929,
+      "new_recall@10": 21.71,
+      "pure_unseen_hits@10": 1681,
+      "pure_unseen_recall@10": 42.78
+    },
+    "all_unlearned": {
+      "orders": 3345,
+      "recall@10": 57.8,
+      "ndcg@10": 43.47,
+      "new_hits@10": 605,
+      "new_targets": 2348,
+      "new_recall@10": 25.77,
+      "pure_unseen_hits@10": 999,
+      "pure_unseen_recall@10": 42.55
+    },
+    "unlearned_customers_all": {
+      "orders": 967,
+      "recall@10": 61.21,
+      "ndcg@10": 45.77,
+      "new_hits@10": 343,
+      "new_targets": 871,
+      "new_recall@10": 39.38,
+      "pure_unseen_hits@10": 409,
+      "pure_unseen_recall@10": 46.96
+    },
+    "unlearned_customers_only": {
+      "orders": 792,
+      "recall@10": 61.86,
+      "ndcg@10": 45.62,
+      "new_hits@10": 262,
+      "new_targets": 665,
+      "new_recall@10": 39.4,
+      "pure_unseen_hits@10": 306,
+      "pure_unseen_recall@10": 46.02
+    },
+    "unlearned_products_all": {
+      "orders": 2553,
+      "recall@10": 56.55,
+      "ndcg@10": 42.81,
+      "new_hits@10": 343,
+      "new_targets": 1683,
+      "new_recall@10": 20.38,
+      "pure_unseen_hits@10": 693,
+      "pure_unseen_recall@10": 41.18
+    },
+    "unlearned_products_in_1141_zero_shot": {
+      "orders": 1791,
+      "recall@10": 66.29,
+      "ndcg@10": 48.71,
+      "new_hits@10": 305,
+      "new_targets": 953,
+      "new_recall@10": 32.0,
+      "pure_unseen_hits@10": 616,
+      "pure_unseen_recall@10": 64.64
+    },
+    "unlearned_products_only": {
+      "orders": 2378,
+      "recall@10": 56.42,
+      "ndcg@10": 42.54,
+      "new_hits@10": 262,
+      "new_targets": 1477,
+      "new_recall@10": 17.74,
+      "pure_unseen_hits@10": 590,
+      "pure_unseen_recall@10": 39.95
+    },
+    "both_unlearned_cust_and_prod": {
+      "orders": 175,
+      "recall@10": 58.27,
+      "ndcg@10": 46.42,
+      "new_hits@10": 81,
+      "new_targets": 206,
+      "new_recall@10": 39.32,
+      "pure_unseen_hits@10": 103,
+      "pure_unseen_recall@10": 50.0
+    },
+    "trained_cp": {
+      "orders": 9839,
+      "recall@10": 83.03,
+      "ndcg@10": 63.49,
+      "new_hits@10": 248,
+      "new_targets": 1581,
+      "new_recall@10": 15.69,
+      "pure_unseen_hits@10": 682,
+      "pure_unseen_recall@10": 43.14
+    }
+  },
+  "w2_2mem_blocks_no_recency_ep10": {
+    "full_catalogue_all": {
+      "orders": 13184,
+      "recall@10": 75.84,
+      "ndcg@10": 57.9,
+      "new_hits@10": 818,
+      "new_targets": 3929,
+      "new_recall@10": 20.82,
+      "pure_unseen_hits@10": 1667,
+      "pure_unseen_recall@10": 42.43
+    },
+    "all_unlearned": {
+      "orders": 3345,
+      "recall@10": 54.49,
+      "ndcg@10": 41.99,
+      "new_hits@10": 551,
+      "new_targets": 2348,
+      "new_recall@10": 23.47,
+      "pure_unseen_hits@10": 992,
+      "pure_unseen_recall@10": 42.25
+    },
+    "unlearned_customers_all": {
+      "orders": 967,
+      "recall@10": 61.44,
+      "ndcg@10": 45.79,
+      "new_hits@10": 351,
+      "new_targets": 871,
+      "new_recall@10": 40.3,
+      "pure_unseen_hits@10": 409,
+      "pure_unseen_recall@10": 46.96
+    },
+    "unlearned_customers_only": {
+      "orders": 792,
+      "recall@10": 62.41,
+      "ndcg@10": 45.76,
+      "new_hits@10": 270,
+      "new_targets": 665,
+      "new_recall@10": 40.6,
+      "pure_unseen_hits@10": 306,
+      "pure_unseen_recall@10": 46.02
+    },
+    "unlearned_products_all": {
+      "orders": 2553,
+      "recall@10": 52.04,
+      "ndcg@10": 40.82,
+      "new_hits@10": 281,
+      "new_targets": 1683,
+      "new_recall@10": 16.7,
+      "pure_unseen_hits@10": 686,
+      "pure_unseen_recall@10": 40.76
+    },
+    "unlearned_products_in_1141_zero_shot": {
+      "orders": 1791,
+      "recall@10": 60.31,
+      "ndcg@10": 46.15,
+      "new_hits@10": 247,
+      "new_targets": 953,
+      "new_recall@10": 25.92,
+      "pure_unseen_hits@10": 610,
+      "pure_unseen_recall@10": 64.01
+    },
+    "unlearned_products_only": {
+      "orders": 2378,
+      "recall@10": 51.67,
+      "ndcg@10": 40.44,
+      "new_hits@10": 200,
+      "new_targets": 1477,
+      "new_recall@10": 13.54,
+      "pure_unseen_hits@10": 583,
+      "pure_unseen_recall@10": 39.47
+    },
+    "both_unlearned_cust_and_prod": {
+      "orders": 175,
+      "recall@10": 57.02,
+      "ndcg@10": 45.94,
+      "new_hits@10": 81,
+      "new_targets": 206,
+      "new_recall@10": 39.32,
+      "pure_unseen_hits@10": 103,
+      "pure_unseen_recall@10": 50.0
+    },
+    "trained_cp": {
+      "orders": 9839,
+      "recall@10": 83.09,
+      "ndcg@10": 63.31,
+      "new_hits@10": 267,
+      "new_targets": 1581,
+      "new_recall@10": 16.89,
+      "pure_unseen_hits@10": 675,
+      "pure_unseen_recall@10": 42.69
+    }
+  }
+}
