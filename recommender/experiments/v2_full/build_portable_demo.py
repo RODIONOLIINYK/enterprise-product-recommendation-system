@@ -964,8 +964,11 @@ def build_live_app_zip(
     *,
     output_zip: Path = DEFAULT_LIVE_APP_ZIP,
     live_cache_dir: Path = DEFAULT_LIVE_CACHE_DIR,
+    test_cases_json: Path = DEFAULT_TEST_CASES_JSON,
 ) -> Path:
-    """Package standalone runnable Live Python web app + promoted recency model + all 13,184 Test data (no presentation)."""
+    """Package standalone runnable Live Python web app + visible site HTML + promoted recency model + all 13,184 Test data (no presentation)."""
+    from .live_demo_server import LIVE_HTML_PAGE
+
     t0 = time.perf_counter()
     ref = json.loads(V2_FULL_REFERENCE_PATH.read_text(encoding="utf-8"))
     ckpt_disc = Path(ref["checkpoints"]["ranker"]["path"])
@@ -990,14 +993,32 @@ def build_live_app_zip(
     }
     doc_html = render_documentation_html(doc_meta)
 
+    offline_demo_html: Optional[str] = None
+    if Path(test_cases_json).is_file():
+        payload = json.loads(Path(test_cases_json).read_text(encoding="utf-8"))
+        payload_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+        offline_demo_html = PORTABLE_HTML_TEMPLATE.replace("__DEMO_PAYLOAD_JSON__", payload_json)
+        # Hide Presentation link inside offline OPEN_DEMO.html since no presentation is included in live_app ZIP
+        offline_demo_html = offline_demo_html.replace(
+            '<a class="nav-pill" href="PRESENTATION.html">Презентація</a>\n', ""
+        )
+
+    # Also hide Presentation link inside DOCUMENTATION.html for the no-presentation live_app ZIP
+    doc_html_no_pres = doc_html.replace(
+        '<a class="nav-pill" href="PRESENTATION.html">Презентація</a>\n', ""
+    )
+
     output_zip = Path(output_zip)
     output_zip.parent.mkdir(parents=True, exist_ok=True)
     root_folder = "B2B_Recommender_Live_App"
-    print(f"[live-app-zip] Packaging full 13,184-order Live Python App (no presentation) -> {output_zip}...", flush=True)
+    print(f"[live-app-zip] Packaging full 13,184-order Live Python App + site HTML (no presentation) -> {output_zip}...", flush=True)
     with zipfile.ZipFile(output_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
+        zf.writestr(f"{root_folder}/index.html", LIVE_HTML_PAGE.encode("utf-8"))
+        if offline_demo_html is not None:
+            zf.writestr(f"{root_folder}/OPEN_DEMO.html", offline_demo_html.encode("utf-8"))
+        zf.writestr(f"{root_folder}/DOCUMENTATION.html", doc_html_no_pres.encode("utf-8"))
         zf.writestr(f"{root_folder}/README_START.txt", LIVE_APP_README_TXT.encode("utf-8"))
         zf.writestr(f"{root_folder}/requirements.txt", REQUIREMENTS_TXT.encode("utf-8"))
-        zf.writestr(f"{root_folder}/DOCUMENTATION.html", doc_html.encode("utf-8"))
         zf.writestr(f"{root_folder}/START_LIVE_DEMO.bat", START_WIN_BAT.replace("\n", "\r\n").encode("utf-8"))
 
         zi_sh = zipfile.ZipInfo(f"{root_folder}/START_LIVE_DEMO.command")

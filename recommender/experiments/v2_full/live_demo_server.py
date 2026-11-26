@@ -1330,7 +1330,9 @@ def create_live_server(engine: LiveTestInferenceEngine, docs_dir: Path, host: st
             parsed = urlparse(self.path)
             path = parsed.path
             if path in ("/", "/index.html", "/LIVE_DEMO.html", "/OPEN_DEMO.html"):
-                self._send_bytes(LIVE_HTML_PAGE.encode("utf-8"), "text/html; charset=utf-8")
+                idx_file = docs_root / "index.html"
+                body = idx_file.read_bytes() if idx_file.is_file() else LIVE_HTML_PAGE.encode("utf-8")
+                self._send_bytes(body, "text/html; charset=utf-8")
                 return
             if path in allowed_static:
                 fn, ctype = allowed_static[path]
