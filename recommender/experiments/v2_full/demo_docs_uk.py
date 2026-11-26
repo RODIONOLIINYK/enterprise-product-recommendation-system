@@ -212,7 +212,7 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div class="card accent">
         <div class="kpi-lbl">Фінальний тест · Recall@10</div>
         <div class="kpi-big blue">83.03%</div>
-        <div class="kpi-sub">Навчені C&amp;P (79.21% мод. / 76.63% усі)</div>
+        <div class="kpi-sub">Навчені C&amp;P (79.21% у 1 141 тов. / 76.63% усі)</div>
       </div>
       <div class="card amber">
         <div class="kpi-lbl">Якість порядку (NDCG@10)</div>
@@ -490,7 +490,7 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
             <td class="mono">27.91% (51.8% чист.)</td>
           </tr>
           <tr>
-            <td>Фінальний тест · модельований каталог (1 141)</td>
+            <td>Фінальний тест · у межах каталогу (1 141 товар)</td>
             <td class="mono">12 928</td>
             <td class="mono">79.21%</td>
             <td class="mono">60.10%</td>
@@ -1178,83 +1178,227 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
 
   const BLOCKS = [
     {
-      id: 'cust', label: '1. Профіль клієнта', sub: 'Токен 0 · 1×128D',
-      x: -7.2, y: 2.0, z: 0.1, dx: 1.7, dy: 1.5, dz: 1.15,
-      top: '#60a5fa', front: '#3b82f6', side: '#1d4ed8',
-      desc: '<strong>Профіль клієнта (Токен 0 · 1×128D):</strong> об’єднує текстовий опис компанії (BGE-M3), місто, регіон, галузь та 7 фінансово-поведінкових ознак (CUST_7: передплата, відстрочка, активність). Саме цей блок працює для нових клієнтів із 0 покупок.'
+      id: 'cust_feat', label: '1. Ознаки клієнта (CUST_7)',
+      x: -8.4, y: 1.95, z: 0.1, dx: 1.75, dy: 1.5, dz: 1.05,
+      top: '#7dd3fc', front: '#0ea5e9', side: '#0369a1',
+      summary: '<strong>1. Вхідні дані та ознаки клієнта (CUST_7 + профіль):</strong> окремий блок сирих даних про компанію на дату замовлення — опис діяльності, географія, галузь і 7 динамічних фінансово-поведінкових метрик.',
+      features: [
+        'Текстовий опис компанії — BAAI/bge-m3 (1024D)',
+        'Категоріальні ID: city_id (місто), region_id (регіон), industry_id (галузь)',
+        'CUST_7 [0]: customer_age — тривалість співпраці з клієнтом',
+        'CUST_7 [1]: customer_30d_activity — активність замовлень за 30 днів',
+        'CUST_7 [2]: customer_90d_activity — активність замовлень за 90 днів',
+        'CUST_7 [3]: cust_prepaid_or_cash_ratio — частка передплат / готівки',
+        'CUST_7 [4]: cust_avg_deferral_days_norm — середня відстрочка платежу',
+        'CUST_7 [5]: cust_last_deferral_days_norm — остання відстрочка платежу',
+        'CUST_7 [6]: cust_overdue_unpaid_ratio — частка прострочених оплат',
+      ],
+      dims: 'Вхід: текст 1024D + 3 категорії + CUST_7 (7D) → передається в CustomerTower; CUST_7 також іде у білінійний bias Cross-Attention.',
+      training: 'Усі 7 ознак CUST_7 розраховуються строго до дати замовлення (< as_of_date). Неінформативні 4 колонки з CUST_11 видалено на етапі абляції.',
     },
     {
-      id: 'hist', label: '2. Історія (32 покупки)', sub: 'Токени 1..32 · 32×128D',
-      x: -7.2, y: 0.0, z: 0.1, dx: 1.7, dy: 1.45, dz: 1.25, stacks: 4,
-      top: '#34d399', front: '#10b981', side: '#047857',
-      desc: '<strong>Історія покупок (Токени 1..32 · 32×128D):</strong> останні 32 замовлені продукти клієнта строго до дати прогнозу. Кожна платівка несе вектор товару (v_bn) + 5 часових і кількісних ознак (SEQ_5).'
-    },
-    {
-      id: 'cat', label: '3. Каталог ProductTower', sub: '1 141 × 128D',
-      x: -7.2, y: -2.1, z: 0.1, dx: 1.7, dy: 1.5, dz: 1.25, stacks: 4,
-      top: '#fbbf24', front: '#f59e0b', side: '#b45309',
-      desc: '<strong>Паспорт каталогу (ProductTower · 1 141×128D):</strong> перетворює назву (BGE-M3) та 65 технічних характеристик (тара, об’єм, галузь, в’язкість) кожного продукту на вектор із 128 чисел. Кешується заздалегідь для швидкості 2.9 мс.'
-    },
-    {
-      id: 'mem1', label: '4А. Transformer · Шар 1', sub: '33×128D → FFN 384',
-      x: -3.8, y: 0.7, z: 0.1, dx: 1.25, dy: 2.7, dz: 1.9,
-      top: '#a5b4fc', front: '#6366f1', side: '#4338ca',
-      desc: '<strong>Пам’ять клієнта · Transformer Шар 1:</strong> аналізує зв’язки між профілем клієнта та його 32 минулими покупками (Self-Attention + FFN 384), виявляючи цикли поповнення та комплекти товарів.'
-    },
-    {
-      id: 'mem2', label: '4Б. Transformer · Шар 2', sub: '33×128D → FFN 384',
-      x: -2.15, y: 0.7, z: 0.1, dx: 1.25, dy: 2.7, dz: 1.9,
-      top: '#818cf8', front: '#4f46e5', side: '#312e81',
-      desc: '<strong>Пам’ять клієнта · Transformer Шар 2:</strong> другий глибокий шар пам’яті формує узагальнене уявлення про звички клієнта, переходи між брендами та зміну потреб у часі.'
-    },
-    {
-      id: 'sig42', label: '5. 42 каузальні сигнали', sub: '1 141 × 42D (< дати)',
-      x: -3.5, y: -2.1, z: 0.1, dx: 2.5, dy: 1.55, dz: 1.15,
-      top: '#38bdf8', front: '#0284c7', side: '#075985',
-      desc: '<strong>42 каузальні сигнали (1 141×42D):</strong> історія повторів, схожі клієнти (CF), зв’язки товарів, попит менеджера й регіону за 30/90 днів, галузь і в’язкість — усе обчислюється строго до дати замовлення.'
-    },
-    {
-      id: 'xatt', label: '6. 8-голова Cross-Attention', sub: '8 голів × Full-42 Bias',
-      x: 0.5, y: -0.7, z: 0.1, dx: 2.25, dy: 3.4, dz: 2.25, stacks: 8,
+      id: 'cust_tower', label: '2. CustomerTower',
+      x: -5.65, y: 1.95, z: 0.1, dx: 1.7, dy: 1.5, dz: 1.35,
       top: '#60a5fa', front: '#2563eb', side: '#1e3a8a',
-      desc: '<strong>8-голова перехресна увага (Cross-Attention + Full-42 Bias):</strong> кожен із 1 141 товарів «запитує» пам’ять клієнта з 8 різних ракурсів одночасно, підсилюючи увагу за допомогою всіх 42 бізнес-сигналів.'
+      summary: '<strong>2. Вежа клієнта (CustomerTower):</strong> перетворює текстовий опис, регіон, галузь та 7 фінансово-поведінкових ознак у єдиний щільний 128-вимірний вектор клієнта.',
+      features: [
+        'Текстова гілка: cust_text_proj (Linear 1024 → 128 + LayerNorm + GELU)',
+        'Таблична гілка: ембедінги city (16D) + region (16D) + industry (16D) + CUST_7 (7D) → 128D',
+        'Злиття: token0_fusion([text_128, tab_128]) → 128D',
+      ],
+      dims: 'Вхід: [1024D текст, 3 ID, 7D CUST_7] → Вихід: вектор клієнта 128D → передається у Токен 0.',
+      training: 'Навчається наскрізно (End-to-End) разом з усією моделлю; dropout = 0.12, weight_decay = 1e-2.',
     },
     {
-      id: 'main', label: '7А. Main Head (Повтори)', sub: 'MLP 384→192→96→1',
-      x: 4.1, y: 1.25, z: 0.1, dx: 1.65, dy: 1.85, dz: 1.55,
+      id: 'tok0', label: '3. Токен 0 (Профіль)',
+      x: -3.25, y: 1.95, z: 0.1, dx: 1.45, dy: 1.5, dz: 1.35,
+      top: '#93c5fd', front: '#3b82f6', side: '#1d4ed8',
+      summary: '<strong>3. Токен 0 (Профіль клієнта):</strong> перша позиція у 33-токенній пам’яті клієнта. Ніколи не маскується — саме цей токен дозволяє моделі прогнозувати навіть для нових клієнтів із 0 покупок.',
+      features: [
+        'Вектор 128D від CustomerTower',
+        '+ type_emb[0] (маркер типу «профіль клієнта»)',
+        'Ключ уваги несе 7 ознак CUST_7 у 12D просторі пам’яті',
+      ],
+      dims: 'Форма: (B, 1, 128) → об’єднується з Токенами 1..32 у послідовність (B, 33, 128) для Transformer Шар 1.',
+      training: 'Постійно активний (attention_mask = 1) під час навчання й інференсу.',
+    },
+    {
+      id: 'prod_tower', label: '4. ProductTower (1 141×128D)',
+      x: -8.4, y: -2.25, z: 0.1, dx: 1.9, dy: 1.65, dz: 1.45, stacks: 4,
+      top: '#fbbf24', front: '#f59e0b', side: '#b45309',
+      summary: '<strong>4. Вежа продукту (ProductTower · StaticEnrichedProductTower):</strong> будує спільний 128D вектор-паспорт v_bn для кожного з 1 141 товарів. Подається ОДНОЧАСНО в Історію покупок (Токени 1..32) та у Cross-Attention як запити Q = v_bn!',
+      features: [
+        'Назва продукту без фасування — BAAI/bge-m3 (1024D)',
+        '65D структурованих специфікацій: container_type (12D), volume tiers (8D), application_domain (11D), viscosity_grade (34D)',
+        '6 категоріальних ембедінгів (16D кожен): product_category, product_subcategory, business_line, tier, unit, country_of_origin',
+        'НУЛЬ ID-ембедінгів окремих товарів → здатен кодувати абсолютно нові товари за описом і специфікаціями без перенавчання!',
+      ],
+      dims: 'Вихід: v_bn форми (1 141, 128). Кешується офлайн (242 тис. параметрів вежі не запускаються на кожен запит → 2.9 мс CPU).',
+      training: 'Навчається наскрізно (End-to-End) разом із ранжирувальником; дропаут = 0.12.',
+    },
+    {
+      id: 'hist', label: '5. Історія (Токени 1..32 + SEQ_5)',
+      x: -5.55, y: -0.45, z: 0.1, dx: 1.8, dy: 1.6, dz: 1.45, stacks: 4,
       top: '#34d399', front: '#10b981', side: '#047857',
-      desc: '<strong>Голова 1 · Main Head (Регулярні повтори):</strong> глибокий MLP, навчений із вагою свіжості HL=365 днів. Точно визначає, які знайомі товари клієнт має докупити саме сьогодні.'
+      summary: '<strong>5. Історія покупок (Токени 1..32 + SEQ_5):</strong> останні 32 замовлені клієнтом продукти. Кожен токен бере спільний вектор v_bn напряму з ProductTower + позиційне кодування + 5 часових/об’ємних ознак SEQ_5.',
+      features: [
+        'Спільний вектор товару v_bn[seq_product_id] (128D) напряму з ProductTower',
+        '+ pos_emb (позиція 1..32) + type_emb[1] (маркер «історія покупок»)',
+        'SEQ_5 [0]: qty_log1p_norm — нормована кількість у замовленні',
+        'SEQ_5 [1]: live_age — скільки днів минуло від цієї покупки до дати прогнозу',
+        'SEQ_5 [5]: prior_bn_count_norm — накопичена к-сть покупок цього товару',
+        'SEQ_5 [6]: prior_bn_vol_share — частка товару в об’ємі клієнта',
+        'SEQ_5 [8]: real_event_indicator — індикатор реальної події (не паддінг)',
+      ],
+      dims: 'Форма: (B, 32, 128) + маска валідних подій + (B, 32, 5) SEQ_5 для білінійного bias Cross-Attention.',
+      training: 'Календарні ознаки month_sin/cos і gap_days видалено після абляції; усі події строго < дати замовлення.',
     },
     {
-      id: 'opta', label: '7Б. Option A (Новинки)', sub: '0% dropout · Cross-Sell',
-      x: 4.1, y: -1.45, z: 0.1, dx: 1.65, dy: 1.85, dz: 1.55,
+      id: 'mem1', label: '6А. Transformer · Шар 1',
+      x: -2.65, y: -0.45, z: 0.1, dx: 1.2, dy: 2.35, dz: 1.95,
+      top: '#a5b4fc', front: '#6366f1', side: '#4338ca',
+      summary: '<strong>6А. Пам’ять клієнта · Transformer Шар 1:</strong> приймає об’єднану стрічку з 33 токенів (Токен 0 профілю + 32 токени історії) та виявляє зв’язки між минулими покупками.',
+      features: [
+        'Вхід: 33 токени (Токен 0 від CustomerTower + Токени 1..32 з ProductTower)',
+        '8-голова Self-Attention по всіх 33 токенах із маскою паддінгу',
+        'Feed-Forward мережа: 128 → 384 → 128 (GELU + LayerNorm + Residual)',
+      ],
+      dims: 'Форма: (B, 33, 128) → (B, 33, 128), hidden FFN = 384.',
+      training: 'Dropout = 0.12 на увазі та FFN; Pre-LN стабілізує градієнти (grad_clip = 1.0).',
+    },
+    {
+      id: 'mem2', label: '6Б. Transformer · Шар 2',
+      x: -1.05, y: -0.45, z: 0.1, dx: 1.2, dy: 2.35, dz: 1.95,
+      top: '#818cf8', front: '#4f46e5', side: '#312e81',
+      summary: '<strong>6Б. Пам’ять клієнта · Transformer Шар 2:</strong> другий глибокий блок пам’яті узагальнює довгі залежності, цикли поповнення та зміну брендів перед перехресною увагою.',
+      features: [
+        'Вхід: збагачені 33 токени з Шару 1',
+        '8-голова Self-Attention + FFN (128 → 384 → 128)',
+        'Вихідні ключі (K) та значення (V) для Cross-Attention',
+      ],
+      dims: 'Форма: (B, 33, 128). Додавання 2-го шару пам’яті підняло і Recall@10, і New@10 без перенавчання.',
+      training: 'Dropout = 0.12; навчання 10 епох на 137 765 замовленнях із CosineAnnealingLR (eta_min = 1e-5).',
+    },
+    {
+      id: 'sig42', label: '7. 42 стат. ознаки (cand_42)',
+      x: 1.5, y: -2.45, z: 0.1, dx: 2.3, dy: 1.45, dz: 1.15,
+      top: '#38bdf8', front: '#0284c7', side: '#075985',
+      summary: '<strong>7. 42 статистичні каузальні ознаки (cand_42 · в парі з Cross-Attention):</strong> підключені безпосередньо до 8-голової перехресної уваги (як білінійний bias) та фінальних голів оцінки. Не входять у ProductTower чи CustomerTower!',
+      features: [
+        'Повтори (5): has_bought, order_count, qty_share, days_since_last, urgency',
+        'Схожість із клієнтом (8): cat/subcat/brand/family shares, is_repeat_cat/brand/line, family_age & overdue',
+        'Глобальний попит (7): global_pop, orders_7d/30d/90d, buyers_30d, cat_rel_share, global_sale_age',
+        'Послідовності (7): last_lift, recent3_lift, cat/family/line_lift, support_confidence, same_basket_lift',
+        'Менеджер, регіон і галузь (9): mgr_90d/30d, mgr_brand/cat_90d, mgr×ind_90d, region_90d, industry_affinity, viscosity, equipment_match',
+        'Колаборативна фільтрація (2): full_cf_cosine, full_cf_recency_weighted (HL=180д) + category_age/overdue (4)',
+      ],
+      dims: 'Форма: (B, 1 141, 42) float16 → Білінійна матриця bias W_h: 8 × (42+1) × (5+7) прямо в Cross-Attention.',
+      training: 'Усі 42 ознаки строго каузальні (< дати замовлення). 2 слабкі ознаки росту (growth_30d) видалено абляцією.',
+    },
+    {
+      id: 'xatt', label: '8. 8-голова Cross-Attention',
+      x: 1.5, y: -0.5, z: 0.1, dx: 2.3, dy: 3.05, dz: 2.25, stacks: 8,
+      top: '#60a5fa', front: '#2563eb', side: '#1e3a8a',
+      summary: '<strong>8. 8-голова перехресна увага (Cross-Attention + Full-42 Bias):</strong> «серце» моделі. Кожен із 1 141 товарів (Чистий запит Q = v_bn із ProductTower) звертається до 33 токенів пам’яті, а 42 статистичні ознаки керують вагою кожної з 8 голів.',
+      features: [
+        'Запити Q = v_bn (1 141 × 128D) напряму з ProductTower (без зайвого candidate_mlp)',
+        'Ключі K і Значення V (33 × 128D) із 2-шарового Transformer пам’яті',
+        'Full-42 Bilinear Bias: B_h(c, m) = [1, cand_42] · W_h · [SEQ_5 | CUST_7] окремо для кожної з 8 голів',
+      ],
+      dims: 'Вхід: Q(1 141×128), K/V(33×128), Bias(1 141×43 × 33×12) → Вихід: контекст h_att (1 141 × 128D).',
+      training: 'Dropout = 0.12; кожен кандидат оцінюється паралельно без обрізання пулу (100% каталогу).',
+    },
+    {
+      id: 'main', label: '9А. Main Head (Повтори)',
+      x: 4.95, y: 1.1, z: 0.1, dx: 1.65, dy: 1.75, dz: 1.5,
+      top: '#34d399', front: '#10b981', side: '#047857',
+      summary: '<strong>9А. Голова 1 · Main Head (Регулярні повтори):</strong> глибока MLP-мережа для регулярного поповнення запасів, навчена з акцентом на свіжі продажі.',
+      features: [
+        'Конкатенація [v_bn (128), h_att (128), v_bn ⊙ h_att (128), cand_42 (42)] = 426D',
+        'MLP: 426 → 384 → 192 → 96 → 1 (логіт повтору s_main)',
+        'Допоміжна 60-денна голова під час навчання (aux_60d, λ = 0.3, вимкнена на інференсі)',
+      ],
+      dims: 'Вхід: 426D × 1 141 → Вихід: s_main (1 141 скалярних оцінок).',
+      training: 'Dropout = 0.12; WeightedRankerLoss (BCE pos_weight=10 + Listwise Softmax CE) із експоненційною вагою свіжості HL=365д (2.31× на 2026-01 → 0.28× на 2023-01).',
+    },
+    {
+      id: 'opta', label: '9Б. Option A (Новинки)',
+      x: 4.95, y: -1.45, z: 0.1, dx: 1.65, dy: 1.75, dz: 1.5,
       top: '#fcd34d', front: '#f59e0b', side: '#b45309',
-      desc: '<strong>Голова 2 · Option A Head (Нові товари):</strong> окрема спеціалізована голова, яка тренується виключно на товарах, що клієнт купує ВПЕРШЕ. Дає 50.47% точність чистих крос-продажів на фінальному тесті.'
+      summary: '<strong>9Б. Голова 2 · Option A Head (Нові товари / Cross-Sell):</strong> окрема голова, яка отримує лише 37 неповторних ознак і навчається виключно на товарах, які клієнт купує ВПЕРШЕ.',
+      features: [
+        'Конкатенація [v_bn (128), h_att (128), v_bn ⊙ h_att (128), cand_non_repeat_37 (37)] = 421D',
+        '5 повторних колонок (has_bought, order_count, qty_share, days_since, urgency) повністю виключені!',
+        'Окрема функція втрат (separated conflict-free targets) з вагою w_optA = 1.0',
+      ],
+      dims: 'Вхід: 421D × 1 141 → Вихід: s_unseen (оцінка відкриття нового товару).',
+      training: '0% tabular dropout (unseen_dropout_cold_prob = 0.0) — дало максимальну стабільність крос-продажів; вага свіжості HL=365д.',
     },
     {
-      id: 'out', label: '8. Калібрування + SKU', sub: 'a·s_new + b → Топ-10',
-      x: 6.75, y: -0.25, z: 0.15, dx: 1.45, dy: 2.35, dz: 2.05,
+      id: 'out', label: '10. Калібрування + SKU',
+      x: 7.45, y: -0.3, z: 0.15, dx: 1.4, dy: 2.3, dz: 2.05,
       top: '#3b82f6', front: '#1d4ed8', side: '#1e3a8a',
-      desc: '<strong>Калібрування + Підбір тари (SKU Resolver):</strong> зводить оцінки двох голів у єдиний Топ-10 продуктів та автоматично підбирає конкретне фасування (бочка 209л, відро 20л, каністра 4л).'
+      summary: '<strong>10. Калібрування + Підбір фасування (SKU Resolver):</strong> зводить оцінки двох голів у єдиний Топ-10 та перетворює кожен продукт на конкретну тару клієнта.',
+      features: [
+        'Для вже куплених товарів: s_final = s_main',
+        'Для нових товарів: s_final = a · s_unseen + b (заморожені параметри a = 0.940, b = −2.009)',
+        'Каузальний Pack-Size SKU Resolver: історія тари клієнта → улюблений тип тари → популярність SKU',
+      ],
+      dims: 'Вихід: Топ-10 унікальних продуктів + 10 точних артикулів (SKU) за ~2.9 мс на CPU.',
+      training: 'Параметри (a, b) підбирались 2-фолдовою customer-grouped OOF-калібровкою виключно на валідації (нуль дотику до тесту).',
     },
   ];
 
   const EDGES = [
-    ['cust', 'mem1', '#2563eb'], ['hist', 'mem1', '#10b981'],
-    ['mem1', 'mem2', '#4f46e5'], ['mem2', 'xatt', '#4f46e5'],
-    ['cat', 'sig42', '#d97706'], ['sig42', 'xatt', '#0284c7'],
-    ['xatt', 'main', '#10b981'], ['xatt', 'opta', '#f59e0b'],
-    ['main', 'out', '#10b981'], ['opta', 'out', '#f59e0b'],
+    ['cust_feat', 'cust_tower', '#0ea5e9'],
+    ['cust_tower', 'tok0', '#2563eb'],
+    ['tok0', 'mem1', '#3b82f6'],
+    ['prod_tower', 'hist', '#f59e0b'],
+    ['prod_tower', 'xatt', '#d97706'],
+    ['hist', 'mem1', '#10b981'],
+    ['mem1', 'mem2', '#4f46e5'],
+    ['mem2', 'xatt', '#4f46e5'],
+    ['sig42', 'xatt', '#0284c7'],
+    ['sig42', 'opta', '#0284c7'],
+    ['xatt', 'main', '#10b981'],
+    ['xatt', 'opta', '#f59e0b'],
+    ['main', 'out', '#10b981'],
+    ['opta', 'out', '#f59e0b'],
   ];
 
   const byId = Object.fromEntries(BLOCKS.map(b => [b.id, b]));
-  // Camera angles: yaw orbits horizontally around Z, elev tilts down from above (0.12..1.35 rad)
-  let yaw = -0.34, elev = 0.46, zoom = 1.0, autoSpin = false, selectedId = 'xatt';
+  // Camera angles: yaw orbits horizontally around Z, elev tilts down from above (0.10..1.38 rad)
+  let yaw = -0.32, elev = 0.48, zoom = 0.96, autoSpin = false, selectedId = 'xatt';
   let dragging = false, lx = 0, ly = 0, draggedDist = 0;
   let hitZones = [];
   let tAnim = 0;
 
-  if (infoEl && byId[selectedId]) infoEl.innerHTML = byId[selectedId].desc;
+  function renderInspector(b) {
+    if (!infoEl || !b) return;
+    const isCompact = canvasId.startsWith('pres-');
+    if (isCompact) {
+      infoEl.innerHTML = `${b.summary} <span style="color:#475569;">(${b.dims})</span>`;
+      return;
+    }
+    const featLis = b.features.map(f => `<li style="margin-bottom:3px;">${f}</li>`).join('');
+    infoEl.innerHTML = `
+      <div style="margin-bottom:8px;">${b.summary}</div>
+      <details style="margin-top:6px;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;padding:7px 11px;">
+        <summary style="cursor:pointer;font-weight:700;color:#1e3a8a;font-size:13px;">📋 Вхідні ознаки та компоненти блоку (${b.features.length})</summary>
+        <ul style="margin:7px 0 2px 18px;font-size:12.8px;color:#334155;">${featLis}</ul>
+      </details>
+      <details style="margin-top:6px;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;padding:7px 11px;">
+        <summary style="cursor:pointer;font-weight:700;color:#1e3a8a;font-size:13px;">📐 Розмірності тензорів і зв'язки</summary>
+        <div style="margin-top:6px;font-size:12.8px;color:#334155;font-family:var(--mono);">${b.dims}</div>
+      </details>
+      <details style="margin-top:6px;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;padding:7px 11px;">
+        <summary style="cursor:pointer;font-weight:700;color:#1e3a8a;font-size:13px;">⚙️ Навчання, Dropout та регуляризація</summary>
+        <div style="margin-top:6px;font-size:12.8px;color:#334155;">${b.training}</div>
+      </details>
+    `;
+  }
+
+  renderInspector(byId[selectedId]);
   if (autoBtn) autoBtn.textContent = 'Авто-обертання: Вимк.';
 
   function resize() {
@@ -1282,7 +1426,7 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
     const up = y1 * se + z * ce;
     const camDist = 26.0;
     const persp = camDist / Math.max(4.0, camDist + depth);
-    const scale = Math.min(W / 18.8, H / 8.2) * zoom * persp;
+    const scale = Math.min(W / 20.4, H / 8.4) * zoom * persp;
     return { sx: W * 0.5 + x1 * scale, sy: H * 0.57 - up * scale, depth, scale };
   }
 
@@ -1507,7 +1651,7 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
         const z = hitZones[i];
         if (mx >= z.minX - 6 && mx <= z.maxX + 6 && my >= z.minY - 24 && my <= z.maxY + 6) {
           selectedId = z.id;
-          if (infoEl) infoEl.innerHTML = byId[z.id].desc;
+          renderInspector(byId[z.id]);
           break;
         }
       }
@@ -1523,7 +1667,7 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
     autoBtn.textContent = autoSpin ? 'Авто-обертання: Увімк.' : 'Авто-обертання: Вимк.';
   });
   if (resetBtn) resetBtn.addEventListener('click', () => {
-    yaw = -0.34; elev = 0.46; zoom = 1.0; autoSpin = false;
+    yaw = -0.32; elev = 0.48; zoom = 0.96; autoSpin = false;
     if (autoBtn) autoBtn.textContent = 'Авто-обертання: Вимк.';
   });
   if (topBtn) topBtn.addEventListener('click', () => {

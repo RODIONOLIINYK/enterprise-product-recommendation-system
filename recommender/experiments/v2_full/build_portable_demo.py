@@ -37,7 +37,7 @@ from .extra_features import assemble_cand_42, prune_cust_7
 
 
 DEFAULT_OUTPUT_ZIP = Path("exports/B2B_Recommender_Demo_v2_final.zip")
-DEFAULT_TEST_CASES_JSON = Path("data/v2_full/interim/test_demo_cases_trained_cp.json")
+DEFAULT_TEST_CASES_JSON = Path("data/v2_full/interim/test_demo_cases_tagged.json")
 
 
 def _extract_drivers(
@@ -527,6 +527,8 @@ PORTABLE_HTML_TEMPLATE = r"""<!DOCTYPE html>
     <span class="pill mono" id="pool-counter">—</span>
   </div>
 
+  <div id="unlearned-warn" style="display:none;background:var(--amber-bg);border:1.5px solid var(--amber-border);border-radius:12px;padding:11px 16px;font-size:13px;color:#92400e;font-weight:600;"></div>
+
   <div class="case-kpi-strip">
     <div class="kpi">
       <div class="lbl" id="lbl-c-r10">Точність прогнозу (Recall@10)</div>
@@ -627,10 +629,10 @@ const splitWordGen = isTestSplit ? 'тесту' : 'валідації';
 
 const T = {
   cohorts: {
-    showcase: `Найкращі приклади (${splitWord})`,
+    showcase: `Найкращі приклади · навчені клієнти й товари (${splitWord})`,
+    trained_cp: `Усі навчені клієнти й товари (${splitWord})`,
+    unlearned: `Ненавчені клієнти або товари ⚠️ (${splitWord})`,
     all: `Усі кейси ${splitWordGen} в демо`,
-    has_new: "Постійні клієнти з новинками",
-    first_observed: "Нові клієнти (1-ше замовлення)",
   },
   modes: {
     blended: "Змішаний прогноз (Повтори + Новинки)",
@@ -675,25 +677,20 @@ const sigmoid = x => 1 / (1 + Math.exp(-Math.max(-20, Math.min(20, x))));
 function initUI() {
   const meta = DEMO_PAYLOAD.meta;
   const splitLabel = isTestSplit ? 'Фінальний тест' : 'Валідація';
-  const trainedOnly = Boolean(meta.trained_only_filter);
-  const totalBaskets = isTestSplit
-    ? (trainedOnly ? (meta.test_baskets_trained_cp || 9839) : (meta.test_baskets || 13184))
-    : (meta.validation_baskets || 16623);
-  const scopeTag = trainedOnly ? ' · навчені клієнти й товари' : '';
+  const totalBaskets = isTestSplit ? (meta.test_baskets || 13184) : (meta.validation_baskets || 16623);
   document.getElementById('split-badge').textContent = `${splitLabel} · ${meta.date_range[0].slice(0, 7)}–${meta.date_range[1].slice(0, 7)}`;
   document.getElementById('top-subtitle').textContent =
-    `Фінальна модель ${meta.arm} (Епоха ${meta.epoch}) · ${DEMO_PAYLOAD.cases.length} кейсів (${splitWord}${scopeTag})`;
+    `Фінальна модель ${meta.arm} (Епоха ${meta.epoch}) · ${DEMO_PAYLOAD.cases.length} реальних кейсів тесту (навчені + ненавчені)`;
   document.getElementById('footer-left').textContent =
-    `Реліз: ${meta.reference_id} · ${splitLabel} ${meta.date_range[0]} → ${meta.date_range[1]} (${totalBaskets.toLocaleString('uk-UA')} замовлень${scopeTag})`;
-  document.getElementById('footer-right').textContent = isTestSplit
-    ? 'Усі кейси — з фінальної тестової вибірки (тільки навчені клієнти та продукти, без витоку майбутніх даних).'
-    : 'Усі кейси взято виключно з валідаційної вибірки без доступу до майбутніх даних.';
+    `Реліз: ${meta.reference_id} · ${splitLabel} ${meta.date_range[0]} → ${meta.date_range[1]} (${totalBaskets.toLocaleString('uk-UA')} замовлень: 9 839 навч. C&P + 3 345 ненавч.)`;
+  document.getElementById('footer-right').textContent =
+    'Усі кейси згенеровано на відкладеній тестовій вибірці без доступу до майбутніх даних.';
 
   const counts = {
     showcase: DEMO_PAYLOAD.cases.filter(x => x.sc).length,
+    trained_cp: DEMO_PAYLOAD.cases.filter(x => x.tr_cp === 1).length,
+    unlearned: DEMO_PAYLOAD.cases.filter(x => x.tr_cp === 0).length,
     all: DEMO_PAYLOAD.cases.length,
-    has_new: DEMO_PAYLOAD.cases.filter(x => x.hn).length,
-    first_observed: DEMO_PAYLOAD.cases.filter(x => x.fo).length,
   };
   document.getElementById('sel-cohort').innerHTML = Object.entries(T.cohorts)
     .filter(([k]) => counts[k] > 0)
@@ -707,8 +704,8 @@ function rebuildFilter() {
   const q = (document.getElementById('inp-search').value || '').trim().toLowerCase();
   filteredCases = DEMO_PAYLOAD.cases.filter(x => {
     if (coh === 'showcase' && !x.sc) return false;
-    if (coh === 'has_new' && !x.hn) return false;
-    if (coh === 'first_observed' && !x.fo) return false;
+    if (coh === 'trained_cp' && x.tr_cp !== 1) return false;
+    if (coh === 'unlearned' && x.tr_cp !== 0) return false;
     if (q) {
       const hay = `${x.c.nm} ${x.c.ct} ${x.c.ind} ${x.c.cid} ${x.gt.map(g=>g.n).join(' ')} ${x.cands.map(p=>p.n).join(' ')}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -739,6 +736,17 @@ function renderCurrentCase() {
   curPos = ((curPos % filteredCases.length) + filteredCases.length) % filteredCases.length;
   const d = filteredCases[curPos];
   cntEl.textContent = `${curPos + 1} / ${filteredCases.length} (Кейс #${d.id})`;
+
+  const warnEl = document.getElementById('unlearned-warn');
+  if (d.tr_cp === 0) {
+    const reasons = [];
+    if (d.tr_c === 0) reasons.push('клієнт не зустрічався в навчанні (< 2026-02-01)');
+    if (d.tr_p === 0) reasons.push('у кошику є новий товар, що не зустрічався в навчанні');
+    warnEl.style.display = 'block';
+    warnEl.textContent = `⚠️ Увага (Варіант 2 впровадження): ${reasons.join('; ')} — прогноз орієнтовний, рекомендовано перевірити вручну.`;
+  } else {
+    warnEl.style.display = 'none';
+  }
 
   const mode = document.getElementById('sel-mode').value || 'blended';
   const top10 = rankCaseClient(d, mode);
