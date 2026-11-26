@@ -926,7 +926,103 @@ numpy>=1.24.0
 """
 
 DEFAULT_LIVE_BUNDLE_PATH = Path("data/v2_full/interim/test_live_bundle_1000.pt.gz")
+DEFAULT_LIVE_CACHE_DIR = Path("data/v2_full/interim/test_live_cache")
+DEFAULT_LIVE_APP_ZIP = Path("exports/B2B_Recommender_Live_App_w2_2mem_recency_hl365.zip")
 LIVE_SERVER_SCRIPT_PATH = Path(__file__).resolve().parent / "live_demo_server.py"
+
+LIVE_APP_README_TXT = """====================================================================
+  B2B AI Product Recommender — Standalone Live Python App
+  Promoted Reference Model: w2_2mem_recency_hl365 (Ep 10 Primary)
+====================================================================
+
+WHAT IS INCLUDED (ZERO PRESENTATION FILES):
+  - live_demo_server.py       — Standalone Python web backend + Light-Theme UI
+                                + Wave2BE2ERanker PyTorch CPU inference + live benchmark
+  - START_LIVE_DEMO.command   — Double-click launcher (macOS)
+  - START_LIVE_DEMO.bat       — Double-click launcher (Windows)
+  - requirements.txt          — Python dependencies (torch, numpy)
+  - DOCUMENTATION.html        — Interactive 3D architecture documentation
+  - model/best_discovery.pt   — Promoted w2_2mem_recency_hl365 Ep 10 checkpoint (5.26 MB)
+  - model/best_ndcg.pt        — Companion w2_2mem_recency_hl365 Ep 9 checkpoint (5.26 MB)
+  - model/v2_full_reference.json — Architecture spec & SHA-256 checksums
+  - data/test_live_meta.pt    — All 13,184 held-out Test orders (9,839 Trained + 3,345 Unlearned)
+  - data/test_cand_42.npy     — Exact causal cand_42 feature tensors for all 13,184 Test orders
+
+HOW TO RUN:
+  1. Unzip this archive anywhere on your computer.
+  2. Install dependencies once (Python 3.9+):
+       pip install -r requirements.txt
+  3. Launch:
+     - macOS:   Double-click START_LIVE_DEMO.command (or run: python3 live_demo_server.py)
+     - Windows: Double-click START_LIVE_DEMO.bat     (or run: python live_demo_server.py)
+  4. Browser opens automatically at http://127.0.0.1:8799/
+====================================================================
+"""
+
+
+def build_live_app_zip(
+    *,
+    output_zip: Path = DEFAULT_LIVE_APP_ZIP,
+    live_cache_dir: Path = DEFAULT_LIVE_CACHE_DIR,
+) -> Path:
+    """Package standalone runnable Live Python web app + promoted recency model + all 13,184 Test data (no presentation)."""
+    t0 = time.perf_counter()
+    ref = json.loads(V2_FULL_REFERENCE_PATH.read_text(encoding="utf-8"))
+    ckpt_disc = Path(ref["checkpoints"]["ranker"]["path"])
+    ckpt_ndcg = Path(ref["checkpoints"]["ndcg_ranker"]["path"])
+    cache_dir = Path(live_cache_dir)
+    meta_pt = cache_dir / "test_live_meta.pt"
+    cand_npy = cache_dir / "test_cand_42.npy"
+    for req in (ckpt_disc, meta_pt, cand_npy, LIVE_SERVER_SCRIPT_PATH):
+        if not req.is_file():
+            raise FileNotFoundError(f"Required Live App artifact missing: {req}")
+
+    doc_meta = {
+        "reference_id": ref["reference_id"],
+        "arm": ref["active_architecture"]["arm"],
+        "epoch": int(ref["validation_metrics_primary_cal_discovery"]["epoch"]),
+        "split": "heldout_test",
+        "train_params": int(ref["active_architecture"]["trainable_params"]),
+        "per_request_params": int(ref["active_architecture"]["per_request_params"]),
+        "num_formulations": int(ref["num_formulations"]),
+        "checkpoint_bytes": int(ckpt_disc.stat().st_size),
+        "checkpoint_sha256": file_digest(ckpt_disc),
+    }
+    doc_html = render_documentation_html(doc_meta)
+
+    output_zip = Path(output_zip)
+    output_zip.parent.mkdir(parents=True, exist_ok=True)
+    root_folder = "B2B_Recommender_Live_App"
+    print(f"[live-app-zip] Packaging full 13,184-order Live Python App (no presentation) -> {output_zip}...", flush=True)
+    with zipfile.ZipFile(output_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
+        zf.writestr(f"{root_folder}/README_START.txt", LIVE_APP_README_TXT.encode("utf-8"))
+        zf.writestr(f"{root_folder}/requirements.txt", REQUIREMENTS_TXT.encode("utf-8"))
+        zf.writestr(f"{root_folder}/DOCUMENTATION.html", doc_html.encode("utf-8"))
+        zf.writestr(f"{root_folder}/START_LIVE_DEMO.bat", START_WIN_BAT.replace("\n", "\r\n").encode("utf-8"))
+
+        zi_sh = zipfile.ZipInfo(f"{root_folder}/START_LIVE_DEMO.command")
+        zi_sh.external_attr = 0o755 << 16
+        zf.writestr(zi_sh, START_MAC_SH.encode("utf-8"))
+
+        zi_py = zipfile.ZipInfo(f"{root_folder}/live_demo_server.py")
+        zi_py.external_attr = 0o755 << 16
+        zf.writestr(zi_py, LIVE_SERVER_SCRIPT_PATH.read_bytes())
+
+        zf.write(ckpt_disc, arcname=f"{root_folder}/model/best_discovery.pt")
+        if ckpt_ndcg.is_file():
+            zf.write(ckpt_ndcg, arcname=f"{root_folder}/model/best_ndcg.pt")
+        zf.write(V2_FULL_REFERENCE_PATH, arcname=f"{root_folder}/model/v2_full_reference.json")
+        zf.write(meta_pt, arcname=f"{root_folder}/data/test_live_meta.pt")
+        zf.write(cand_npy, arcname=f"{root_folder}/data/test_cand_42.npy")
+
+    elapsed = time.perf_counter() - t0
+    size_mb = output_zip.stat().st_size / (1024 * 1024)
+    print(
+        f"[live-app-zip] Built {output_zip} ({size_mb:.1f} MB, all 13,184 Test orders, "
+        f"model={ref['active_architecture']['arm']}, zero presentation files) in {elapsed:.1f}s",
+        flush=True,
+    )
+    return output_zip
 
 
 def build_portable_demo_zip(
@@ -1044,15 +1140,23 @@ def build_portable_demo_zip(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_ZIP)
+    parser.add_argument("--mode", choices=("portable", "live_app"), default="portable")
+    parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--split", choices=("test", "val"), default="test")
     parser.add_argument("--test-cases-json", type=Path, default=DEFAULT_TEST_CASES_JSON)
     parser.add_argument("--presentation-pdf", type=Path, default=None)
     parser.add_argument("--live-bundle", type=Path, default=DEFAULT_LIVE_BUNDLE_PATH)
+    parser.add_argument("--live-cache-dir", type=Path, default=DEFAULT_LIVE_CACHE_DIR)
     args = parser.parse_args()
+    if args.mode == "live_app":
+        build_live_app_zip(
+            output_zip=args.output or DEFAULT_LIVE_APP_ZIP,
+            live_cache_dir=args.live_cache_dir,
+        )
+        return
     build_portable_demo_zip(
-        output_zip=args.output,
+        output_zip=args.output or DEFAULT_OUTPUT_ZIP,
         seed=args.seed,
         split=args.split,
         test_cases_json=args.test_cases_json,

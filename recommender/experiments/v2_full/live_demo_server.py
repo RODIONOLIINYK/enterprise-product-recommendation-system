@@ -975,8 +975,8 @@ LIVE_HTML_PAGE = r"""<!DOCTYPE html>
     </div>
     <div class="top-actions">
       <a class="nav-pill active" href="/">⚡ Live Python Демо</a>
-      <a class="nav-pill" href="PRESENTATION.html">Презентація</a>
-      <a class="nav-pill" href="DOCUMENTATION.html">Документація та 3D</a>
+      <a class="nav-pill" id="nav-pres" href="PRESENTATION.html" style="display:none;">Презентація</a>
+      <a class="nav-pill" id="nav-doc" href="DOCUMENTATION.html" style="display:none;">Документація та 3D</a>
     </div>
   </div>
 
@@ -1108,6 +1108,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt
 async function init() {
   const res = await fetch('/api/meta');
   META = await res.json();
+  if (META.has_presentation) document.getElementById('nav-pres').style.display = '';
+  if (META.has_documentation) document.getElementById('nav-doc').style.display = '';
   const nCases = META.num_cases.toLocaleString('uk-UA');
   document.getElementById('live-badge').textContent = `⚡ LIVE PYTHON · PYTORCH ${META.runtime.torch} CPU · ${nCases} ЗАМОВЛЕНЬ`;
   document.getElementById('top-subtitle').textContent =
@@ -1337,7 +1339,10 @@ def create_live_server(engine: LiveTestInferenceEngine, docs_dir: Path, host: st
                     self._send_bytes(target.read_bytes(), ctype)
                     return
             if path == "/api/meta":
-                self._send_json(engine.metadata_payload())
+                mp = dict(engine.metadata_payload())
+                mp["has_presentation"] = (docs_root / "PRESENTATION.html").is_file()
+                mp["has_documentation"] = (docs_root / "DOCUMENTATION.html").is_file()
+                self._send_json(mp)
                 return
             if path == "/api/search":
                 qs = parse_qs(parsed.query)
@@ -1394,7 +1399,9 @@ def main() -> None:
     data_dir = args.data_dir
     bundle = args.bundle
     if data_dir is None and bundle is None:
-        if (here / "model" / "test_live_bundle.pt.gz").is_file():
+        if (here / "data" / "test_live_meta.pt").is_file():
+            data_dir = here / "data"
+        elif (here / "model" / "test_live_bundle.pt.gz").is_file():
             bundle = here / "model" / "test_live_bundle.pt.gz"
         elif Path("data/v2_full/interim/test_live_cache/test_live_meta.pt").is_file():
             data_dir = Path("data/v2_full/interim/test_live_cache")
