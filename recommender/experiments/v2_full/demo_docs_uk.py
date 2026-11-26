@@ -207,22 +207,22 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div class="card green">
         <div class="kpi-lbl">Валідація · Recall@10</div>
         <div class="kpi-big green">84.27%</div>
-        <div class="kpi-sub">15 343 зам. (навчені клієнти й товари)</div>
+        <div class="kpi-sub">Навчені C&amp;P (82.26% усі 16 623 зам.)</div>
       </div>
       <div class="card accent">
         <div class="kpi-lbl">Фінальний тест · Recall@10</div>
         <div class="kpi-big blue">83.03%</div>
-        <div class="kpi-sub">9 839 зам. через 5–10 міс. після навчання</div>
+        <div class="kpi-sub">Навчені C&amp;P (79.21% мод. / 76.63% усі)</div>
       </div>
       <div class="card amber">
         <div class="kpi-lbl">Якість порядку (NDCG@10)</div>
         <div class="kpi-big amber">67.18%</div>
-        <div class="kpi-sub">Валідація (63.49% на фінальному тесті)</div>
+        <div class="kpi-sub">Val навч. C&amp;P (63.49% тест / 58.41% усі)</div>
       </div>
       <div class="card">
         <div class="kpi-lbl">Швидкість роботи (CPU)</div>
         <div class="kpi-big">2.9 мс</div>
-        <div class="kpi-sub">Без GPU · 1.13M параметрів</div>
+        <div class="sub kpi-sub">Без GPU · 1.13M параметрів</div>
       </div>
     </div>
     <div class="slide-foot">
@@ -744,8 +744,9 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
       <a href="#blocks">4. З чого складається кожен блок</a>
       <a href="#signals">5. 42 сигнали, на які дивиться AI</a>
       <a href="#recency">6. Навчання та вага свіжості</a>
-      <a href="#demo-guide">7. Як читати демо і метрики</a>
-      <a href="#passport">8. Технічний паспорт моделі</a>
+      <a href="#deployment">7. Два варіанти впровадження</a>
+      <a href="#demo-guide">8. Як читати демо і метрики</a>
+      <a href="#passport">9. Технічний паспорт моделі</a>
     </aside>
 
     <main class="doc">
@@ -1079,9 +1080,53 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
         </div>
       </section>
 
-      <!-- 7. HOW TO READ THE DEMO -->
+      <!-- 7. TWO DEPLOYMENT SOLUTIONS -->
+      <section class="section" id="deployment">
+        <h2>7. Два варіанти впровадження системи в роботу</h2>
+        <p>
+          На фінальному тесті ми чітко побачили різницю між двома сценаріями: коли клієнт і товар уже були в навчанні
+          (<strong>83.03% Recall@10</strong> на тесті vs <strong>84.27%</strong> на валідації) і коли трапляється абсолютно новий
+          клієнт або новий товар після дати навчання (<strong>~57.8% Recall@10</strong>). Тому для реального впровадження в CRM / 1C
+          пропонуються <strong>два практичні рішення</strong>:
+        </p>
+        <div class="arch-grid">
+          <div class="block-card" style="background:var(--green-bg);border-color:var(--green-border);">
+            <div class="block-num" style="background:#ffffff;color:var(--green);">Варіант 1 · Режим високої точності</div>
+            <h3>Працювати лише для навчених клієнтів і товарів</h3>
+            <p style="margin-bottom:8px;">
+              Рекомендації автоматично показуються лише для клієнтів та позицій, що вже були присутні в останній навчальній вибірці
+              (<code>&lt; T_cutoff</code>). Нові клієнти та щойно додані товари підключаються після чергового планового перенавчання
+              (наприклад, раз на місяць або квартал).
+            </p>
+            <ul style="font-size:13.5px;margin-bottom:0;">
+              <li><strong>Очікувана точність:</strong> <strong>83.0%–84.3% Recall@10</strong> (максимальна стабільність).</li>
+              <li><strong>Перевага:</strong> висока довіра менеджерів, мінімум нерелевантних підказок.</li>
+              <li><strong>Обмеження:</strong> не покриває найновіших клієнтів і товари до наступного оновлення моделі.</li>
+            </ul>
+          </div>
+          <div class="block-card" style="background:var(--amber-bg);border-color:var(--amber-border);">
+            <div class="block-num" style="background:#ffffff;color:var(--amber);">Варіант 2 · Універсальний режим + Попередження ⚠️</div>
+            <h3>Працювати для всіх, але позначати нові сутності знаком ⚠️</h3>
+            <p style="margin-bottom:8px;">
+              Система видає прогнози для <strong>100% клієнтів і товарів</strong>: нові продукти кодуються через <code>ProductTower</code>
+              за їхнім описом і 65 характеристиками, а нові клієнти — за профілем, галуззю та регіоном. Якщо клієнт або товар ще не
+              проходили навчання, інтерфейс чітко показує менеджеру попереджувальний знак:
+            </p>
+            <div style="background:#ffffff;border:1.5px solid #f59e0b;border-radius:9px;padding:9px 12px;margin:8px 0;font-size:13px;color:#92400e;font-weight:700;">
+              ⚠️ Увага: новий клієнт або новий товар (поза навчальною вибіркою) — прогноз орієнтовний, рекомендовано перевірити вручну.
+            </div>
+            <ul style="font-size:13.5px;margin-bottom:0;">
+              <li><strong>Очікувана точність:</strong> <strong>76.6%–82.3%</strong> загалом (<strong>~58%</strong> на нових сутностях).</li>
+              <li><strong>Перевага:</strong> 100% охоплення бізнесу з першого дня + прозора підказка менеджеру, де варто бути уважнішим.</li>
+              <li><strong>Рекомендація:</strong> поєднувати Варіант 2 із квартальним перенавчанням — тоді частка кейсів із <code>⚠️</code> завжди мінімальна.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. HOW TO READ THE DEMO -->
       <section class="section" id="demo-guide">
-        <h2>7. Як користуватися демо та розуміти показники</h2>
+        <h2>8. Як користуватися демо та розуміти показники</h2>
         <p>Відкрийте файл <a href="OPEN_DEMO.html" style="color:var(--primary);font-weight:700;">OPEN_DEMO.html</a> — на екрані показано реальні замовлення клієнтів із фінального тесту (липень–листопад 2026):</p>
         <ul>
           <li><span class="pill hit">✓ Вгадано · Повтор</span> — зелений рядок означає, що клієнт справді купив цей знайомий товар того дня, і модель поставила його в Топ-10.</li>
@@ -1092,9 +1137,9 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
         </ul>
       </section>
 
-      <!-- 8. PASSPORT -->
+      <!-- 9. PASSPORT -->
       <section class="section" id="passport">
-        <h2>8. Технічний паспорт фінальної моделі в пакеті</h2>
+        <h2>9. Технічний паспорт фінальної моделі в пакеті</h2>
         <table>
           <tbody>
             <tr><td><strong>Ідентифікатор релізу</strong></td><td class="mono">__REF_ID__</td></tr>
