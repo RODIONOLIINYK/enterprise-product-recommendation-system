@@ -433,8 +433,8 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div class="evo-row"><div>4. CatBoost v1 · 52 ознаки (GBDT-бенчмарк)</div><div class="evo-track"><div class="evo-fill" style="width:84%;background:#64748b;"></div></div><div class="mono" style="text-align:right;color:#475569;">75.82%</div><div class="mono" style="text-align:right;color:#475569;">10.88%</div></div>
         <div class="evo-row"><div>5. 4 прапорці знайомості + Stat-Attention (<code>4f3d326</code>)</div><div class="evo-track"><div class="evo-fill" style="width:86%"></div></div><div class="mono" style="text-align:right;">76.15%</div><div class="mono" style="text-align:right;color:var(--amber);">11.25%</div></div>
         <div class="evo-row"><div>6. Канонічні продукти (base_name) + Full-Pool (<code>e0681bd</code>)</div><div class="evo-track"><div class="evo-fill" style="width:91%"></div></div><div class="mono" style="text-align:right;">80.89%</div><div class="mono" style="text-align:right;color:var(--amber);">21.62%</div></div>
-        <div class="evo-row"><div>7. CatBoost v2 · 42 ознаки + Option A (GBDT)</div><div class="evo-track"><div class="evo-fill" style="width:92%;background:#64748b;"></div></div><div class="mono" style="text-align:right;color:#475569;">81.61%</div><div class="mono" style="text-align:right;color:#475569;">25.33%</div></div>
-        <div class="evo-row"><div>8. E2E Wave2BE2ERanker + Option A (<code>w2_2mem_blocks</code>)</div><div class="evo-track"><div class="evo-fill" style="width:94%"></div></div><div class="mono" style="text-align:right;">82.18%</div><div class="mono" style="text-align:right;color:var(--amber);">27.31%</div></div>
+        <div class="evo-row"><div>7. CatBoost v2 · 42 ознаки + Unseen Products Head (GBDT)</div><div class="evo-track"><div class="evo-fill" style="width:92%;background:#64748b;"></div></div><div class="mono" style="text-align:right;color:#475569;">81.61%</div><div class="mono" style="text-align:right;color:#475569;">25.33%</div></div>
+        <div class="evo-row"><div>8. E2E Wave2BE2ERanker + Unseen Products Head (<code>w2_2mem_blocks</code>)</div><div class="evo-track"><div class="evo-fill" style="width:94%"></div></div><div class="mono" style="text-align:right;">82.18%</div><div class="mono" style="text-align:right;color:var(--amber);">27.31%</div></div>
         <div class="evo-row best"><div>9. Фінал: 2× пам'ять + свіжість 365д ⭐</div><div class="evo-track"><div class="evo-fill" style="width:97%"></div></div><div class="mono" style="text-align:right;color:var(--green);">82.26% / 84.27%*</div><div class="mono" style="text-align:right;color:var(--amber);">27.91%</div></div>
       </div>
     </div>
@@ -501,7 +501,7 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
         </tbody>
       </table>
       <p style="font-size:12px;color:var(--muted);margin-top:8px;">
-        *Чисті новинки — режим Option A. **У продакшені <code>ProductTower</code> одразу кодує нові товари через опис і 65D спец. без перенавчання; у тесті таблиця була заморожена на 1 141 продукті (76.63% — нижня оцінка).<br />
+        *Чисті новинки — режим Unseen Products Head. **У продакшені <code>ProductTower</code> одразу кодує нові товари через опис і 65D спец. без перенавчання; у тесті таблиця була заморожена на 1 141 продукті (76.63% — нижня оцінка).<br />
         <strong>Без перенавчання:</strong> розрив від останнього навчання (<code>2026-01-30</code>) до середнього тесту (<code>2026-09-12</code>) — <strong>7.4 міс. (225 дн., до 9.7 міс.)</strong>, а точність на навчених C&amp;P тримається на <strong>83.03%</strong>.<br />
         <strong>Дешеве оновлення в роботі:</strong> донавчання моделі <strong>раз на 2 місяці або після додавання ~10 нових товарів</strong> коштує копійки й постійно утримує якість біля рівня навчених клієнтів і товарів (~<strong>84–85% Recall@10</strong>, як <code>84.27%</code> на валідації).
       </p>
@@ -922,7 +922,7 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
             <text x="250" y="527" text-anchor="middle" font-size="11.5" fill="#64748b">Вихід: оцінка повтору s_main</text>
 
             <rect x="520" y="442" width="420" height="96" rx="14" fill="#fffbeb" stroke="#f59e0b" stroke-width="2"/>
-            <text x="730" y="468" text-anchor="middle" font-size="14" font-weight="800" fill="#92400e">БЛОК 5Б · Option A Head (Нові товари)</text>
+            <text x="730" y="468" text-anchor="middle" font-size="14" font-weight="800" fill="#92400e">БЛОК 5Б · Unseen Products Head (Нові товари)</text>
             <text x="730" y="489" text-anchor="middle" font-size="12" fill="#334155">Спеціалізована голова уваги + MLP (0% dropout)</text>
             <text x="730" y="509" text-anchor="middle" font-size="12" fill="#b45309">Навчається виключно на товарах, які клієнт купує ВПЕРШЕ</text>
             <text x="730" y="527" text-anchor="middle" font-size="11.5" fill="#64748b">Вихід: оцінка новинки s_unseen → калібрування a·s_unseen + b</text>
@@ -976,7 +976,7 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
             <h3>Дві спеціалізовані голови + Калібрування</h3>
             <p>
               Якби була лише одна голова, прості повтори завжди б витісняли новинки. Тому створено дві окремі голови:
-              <strong>Main Head</strong> відповідає за точність повторів, а <strong>Option A Head</strong> спеціально
+              <strong>Main Head</strong> відповідає за точність повторів, а <strong>Unseen Products Head</strong> спеціально
               тренується знаходити нові товари. Потім лінійне калібрування (<code>a·s_new + b</code>) зводить обидві шкали в один чесний Топ-10.
             </p>
           </div>
@@ -1148,7 +1148,7 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
         <table>
           <tbody>
             <tr><td><strong>Ідентифікатор релізу</strong></td><td class="mono">__REF_ID__</td></tr>
-            <tr><td><strong>Архітектура</strong></td><td class="mono">Wave2BE2ERanker (2× Memory Transformer + OptionAUnseenHead)</td></tr>
+            <tr><td><strong>Архітектура</strong></td><td class="mono">Wave2BE2ERanker (2× Memory Transformer + Unseen Products Head)</td></tr>
             <tr><td><strong>Кількість параметрів</strong></td><td class="mono">__TRAIN_PARAMS__ (навчання) / __REQ_PARAMS__ (на 1 запит)</td></tr>
             <tr><td><strong>Каталог продуктів</strong></td><td class="mono">1 141 канонічний продукт (1 660 SKU)</td></tr>
             <tr><td><strong>Валідація (навчені C&amp;P / повна)</strong></td><td class="mono">84.27% (15 343 зам., NDCG 67.18%) · Повна: 82.26% (16 623 зам., PureU 51.78%)</td></tr>
@@ -1327,10 +1327,10 @@ function mountArch3D(canvasId, infoId, autoBtnId, resetBtnId, topBtnId) {
       training: 'Dropout = 0.12; WeightedRankerLoss (BCE pos_weight=10 + Listwise Softmax CE) із експоненційною вагою свіжості HL=365д (2.31× на 2026-01 → 0.28× на 2023-01).',
     },
     {
-      id: 'opta', label: '9Б. Option A (Новинки)',
+      id: 'opta', label: '9Б. Unseen Products Head',
       x: 4.95, y: -1.45, z: 0.1, dx: 1.65, dy: 1.75, dz: 1.5,
       top: '#fcd34d', front: '#f59e0b', side: '#b45309',
-      summary: '<strong>9Б. Голова 2 · Option A Head (Нові товари / Cross-Sell):</strong> окрема голова, яка отримує лише 37 неповторних ознак і навчається виключно на товарах, які клієнт купує ВПЕРШЕ.',
+      summary: '<strong>9Б. Голова 2 · Unseen Products Head (Нові товари / Cross-Sell):</strong> окрема голова, яка отримує лише 37 неповторних ознак і навчається виключно на товарах, які клієнт купує ВПЕРШЕ.',
       features: [
         'Конкатенація [v_bn (128), h_att (128), v_bn ⊙ h_att (128), cand_non_repeat_37 (37)] = 421D',
         '5 повторних колонок (has_bought, order_count, qty_share, days_since, urgency) повністю виключені!',
