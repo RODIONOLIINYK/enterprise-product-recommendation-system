@@ -212,7 +212,7 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div class="card accent">
         <div class="kpi-lbl">Фінальний тест · Recall@10</div>
         <div class="kpi-big blue">83.03%</div>
-        <div class="kpi-sub">Навчені C&amp;P (79.21% у 1 141 тов. / 76.63% усі)</div>
+        <div class="kpi-sub">Навчені C&amp;P (76.63% усі 13 184)</div>
       </div>
       <div class="card amber">
         <div class="kpi-lbl">Якість порядку (NDCG@10)</div>
@@ -490,13 +490,6 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
             <td class="mono">82.26%</td>
             <td class="mono">65.48%</td>
             <td class="mono">27.91% (51.8% чист.)</td>
-          </tr>
-          <tr>
-            <td>Фінальний тест · у межах каталогу (1 141 товар)</td>
-            <td class="mono">12 928</td>
-            <td class="mono">79.21%</td>
-            <td class="mono">60.10%</td>
-            <td class="mono">25.61% (50.5% чист.)</td>
           </tr>
           <tr style="background:var(--amber-bg);">
             <td>Фінальний тест · усі замовлення (повний каталог)**</td>
@@ -1087,8 +1080,8 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
           (<code>2025-02</code>) — <strong>1.16×</strong> (січень 2025: <strong>1.09×</strong>), 2 роки тому — <strong>0.58×</strong>,
           3 роки тому — <strong>0.28×</strong>. Під час щоденної роботи всі 42 сигнали оновлюються наживо, а
           <code>ProductTower</code> кодує будь-який новий товар через його опис і 65 специфікацій навіть без перенавчання
-          (у фінальному тесті: <strong>83.03% Recall@10</strong> на навчених клієнтах і товарах та <strong>79.21% / 76.63%</strong>
-          на модельованому / замороженому повному каталозі).
+          (у фінальному тесті: <strong>83.03% Recall@10</strong> на навчених клієнтах і товарах та <strong>76.63%</strong>
+          на всіх 13 184 замовленнях повного каталогу).
         </div>
       </section>
 
@@ -1159,7 +1152,7 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
             <tr><td><strong>Кількість параметрів</strong></td><td class="mono">__TRAIN_PARAMS__ (навчання) / __REQ_PARAMS__ (на 1 запит)</td></tr>
             <tr><td><strong>Каталог продуктів</strong></td><td class="mono">1 141 канонічний продукт (1 660 SKU)</td></tr>
             <tr><td><strong>Валідація (навчені C&amp;P / повна)</strong></td><td class="mono">84.27% (15 343 зам., NDCG 67.18%) · Повна: 82.26% (16 623 зам., PureU 51.78%)</td></tr>
-            <tr><td><strong>Фінальний тест (навчені C&amp;P / повна)</strong></td><td class="mono">83.03% (9 839 зам., NDCG 63.49%) · Модельов.: 79.21% · Повна: 76.63% (13 184 зам.)</td></tr>
+            <tr><td><strong>Фінальний тест (навчені C&amp;P / повна)</strong></td><td class="mono">83.03% (9 839 зам., NDCG 63.49%) · Повна: 76.63% (13 184 зам.)</td></tr>
             <tr><td><strong>Швидкість прогнозу (CPU)</strong></td><td class="mono">~2.9 мс на 1 клієнта (по всіх 1 141 продуктах)</td></tr>
             <tr><td><strong>Файл моделі у ZIP</strong></td><td class="mono">model/best_discovery.pt (__CKPT_MB__ МБ)</td></tr>
             <tr><td><strong>Контрольна сума SHA-256</strong></td><td class="mono" style="word-break:break-all;">__CKPT_SHA__</td></tr>
