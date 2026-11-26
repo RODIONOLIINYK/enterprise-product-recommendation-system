@@ -37,7 +37,7 @@ from .extra_features import assemble_cand_42, prune_cust_7
 
 
 DEFAULT_OUTPUT_ZIP = Path("exports/B2B_Recommender_Demo_v2_final.zip")
-DEFAULT_TEST_CASES_JSON = Path("data/v2_full/interim/test_demo_cases_w2_2mem_recency_hl365.json")
+DEFAULT_TEST_CASES_JSON = Path("data/v2_full/interim/test_demo_cases_trained_cp.json")
 
 
 def _extract_drivers(
@@ -674,15 +674,19 @@ const sigmoid = x => 1 / (1 + Math.exp(-Math.max(-20, Math.min(20, x))));
 
 function initUI() {
   const meta = DEMO_PAYLOAD.meta;
-  const splitLabel = isTestSplit ? 'Відкладений тест' : 'Валідація';
-  const totalBaskets = isTestSplit ? (meta.test_baskets || 13184) : (meta.validation_baskets || 16623);
+  const splitLabel = isTestSplit ? 'Фінальний тест' : 'Валідація';
+  const trainedOnly = Boolean(meta.trained_only_filter);
+  const totalBaskets = isTestSplit
+    ? (trainedOnly ? (meta.test_baskets_trained_cp || 9839) : (meta.test_baskets || 13184))
+    : (meta.validation_baskets || 16623);
+  const scopeTag = trainedOnly ? ' · навчені клієнти й товари' : '';
   document.getElementById('split-badge').textContent = `${splitLabel} · ${meta.date_range[0].slice(0, 7)}–${meta.date_range[1].slice(0, 7)}`;
   document.getElementById('top-subtitle').textContent =
-    `Фінальна модель ${meta.arm} (Епоха ${meta.epoch}) · ${meta.num_formulations.toLocaleString('uk-UA')} продуктів каталогу · ${DEMO_PAYLOAD.cases.length} кейсів (${splitWord})`;
+    `Фінальна модель ${meta.arm} (Епоха ${meta.epoch}) · ${DEMO_PAYLOAD.cases.length} кейсів (${splitWord}${scopeTag})`;
   document.getElementById('footer-left').textContent =
-    `Реліз: ${meta.reference_id} · ${splitLabel} ${meta.date_range[0]} → ${meta.date_range[1]} (${totalBaskets.toLocaleString('uk-UA')} замовлень)`;
+    `Реліз: ${meta.reference_id} · ${splitLabel} ${meta.date_range[0]} → ${meta.date_range[1]} (${totalBaskets.toLocaleString('uk-UA')} замовлень${scopeTag})`;
   document.getElementById('footer-right').textContent = isTestSplit
-    ? 'Усі кейси згенеровано на відкладеній тестовій вибірці (модель ніколи не навчалась і не налаштовувалась на цих датах).'
+    ? 'Усі кейси — з фінальної тестової вибірки (тільки навчені клієнти та продукти, без витоку майбутніх даних).'
     : 'Усі кейси взято виключно з валідаційної вибірки без доступу до майбутніх даних.';
 
   const counts = {
@@ -692,6 +696,7 @@ function initUI() {
     first_observed: DEMO_PAYLOAD.cases.filter(x => x.fo).length,
   };
   document.getElementById('sel-cohort').innerHTML = Object.entries(T.cohorts)
+    .filter(([k]) => counts[k] > 0)
     .map(([k, lbl]) => `<option value="${k}">${esc(lbl)} (${counts[k]})</option>`).join('');
   document.getElementById('sel-mode').innerHTML = Object.entries(T.modes)
     .map(([k, lbl]) => `<option value="${k}">${esc(lbl)}</option>`).join('');

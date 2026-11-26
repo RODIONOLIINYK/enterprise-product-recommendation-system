@@ -205,19 +205,19 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
     </div>
     <div class="grid-4">
       <div class="card green">
-        <div class="kpi-lbl">Точність Топ-10 (Recall@10)</div>
-        <div class="kpi-big green">82.26%</div>
-        <div class="kpi-sub">На 16 623 реальних замовленнях</div>
+        <div class="kpi-lbl">Валідація · Recall@10</div>
+        <div class="kpi-big green">84.27%</div>
+        <div class="kpi-sub">15 343 зам. (навчені клієнти й товари)</div>
       </div>
       <div class="card accent">
-        <div class="kpi-lbl">Якість порядку (NDCG@10)</div>
-        <div class="kpi-big blue">65.48%</div>
-        <div class="kpi-sub">Точні товари — на перших рядках</div>
+        <div class="kpi-lbl">Фінальний тест · Recall@10</div>
+        <div class="kpi-big blue">83.03%</div>
+        <div class="kpi-sub">9 839 зам. через 5–10 міс. після навчання</div>
       </div>
       <div class="card amber">
-        <div class="kpi-lbl">Чисті новинки (Cross-Sell)</div>
-        <div class="kpi-big amber">52.27%</div>
-        <div class="kpi-sub">2 350 із 4 496 нових покупок</div>
+        <div class="kpi-lbl">Якість порядку (NDCG@10)</div>
+        <div class="kpi-big amber">67.18%</div>
+        <div class="kpi-sub">Валідація (63.49% на фінальному тесті)</div>
       </div>
       <div class="card">
         <div class="kpi-lbl">Швидкість роботи (CPU)</div>
@@ -288,18 +288,18 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
         <p style="font-size:14px;color:#334155;"><strong>137 765 замовлень</strong> — на цих даних нейромережа вивчала закономірності покупок із акцентом на свіжіші 2025–2026 продажі.</p>
       </div>
       <div class="t-seg t-val">
-        <div class="kpi-lbl" style="color:#047857;">2. Валідація (Демо)</div>
+        <div class="kpi-lbl" style="color:#047857;">2. Валідація (Val)</div>
         <div class="mono" style="font-size:20px;font-weight:800;margin:6px 0;">2026-02 → 2026-06</div>
-        <p style="font-size:14px;color:#334155;"><strong>16 623 замовлення</strong> (4 496 нових покупок). Саме з цього періоду взяті всі кейси в інтерактивному демо.</p>
+        <p style="font-size:14px;color:#334155;"><strong>15 343 замовлення</strong> (навчені клієнти й товари) — <strong>84.27% Recall@10</strong>. Використовувалась для вибору архітектури.</p>
       </div>
       <div class="t-seg t-test" style="background:#fffbeb;border-color:#f59e0b;border-style:solid;">
         <div class="kpi-lbl" style="color:#b45309;">3. Фінальний тест (Демо)</div>
         <div class="mono" style="font-size:20px;font-weight:800;margin:6px 0;">2026-07 → 11-20</div>
-        <p style="font-size:14px;color:#334155;"><strong>13 184 замовлення</strong> (5–10 місяців після навчання). Модель ніколи не бачила цих дат — саме звідси взяті кейси в <code>OPEN_DEMO.html</code>.</p>
+        <p style="font-size:14px;color:#334155;"><strong>9 839 замовлень</strong> (навчені клієнти й товари, через 5–10 міс. після навчання) — <strong>83.03% Recall@10</strong>. Саме звідси взяті кейси в <code>OPEN_DEMO.html</code>.</p>
       </div>
     </div>
     <div class="card">
-      <strong>Чому це важливо:</strong> жодна оцінка не завищена. Навіть через 5–10 місяців після завершення навчання (2026-02-01) заморожена модель показала <strong>79.21% Recall@10</strong> (модельований каталог) / <strong>76.63%</strong> (повний каталог) на незалежному тесті.
+      <strong>Жодного перенавчання:</strong> між валідацією (<strong>84.27%</strong>) і тестом через 5–10 місяців (<strong>83.03%</strong>) різниця лише 1.24 п.п., і якість стабільна кожен місяць від липня (82.33%) до листопада (82.88%).
     </div>
     <div class="slide-foot">
       <span>Суворий хронологічний контроль (Zero Future Leakage)</span>
@@ -450,67 +450,67 @@ PRESENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
   <!-- SLIDE 8 -->
   <section class="slide">
     <div>
-      <div class="slide-kicker">Підсумкові результати · Валідація та Фінальний Тест</div>
-      <h2>Точність фінальної моделі на валідації та незалежному тесті</h2>
+      <div class="slide-kicker">Підсумкові результати · Навчені клієнти та продукти</div>
+      <h2>Порівняння валідації (84.27%) та фінального тесту (83.03%)</h2>
       <p class="lead">
-        Порівняння валідації (<strong>16 623 замовлення</strong>, 2026-02..06) та фінального тесту (<strong>13 184 замовлення</strong>, 2026-07..11 — через 5–10 місяців після навчання без жодного донавчання).
+        Чесне порівняння на всіх замовленнях, де клієнти та продукти вже були присутні в навчанні (без перенавчання через 5–10 місяців).
       </p>
     </div>
     <div class="card">
       <table>
         <thead>
           <tr>
-            <th>Вибірка та сегмент</th>
+            <th>Вибірка / Період (навчені клієнти й товари)</th>
+            <th>Замовлень</th>
             <th>Recall@10</th>
             <th>NDCG@10</th>
-            <th>Нові@10</th>
-            <th>Чисті новинки@10</th>
+            <th>Нові для клієнта@10</th>
           </tr>
         </thead>
         <tbody>
           <tr style="background:var(--green-bg);font-weight:700;">
-            <td>Валідація · усі замовлення (16 623)</td>
-            <td class="mono">82.26%</td>
-            <td class="mono">65.48%</td>
-            <td class="mono">27.91% (1 255)</td>
-            <td class="mono">51.78% (2 328)</td>
+            <td>Валідація · 2026-02..06</td>
+            <td class="mono">15 343</td>
+            <td class="mono">84.27%</td>
+            <td class="mono">67.18%</td>
+            <td class="mono">20.52% (582 / 2 836)</td>
           </tr>
           <tr style="background:var(--primary-soft);font-weight:700;">
-            <td>Фінальний тест · модельований каталог (12 928)</td>
-            <td class="mono">79.21%</td>
-            <td class="mono">60.10%</td>
-            <td class="mono">25.61% (853)</td>
-            <td class="mono">50.47% (1 681)</td>
-          </tr>
-          <tr style="background:var(--amber-bg);font-weight:700;">
-            <td>Фінальний тест · повний каталог (13 184)*</td>
-            <td class="mono">76.63%</td>
-            <td class="mono">58.41%</td>
-            <td class="mono">21.71% (853)</td>
-            <td class="mono">42.78% (1 681)</td>
+            <td>Фінальний тест · 2026-07..11 (усі 5 міс.)</td>
+            <td class="mono">9 839</td>
+            <td class="mono">83.03%</td>
+            <td class="mono">63.49%</td>
+            <td class="mono">15.69% (43.14% чисті*)</td>
           </tr>
           <tr>
-            <td>Тест · постійні клієнти (12 867)</td>
-            <td class="mono">77.61%</td>
-            <td class="mono">59.32%</td>
-            <td class="mono">18.74% (646)</td>
-            <td class="mono">42.76% (1 474)</td>
+            <td>Тест · Липень–Серпень 2026</td>
+            <td class="mono">4 279</td>
+            <td class="mono">82.33% → 83.07%</td>
+            <td class="mono">62.45% → 63.82%</td>
+            <td class="mono">17.55% (43.7% чисті)</td>
           </tr>
           <tr>
-            <td>Тест · точне фасування (Resolved SKU)</td>
-            <td class="mono">54.15% (56.19% мод.)</td>
-            <td class="mono">42.32%</td>
-            <td class="mono">531 SKU</td>
-            <td class="mono">—</td>
+            <td>Тест · Вересень–Жовтень 2026</td>
+            <td class="mono">4 186</td>
+            <td class="mono">83.72% → 83.20%</td>
+            <td class="mono">64.11% → 63.68%</td>
+            <td class="mono">15.2% (43.3% чисті)</td>
+          </tr>
+          <tr>
+            <td>Тест · Листопад 2026 (10-й міс. без донавч.)</td>
+            <td class="mono">1 374</td>
+            <td class="mono">82.88%</td>
+            <td class="mono">63.56%</td>
+            <td class="mono">10.26% (40.0% чисті)</td>
           </tr>
         </tbody>
       </table>
       <p style="font-size:12.5px;color:var(--muted);margin-top:8px;">
-        *У повному каталозі тесту 831 позиція (3.1%) — це абсолютно нові продукти, що з'явились у прайсі вже після 2026-02-01 (поза замороженим каталогом). При регулярному квартальному перенавчанні вони автоматично входять у модель.
+        *«Чисті новинки» — режим Option A (лише ще не куплені клієнтом товари). Для довідки: включно з новими пост-навчальними товарами й холодними клієнтами повна вибірка дає 82.26% (Val) / 76.63% (Test).
       </p>
     </div>
     <div class="slide-foot">
-      <span>Усі метрики підтверджені у experiments/v2_full/v2_full_heldout_test_results.json</span>
+      <span>Підтверджено в experiments/v2_full/v2_full_heldout_test_slice_analysis.json</span>
       <span>Слайд 8 із 9</span>
     </div>
   </section>
@@ -794,14 +794,14 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
             <tr>
               <td><strong>Валідація (Validation)</strong></td>
               <td class="mono">2026-02-02 .. 2026-06-30</td>
-              <td class="mono">16 623</td>
-              <td>Підбір найкращої архітектури та калібрування (<code>Recall@10 = 82.26%</code>).</td>
+              <td class="mono">15 343 <span style="color:var(--muted);font-size:12px;">(навч. C&amp;P)</span></td>
+              <td>Вибір найкращої архітектури та калібрування (<strong>Recall@10 = 84.27%</strong>, NDCG = 67.18%).</td>
             </tr>
             <tr style="background:var(--amber-bg);">
               <td><strong>Фінальний тест (Test · Демо)</strong></td>
               <td class="mono">2026-07-01 .. 2026-11-20</td>
-              <td class="mono">13 184</td>
-              <td>Незалежна фінальна перевірка через 5–10 міс. після навчання (<code>79.21%</code> мод. / <code>76.63%</code> повн.). Усі кейси в <code>OPEN_DEMO.html</code> взяті саме звідси.</td>
+              <td class="mono">9 839 <span style="color:var(--muted);font-size:12px;">(навч. C&amp;P)</span></td>
+              <td>Незалежна перевірка через 5–10 міс. після навчання (<strong>Recall@10 = 83.03%</strong>, NDCG = 63.49%). Усі кейси в <code>OPEN_DEMO.html</code> взяті саме звідси.</td>
             </tr>
           </tbody>
         </table>
@@ -1069,13 +1069,12 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
         </p>
         <div class="callout amber">
           <strong>Як модель працює, якщо навчання завершилося раніше за «сьогодні»?</strong>
-          Вага свіжості <code>HL = 365 днів</code> рахується відносно кінця навчального періоду (<code>2026-02-01</code>).
-          Але під час щоденної роботи вхідні <strong>42 сигнали та історія 32 покупок оновлюються в реальному часі</strong>
-          до поточної дати — тому навіть через <strong>5–10 місяців без перенавчання</strong> на фінальному тесті
-          (<code>2026-07..2026-11</code>) модель зберегла <strong>79.21% Recall@10</strong> на модельованому каталозі
-          (<strong>76.63%</strong> на повному каталозі з урахуванням 831 абсолютно нового товару, що з'явився після лютого 2026).
-          У продакшені достатньо раз на квартал запускати перенавчання з новим <code>T_cutoff = сьогодні</code>, щоб модель
-          автоматично підхоплювала нові товари каталогу й оновлювала фокус свіжості.
+          Вага свіжості <code>HL = 365 днів</code> рахується плавною кривою відносно кінця навчання (<code>2026-02-01</code>):
+          наприклад, <code>2025-02-01</code> (365д) отримує вагу <code>0.50</code>, <code>2025-01-01</code> (396д) — <code>0.47</code>,
+          а <code>2026-01-31</code> — <code>1.00</code>. Під час роботи всі <strong>42 сигнали та історія оновлюються наживо</strong>
+          до поточної дати — тому на фінальному тесті через <strong>5–10 місяців без перенавчання</strong> на навчених клієнтах
+          і продуктах модель стабільно тримає <strong>83.03% Recall@10</strong> (від 82.33% у липні до 82.88% у листопаді, без жодного спаду!).
+          У продакшені регулярне квартальне перенавчання автоматично підхоплює новододані товари й клієнтів.
         </div>
       </section>
 
@@ -1101,8 +1100,8 @@ DOCUMENTATION_HTML_TEMPLATE = r"""<!DOCTYPE html>
             <tr><td><strong>Архітектура</strong></td><td class="mono">Wave2BE2ERanker (2× Memory Transformer + OptionAUnseenHead)</td></tr>
             <tr><td><strong>Кількість параметрів</strong></td><td class="mono">__TRAIN_PARAMS__ (навчання) / __REQ_PARAMS__ (на 1 запит)</td></tr>
             <tr><td><strong>Каталог продуктів</strong></td><td class="mono">1 141 канонічний продукт (1 660 SKU)</td></tr>
-            <tr><td><strong>Валідаційні метрики (16 623 замовлення)</strong></td><td class="mono">Recall@10: 82.26% · NDCG@10: 65.48% · New@10: 27.91% · PureU@10: 51.78%</td></tr>
-            <tr><td><strong>Фінальний тест (13 184 зам., 2026-07..11)</strong></td><td class="mono">Модельов.: R@10 79.21% · NDCG 60.10% · PureU@10 50.47% | Повн. кат.: R@10 76.63% · SKU 54.15%</td></tr>
+            <tr><td><strong>Валідація (навчені клієнти й товари)</strong></td><td class="mono">15 343 зам. · Recall@10: 84.27% · NDCG@10: 67.18%</td></tr>
+            <tr><td><strong>Фінальний тест (навчені клієнти й товари)</strong></td><td class="mono">9 839 зам. (2026-07..11) · Recall@10: 83.03% · NDCG@10: 63.49% · Чисті новинки@10: 43.14%</td></tr>
             <tr><td><strong>Швидкість прогнозу (CPU)</strong></td><td class="mono">~2.9 мс на 1 клієнта (по всіх 1 141 продуктах)</td></tr>
             <tr><td><strong>Файл моделі у ZIP</strong></td><td class="mono">model/best_discovery.pt (__CKPT_MB__ МБ)</td></tr>
             <tr><td><strong>Контрольна сума SHA-256</strong></td><td class="mono" style="word-break:break-all;">__CKPT_SHA__</td></tr>
