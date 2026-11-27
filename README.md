@@ -1,46 +1,130 @@
+<div align="center">
+
 # Enterprise Product Recommendation System
 
-<p align="center">
-  <img alt="Python 3.12" src="https://img.shields.io/badge/Python%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-  <img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" />
-  <img alt="CUDA" src="https://img.shields.io/badge/CUDA-76B900?style=for-the-badge&logo=nvidia&logoColor=white" />
-  <img alt="Hugging Face" src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" />
-  <img alt="CatBoost" src="https://img.shields.io/badge/CatBoost-FFCC00?style=for-the-badge&logoColor=black" />
-  <img alt="scikit-learn" src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" />
-  <img alt="NumPy" src="https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white" />
-  <img alt="pandas" src="https://img.shields.io/badge/pandas-150458?style=for-the-badge&logo=pandas&logoColor=white" />
-  <img alt="Apache Arrow" src="https://img.shields.io/badge/Apache%20Arrow-000000?style=for-the-badge&logo=apachearrow&logoColor=white" />
-  <img alt="Google Colab" src="https://img.shields.io/badge/Google%20Colab-F9AB00?style=for-the-badge&logo=googlecolab&logoColor=white" />
-  <img alt="pytest" src="https://img.shields.io/badge/pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white" />
-  <img alt="Ruff" src="https://img.shields.io/badge/Ruff-D7FF64?style=for-the-badge&logo=ruff&logoColor=black" />
-</p>
+### An end-to-end Transformer-based engine for B2B next-basket prediction
 
-**A B2B next-basket recommendation engine built on real ERP transaction data, combining semantic embeddings, purchase-history Transformers and point-in-time commercial features to predict what a business customer will buy next.**
+Predict what a business customer will buy next using **real ERP transactions**, semantic product embeddings, purchase-history attention and point-in-time commercial features.
+
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-CUDA-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Transformers](https://img.shields.io/badge/Hugging%20Face-BGE--M3-FFD21E?logo=huggingface&logoColor=black)](https://huggingface.co/BAAI/bge-m3)
+[![CatBoost](https://img.shields.io/badge/CatBoost-GBDT-FFCC00?logoColor=black)](https://catboost.ai/)
+[![Data](https://img.shields.io/badge/pandas-Parquet-150458?logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![Tests](https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![Code style](https://img.shields.io/badge/code%20style-Ruff-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
+
+**Privacy-first · End-to-end learning · Leakage-aware · Full-catalogue ranking · CPU inference**
 
 | Recall@10 · trained entities | Recall@10 · full test | Training baskets | CPU model inference |
 | :---: | :---: | :---: | :---: |
-| **83.03%** | **76.63%** | **137,765** | **7.17 ms median** |
+| **83.03%** | **76.63%** | **137,765** | **7.17 ms** |
 
-**83.03% Recall@10 on 9,839 held-out orders from customers and products represented during training.** Across all 13,184 held-out orders, including unseen entities and out-of-catalogue targets, the model achieves 76.63% Recall@10.
+83.03% Recall@10 on 9,839 held-out orders involving customers and products represented during training; 76.63% across all 13,184 held-out orders. CPU latency is the median model-forward time on Colab, excluding upstream feature preparation.
 
-The 1.37M-parameter model scores all 1,141 modeled product formulations in a single pass. CPU latency was measured on Colab, excluding upstream feature preparation.
+[Results](#evaluation) · [Architecture](#architecture) · [Technology stack](#technology-stack) · [Model evolution](#model-evolution) · [Quick start](#quick-start)
 
-[Evaluation results](#evaluation) · [Architecture](#architecture) · [Model evolution](#model-evolution) · [Run locally](#run-locally)
+</div>
 
-## The problem
+---
 
-Unlike consumer recommenders, B2B purchasing is driven by replenishment cycles, technical product requirements, purchasing patterns and customer-specific commercial context. The system must recommend both previously purchased products and products that a customer has never bought.
+## Why this project stands out
 
-Given a customer, their purchase history and information available at recommendation time, the engine ranks the product catalogue and returns the ten most relevant formulations, with a deterministic resolver for purchasable SKU variants.
+B2B purchasing is shaped by replenishment cycles, technical product requirements and customer-specific commercial context. The engine ranks both repeat purchases and products a customer has never bought, returning the ten most relevant formulations with a deterministic SKU resolver.
 
-## Engineering highlights
+This repository implements the full machine learning lifecycle, rather than just a training script:
 
-- Designed and trained a custom, end-to-end attention-based ranking architecture rather than relying on an off-the-shelf recommender.
-- Built chronological data preparation and rolling feature pipelines over a multi-year ERP ledger, including safeguards against temporal leakage.
-- Combined multilingual semantic embeddings, parsed technical specifications, collaborative filtering signals and transactional statistics.
-- Benchmarked neural architectures against global popularity and CatBoost, then eliminated the retrieval stage when full-catalogue scoring proved practical.
-- Implemented a separate product-discovery head, multi-task supervision, customer-grouped out-of-fold calibration and recency-weighted training.
-- Built a local interactive PyTorch inference server, benchmark tooling, regression tests and checksum-verified model artifacts.
+- prepares multi-year ERP data and builds strictly chronological evaluation splits;
+- extracts semantic embeddings, technical product specifications, transactional and collaborative filtering features;
+- develops and benchmarks CatBoost, Two-Tower retrieval, neural reranking and full-catalogue architectures;
+- jointly trains product and customer representations using a custom 1.37M-parameter Transformer ranker;
+- improves product discovery through a dedicated prediction head, auxiliary supervision and out-of-fold calibration;
+- diagnoses temporal leakage, cold-start performance and the effects of recency weighting;
+- serves predictions through a local interactive PyTorch inference server.
+
+## What this demonstrates
+
+| Area | Evidence in this repository |
+|---|---|
+| Deep learning | Jointly trained product and customer encoders, Transformer memory, statistics-biased cross-attention |
+| Classical ML | CatBoost baselines, collaborative filtering, full-catalogue learning to rank |
+| Data engineering | ERP cleaning, product identity resolution, rolling point-in-time feature computation |
+| Applied ML research | Architecture comparisons, feature ablations, temporal-shift and cold-start analysis |
+| Training optimization | AdamW, CUDA BF16, cosine scheduling, multi-task learning, recency-weighted loss |
+| Reproducibility | Fixed seeds, checkpoint provenance, SHA-256 verification, saved evaluation reports |
+| Software engineering | Modular Python package, CLI, regression tests, Ruff |
+| Model serving | Cached product embeddings, vectorized CPU ranking, interactive local HTTP server |
+
+## Architecture
+
+The final `Wave2BE2ERanker` scores the entire modeled catalogue in one pass. Product representations and customer encoders are jointly optimized for ranking, with product embeddings cached at catalogue refresh for CPU serving.
+
+```mermaid
+flowchart TD
+    P[Product text + technical specs + attributes] --> PT[Product tower: 128D]
+    C[Customer text + profile features] --> CT[Customer profile token]
+    H[Last 32 purchase events] --> HM[History tokens]
+    PT --> HM
+    CT --> MEM[Two Transformer memory blocks]
+    HM --> MEM
+    PT --> ATT[Product-to-memory cross-attention]
+    MEM --> ATT
+    F[42 point-in-time candidate features] --> ATT
+    ATT --> MAIN[Main ranking head]
+    F --> MAIN
+    ATT --> NEW[New-to-customer product head]
+    F --> NEW
+    MAIN --> BLEND[Calibrated score fusion]
+    NEW --> BLEND
+    BLEND --> TOP[Top 10 formulations + SKU resolution]
+```
+
+| Component | Implementation |
+| :--- | :--- |
+| Semantic representation | BAAI BGE-M3, 1,024-dimensional embeddings |
+| Product tower | Text, 65 structured technical-spec features and categorical embeddings → 128D |
+| Customer memory | Profile token + up to 32 historical product tokens; two Transformer layers, eight attention heads |
+| Candidate interaction | Product-query cross-attention with learned bilinear statistical bias |
+| Ranking | Main MLP and separate discovery head, with customer-grouped OOF affine calibration |
+| Training | AdamW, cosine learning-rate schedule, gradient clipping, CUDA bfloat16 mixed precision, 60-day auxiliary supervision and recency weighting |
+| Serving | Cached product embeddings; vectorized full-catalogue ranking on CPU |
+
+The promoted model has 1,370,564 trainable parameters and was trained in approximately 47 minutes in the recorded CUDA run. Its reference CPU model-forward benchmark reports 7.17 ms median and 8.64 ms p95 over all 1,141 formulations.
+
+[Model implementation](recommender/experiments/v2_full/wave2b_models.py) · [Training pipeline](recommender/experiments/v2_full/run_v2_full_wave2.py) · [CatBoost benchmark](recommender/experiments/v2_full/run_v2_full_catboost.py)
+
+## Technology stack
+
+<div align="center">
+
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg" height="48" alt="Python" />
+&nbsp;&nbsp;
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/pytorch/pytorch-original.svg" height="48" alt="PyTorch" />
+&nbsp;&nbsp;
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/numpy/numpy-original.svg" height="48" alt="NumPy" />
+&nbsp;&nbsp;
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/pandas/pandas-original.svg" height="48" alt="pandas" />
+&nbsp;&nbsp;
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/scikitlearn/scikitlearn-original.svg" height="48" alt="scikit-learn" />
+&nbsp;&nbsp;
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/jupyter/jupyter-original.svg" height="48" alt="Jupyter" />
+&nbsp;&nbsp;
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg" height="48" alt="Git" />
+&nbsp;&nbsp;
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" height="48" alt="GitHub" />
+
+</div>
+
+| Area | Technologies |
+| :--- | :--- |
+| Language | Python 3.12 |
+| Deep learning | PyTorch, CUDA, Transformer encoders, multi-head attention, mixed precision |
+| NLP / embeddings | Hugging Face Transformers, Sentence Transformers, BGE-M3 |
+| Classical ML | CatBoost, scikit-learn, collaborative filtering |
+| Data engineering | NumPy, pandas, Apache Arrow / Parquet, openpyxl |
+| Experimentation | Jupyter, Google Colab, chronological backtesting, ablation studies, ranking metrics |
+| Software engineering | pytest, Ruff, Git, SHA-256 artifact verification |
+| Inference and demo | Python HTTP server, PyTorch CPU inference, HTML/CSS/JavaScript |
 
 ## Evaluation
 
@@ -89,44 +173,6 @@ Recency weighting improves product generalization but does not solve customer co
 
 Evidence: [model reference and validation](experiments/v2_full/v2_full_reference.json) · [held-out test report](experiments/v2_full/v2_full_heldout_test_results.json) · [recency ablation](experiments/v2_full/v2_full_recency_vs_uniform_test_comparison.json)
 
-## Architecture
-
-The final `Wave2BE2ERanker` scores the entire modeled catalogue in one pass. Product representations and customer encoders are jointly optimized for ranking, with product embeddings cached at catalogue refresh for CPU serving.
-
-```mermaid
-flowchart TD
-    P[Product text + technical specs + attributes] --> PT[Product tower: 128D]
-    C[Customer text + profile features] --> CT[Customer profile token]
-    H[Last 32 purchase events] --> HM[History tokens]
-    PT --> HM
-    CT --> MEM[Two Transformer memory blocks]
-    HM --> MEM
-    PT --> ATT[Product-to-memory cross-attention]
-    MEM --> ATT
-    F[42 point-in-time candidate features] --> ATT
-    ATT --> MAIN[Main ranking head]
-    F --> MAIN
-    ATT --> NEW[New-to-customer product head]
-    F --> NEW
-    MAIN --> BLEND[Calibrated score fusion]
-    NEW --> BLEND
-    BLEND --> TOP[Top 10 formulations + SKU resolution]
-```
-
-| Component | Implementation |
-| :--- | :--- |
-| Semantic representation | BAAI BGE-M3, 1,024-dimensional embeddings |
-| Product tower | Text, 65 structured technical-spec features and categorical embeddings → 128D |
-| Customer memory | Profile token + up to 32 historical product tokens; two Transformer layers, eight attention heads |
-| Candidate interaction | Product-query cross-attention with learned bilinear statistical bias |
-| Ranking | Main MLP and separate discovery head, with customer-grouped OOF affine calibration |
-| Training | AdamW, cosine learning-rate schedule, gradient clipping, CUDA bfloat16 mixed precision, 60-day auxiliary supervision and recency weighting |
-| Serving | Cached product embeddings; vectorized full-catalogue ranking on CPU |
-
-The promoted model has 1,370,564 trainable parameters and was trained in approximately 47 minutes in the recorded CUDA run. Its reference CPU model-forward benchmark reports 7.17 ms median and 8.64 ms p95 over all 1,141 formulations.
-
-[Model implementation](recommender/experiments/v2_full/wave2b_models.py) · [Training pipeline](recommender/experiments/v2_full/run_v2_full_wave2.py) · [CatBoost benchmark](recommender/experiments/v2_full/run_v2_full_catboost.py)
-
 ## Model evolution
 
 The project evolved through controlled experiments, not simply through increasing model complexity.
@@ -144,27 +190,24 @@ The project evolved through controlled experiments, not simply through increasin
 
 These are historical milestones, **not a single controlled leaderboard**: earlier phases use the v1 SKU dataset (6,191 validation baskets), the full-pool phase uses canonical formulations (6,480), and the final two use the expanded v2 dataset (16,623). The first prototypes used sampled candidate sets and are excluded from the numerical comparison. Earlier measurements also preceded some leakage corrections. See [the full project history](PROJECT_HISTORY.md) for experimental scopes and the chronological engineering log.
 
-### Decisions that mattered
+## Core engineering decisions
 
-- **Measure the right target.** A data audit found that 24.5% of previously classified new-SKU targets were packaging changes rather than genuinely new formulations. Canonicalizing product identity made discovery evaluation more meaningful.
-- **Simplify when evidence supports it.** For a catalogue of this size, direct scoring removes the retrieval recall ceiling without requiring an approximate-nearest-neighbor service.
-- **Treat time as a first-class constraint.** Demand, purchase-history and commercial features must be available before the query timestamp. Validation and test are chronologically separated; artifact provenance protects against accidental reuse.
-- **Preserve unsuccessful experiments.** Frozen tower representations and several alternative attention biases reduced discovery performance. The strong CatBoost baseline and these negative results informed subsequent architectural changes.
+### Product identity and meaningful discovery
 
-## Technology stack
+A data audit found that 24.5% of previously classified new-SKU targets were packaging changes rather than genuinely new formulations. Canonicalizing product identity made discovery evaluation more meaningful.
+### Full-catalogue ranking instead of candidate truncation
 
-| Area | Technologies |
-| :--- | :--- |
-| Language | Python 3.12 |
-| Deep learning | PyTorch, CUDA, Transformer encoders, multi-head attention, mixed precision |
-| NLP / embeddings | Hugging Face Transformers, Sentence Transformers, BGE-M3 |
-| Classical ML | CatBoost, scikit-learn, collaborative filtering |
-| Data engineering | NumPy, pandas, Apache Arrow / Parquet, openpyxl |
-| Experimentation | Jupyter, Google Colab, chronological backtesting, ablation studies, ranking metrics |
-| Software engineering | pytest, Ruff, Git, SHA-256 artifact verification |
-| Inference and demo | Python HTTP server, PyTorch CPU inference, HTML/CSS/JavaScript |
+For a catalogue of this size, direct scoring removes the retrieval recall ceiling without requiring an approximate-nearest-neighbor service.
+### Leakage-resistant temporal evaluation
 
-## Run locally
+Demand, purchase-history and commercial features must be available before the query timestamp. Validation and test are chronologically separated; artifact provenance protects against accidental reuse.
+### Evidence-driven model development
+
+Frozen tower representations and several alternative attention biases reduced discovery performance. The strong CatBoost baseline and these negative results informed subsequent architectural changes.
+
+## Quick start
+
+### 1. Install dependencies
 
 ```bash
 git clone https://github.com/RODIONOLIINYK/enterprise-product-recommendation-system.git
@@ -174,7 +217,9 @@ source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
 ```
 
-Explore the data preparation and model training interfaces:
+### 2. Explore the pipeline
+
+Inspect the data preparation and model training interfaces:
 
 ```bash
 python -m recommender --help
@@ -182,14 +227,16 @@ python -m recommender.experiments.v2_full.run_v2_full_wave2 --help
 python -m recommender.experiments.v2_full.live_demo_server --help
 ```
 
-To launch interactive inference with an authorized local demo bundle:
+### 3. Run live inference
+
+Launch interactive inference with an authorized local demo bundle:
 
 ```bash
 python -m recommender.experiments.v2_full.live_demo_server \
   --bundle /path/to/test_live_bundle.pt.gz
 ```
 
-The demo runs locally at `http://127.0.0.1:8799/` and supports live model predictions and latency benchmarking. The source code and aggregate evaluation artifacts are public; private ERP data, embeddings, checkpoints and customer-level demo bundles are not included. Full training or live inference requires authorized local artifacts, so a fresh public checkout cannot reproduce the private-data benchmark by itself.
+The demo runs locally at `http://127.0.0.1:8799/` and supports live model predictions and latency benchmarking. Full training or live inference requires authorized local artifacts; see [Privacy and reproducibility](#privacy-and-reproducibility).
 
 ## Repository map
 
@@ -201,6 +248,19 @@ The demo runs locally at `http://127.0.0.1:8799/` and supports live model predic
 | [`tests/`](tests/) | Regression and pipeline tests |
 | [`notebooks/`](notebooks/) | Data exploration and experiment orchestration |
 | [`PROJECT_HISTORY.md`](PROJECT_HISTORY.md) | Chronological model development and research decisions |
+
+## Testing and code quality
+
+```bash
+python -m pytest
+ruff check .
+```
+
+The repository includes regression tests for feature generation, temporal evaluation, model architectures and artifact handling.
+
+## Privacy and reproducibility
+
+Source code and aggregate evaluation reports are public. Raw ERP records, private customer data, cached embeddings, trained checkpoints and customer-level demo bundles remain local and are excluded from version control. A fresh public checkout cannot reproduce the private-data benchmarks or launch trained inference without authorized artifacts.
 
 ## Project status
 
