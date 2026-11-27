@@ -1,14 +1,31 @@
 # Enterprise Product Recommendation System
 
+<p align="center">
+  <img alt="Python 3.12" src="https://img.shields.io/badge/Python%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+  <img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" />
+  <img alt="CUDA" src="https://img.shields.io/badge/CUDA-76B900?style=for-the-badge&logo=nvidia&logoColor=white" />
+  <img alt="Hugging Face" src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" />
+  <img alt="CatBoost" src="https://img.shields.io/badge/CatBoost-FFCC00?style=for-the-badge&logoColor=black" />
+  <img alt="scikit-learn" src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" />
+  <img alt="NumPy" src="https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white" />
+  <img alt="pandas" src="https://img.shields.io/badge/pandas-150458?style=for-the-badge&logo=pandas&logoColor=white" />
+  <img alt="Apache Arrow" src="https://img.shields.io/badge/Apache%20Arrow-000000?style=for-the-badge&logo=apachearrow&logoColor=white" />
+  <img alt="Google Colab" src="https://img.shields.io/badge/Google%20Colab-F9AB00?style=for-the-badge&logo=googlecolab&logoColor=white" />
+  <img alt="pytest" src="https://img.shields.io/badge/pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white" />
+  <img alt="Ruff" src="https://img.shields.io/badge/Ruff-D7FF64?style=for-the-badge&logo=ruff&logoColor=black" />
+</p>
+
 **A B2B next-basket recommendation engine built on real ERP transaction data, combining semantic embeddings, purchase-history Transformers and point-in-time commercial features to predict what a business customer will buy next.**
 
-`Python` · `PyTorch` · `Transformers` · `CatBoost` · `Learning to Rank` · `Recommender Systems`
-
-| Held-out Recall@10 | Training baskets | Model size | CPU inference |
+| Recall@10 · trained entities | Recall@10 · full test | Training baskets | CPU model inference |
 | :---: | :---: | :---: | :---: |
-| **76.63%** | **137,765** | **1.37M parameters** | **7.17 ms median** |
+| **83.03%** | **76.63%** | **137,765** | **7.17 ms median** |
 
-Evaluated on **13,184 future orders**; Recall@10 reaches **83.03%** for customers and products represented during training. The deployed-style inference benchmark scores all 1,141 modeled product formulations on a Colab CPU, excluding upstream feature preparation. [Evaluation results](#evaluation) · [Architecture](#architecture) · [Run locally](#run-locally)
+**83.03% Recall@10 on 9,839 held-out orders from customers and products represented during training.** Across all 13,184 held-out orders, including unseen entities and out-of-catalogue targets, the model achieves 76.63% Recall@10.
+
+The 1.37M-parameter model scores all 1,141 modeled product formulations in a single pass. CPU latency was measured on Colab, excluding upstream feature preparation.
+
+[Evaluation results](#evaluation) · [Architecture](#architecture) · [Model evolution](#model-evolution) · [Run locally](#run-locally)
 
 ## The problem
 
